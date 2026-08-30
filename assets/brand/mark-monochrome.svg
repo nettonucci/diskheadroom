@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="256" height="256" role="img" aria-labelledby="title">
+  <title id="title">Disk Headroom mark, monochrome</title>
+  <g fill="currentColor">
+    <path d="M50,14 L68,34 L57,34 L57,52 L43,52 L43,34 L32,34 Z"/>
+    <rect x="16" y="58" width="68" height="24" rx="9"/>
+    <rect x="26" y="69" width="20" height="5" rx="2.5" fill="#F5F5F7" opacity="0.55"/>
+  </g>
+</svg>

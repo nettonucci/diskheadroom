@@ -1,0 +1,257 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const mocks = vi.hoisted(() => ({
+  execFile: vi.fn(),
+  readFile: vi.fn(),
+  writeFile: vi.fn(),
+  mkdir: vi.fn(),
+  open: vi.fn(),
+  readdir: vi.fn(),
+  trashItem: vi.fn(),
+  openExternal: vi.fn(),
+  showItemInFolder: vi.fn(),
+  quit: vi.fn(),
+  getPath: vi.fn((key: string) => key === 'exe'
+    ? '/Applications/Disk Headroom.app/Contents/MacOS/Disk Headroom'
+    : '/tmp/diskheadroom'),
+  getLocale: vi.fn(() => 'pt_BR'),
+  isPackaged: true,
+  imageEmpty: false,
+  setTemplateImage: vi.fn(),
+  setContextMenu: vi.fn(),
+  setToolTip: vi.fn(),
+  trayOn: vi.fn(),
+  buildFromTemplate: vi.fn((template) => template),
+  createFromPath: vi.fn()
+}))
+
+vi.mock('node:child_process', () => ({
+  default: { execFile: mocks.execFile },
+  execFile: mocks.execFile
+}))
+vi.mock('node:fs/promises', () => {
+  const module = {
+    readFile: mocks.readFile,
+    writeFile: mocks.writeFile,
+    mkdir: mocks.mkdir,
+    open: mocks.open,
+    readdir: mocks.readdir,
+    lstat: vi.fn(),
+    readlink: vi.fn(),
+    stat: vi.fn()
+  }
+  return { default: module, ...module }
+})
+vi.mock('node:os', () => ({
+  default: { homedir: () => '/Users/test' },
+  homedir: () => '/Users/test'
+}))
+vi.mock('electron', () => {
+  class Tray {
+    setContextMenu = mocks.setContextMenu
+    setToolTip = mocks.setToolTip
+    on = mocks.trayOn
+  }
+  return {
+    app: {
+      getPath: mocks.getPath,
+      getLocale: mocks.getLocale,
+      get isPackaged() { return mocks.isPackaged },
+      quit: mocks.quit,
+      getAppPath: () => '/project'
+    },
+    shell: {
+      trashItem: mocks.trashItem,
+      openExternal: mocks.openExternal,
+      showItemInFolder: mocks.showItemInFolder
+    },
+    Tray,
+    Menu: { buildFromTemplate: mocks.buildFromTemplate },
+    nativeImage: { createFromPath: mocks.createFromPath }
+  }
+})
+
+import { trashPaths } from '../src/main/cleaner'
+import { getDiskInfo } from '../src/main/disk'
+import {
+  getGrantTarget,
+  getPermissionStatus,
+  openFullDiskAccessSettings,
+  revealGrantTarget
+} from '../src/main/permissions'
+import { loadSettings, saveSettings } from '../src/main/settings'
+import { createTray } from '../src/main/tray'
+
+function callbackResult(stdout: string, error: Error | null = null): void {
+  mocks.execFile.mockImplementationOnce((_cmd, _args, callback) => callback(error, { stdout, stderr: '' }))
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  Object.defineProperty(process, 'resourcesPath', {
+    value: '/resources',
+    configurable: true
+  })
+  mocks.isPackaged = true
+  mocks.imageEmpty = false
+  mocks.createFromPath.mockReturnValue({
+    isEmpty: () => mocks.imageEmpty,
+    setTemplateImage: mocks.setTemplateImage
+  })
+})
+
+describe('disk', () => {
+  it('parses df output', async () => {
+    callbackResult('Filesystem 1024-blocks Used Available Capacity iused ifree %iused Mounted on\n/dev/disk3s1s1 100 60 40 60% 1 2 1% /')
+    await expect(getDiskInfo()).resolves.toEqual({
+      mount: '/',
+      totalBytes: 102400,
+      usedBytes: 61440,
+      freeBytes: 40960
+    })
+  })
+
+  it('rejects malformed output', async () => {
+    callbackResult('Filesystem')
+    await expect(getDiskInfo()).rejects.toThrow('Unable to read disk capacity')
+  })
+
+  it('uses slash when df omits the mount column', async () => {
+    callbackResult('header\n/dev/disk 10 4 6')
+    await expect(getDiskInfo()).resolves.toMatchObject({ mount: '/' })
+  })
+})
+
+describe('settings', () => {
+  it('returns localized defaults when the file is absent', async () => {
+    mocks.readFile.mockRejectedValue(new Error('ENOENT'))
+    await expect(loadSettings()).resolves.toEqual({
+      unusedDays: 90,
+      setupComplete: false,
+      locale: 'pt-BR'
+    })
+  })
+
+  it('merges persisted settings and normalizes locale', async () => {
+    mocks.readFile.mockResolvedValue(JSON.stringify({ unusedDays: 180, locale: 'es-MX' }))
+    await expect(loadSettings()).resolves.toMatchObject({ unusedDays: 180, locale: 'es' })
+  })
+
+  it('uses the default locale when omitted', async () => {
+    mocks.readFile.mockResolvedValue(JSON.stringify({ setupComplete: true }))
+    await expect(loadSettings()).resolves.toMatchObject({ setupComplete: true, locale: 'pt-BR' })
+  })
+
+  it('creates the directory and writes formatted JSON', async () => {
+    const value = { unusedDays: 30 as const, setupComplete: true, locale: 'en' as const }
+    await saveSettings(value)
+    expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/diskheadroom', { recursive: true })
+    expect(mocks.writeFile).toHaveBeenCalledWith(
+      '/tmp/diskheadroom/settings.json',
+      JSON.stringify(value, null, 2),
+      'utf8'
+    )
+  })
+})
+
+describe('cleaner', () => {
+  it('rejects unsafe paths and reports partial failures', async () => {
+    mocks.trashItem
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('locked'))
+      .mockRejectedValueOnce('unknown')
+    const result = await trashPaths(
+      { paths: ['/', '/Users/test/cache-a', '/Users/test/cache-b', '/Users/test/cache-c'] },
+      new Map([
+        ['/Users/test/cache-a', 10],
+        ['/Users/test/cache-b', 20]
+      ])
+    )
+    expect(result).toEqual({
+      trashed: ['/Users/test/cache-a'],
+      failed: [
+        { path: '/', error: 'Path is outside the allowed scan roots' },
+        { path: '/Users/test/cache-b', error: 'locked' },
+        { path: '/Users/test/cache-c', error: 'Could not move to Trash' }
+      ],
+      bytesRequested: 30
+    })
+  })
+})
+
+describe('permissions', () => {
+  it('checks file and directory access', async () => {
+    mocks.open
+      .mockResolvedValueOnce({ close: vi.fn() })
+      .mockRejectedValueOnce(new Error('denied'))
+    mocks.readdir.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('denied'))
+    await expect(getPermissionStatus()).resolves.toEqual({
+      fullDiskAccess: true,
+      libraryCachesReadable: true,
+      applicationsReadable: false
+    })
+  })
+
+  it('falls back through System Settings URLs', async () => {
+    mocks.openExternal
+      .mockRejectedValueOnce(new Error('first'))
+      .mockRejectedValueOnce(new Error('second'))
+      .mockResolvedValueOnce(undefined)
+    await openFullDiskAccessSettings()
+    expect(mocks.openExternal).toHaveBeenCalledTimes(3)
+  })
+
+  it('stops after the first System Settings URL succeeds', async () => {
+    mocks.openExternal.mockResolvedValue(undefined)
+    await openFullDiskAccessSettings()
+    expect(mocks.openExternal).toHaveBeenCalledTimes(1)
+  })
+
+  it('describes packaged and development grant targets', () => {
+    process.env.__CFBundleIdentifier = 'com.apple.Terminal'
+    expect(getGrantTarget()).toEqual({
+      displayName: 'Disk Headroom',
+      bundlePath: '/Applications/Disk Headroom.app',
+      packaged: true,
+      launchedBy: 'Terminal'
+    })
+    process.env.__CFBundleIdentifier = 'com.nettonucci.diskheadroom'
+    expect(getGrantTarget().launchedBy).toBeNull()
+    process.env.__CFBundleIdentifier = 'com.example.UnknownLauncher'
+    expect(getGrantTarget().launchedBy).toBe('com.example.UnknownLauncher')
+    mocks.getPath.mockReturnValueOnce('/usr/local/bin/electron')
+    expect(getGrantTarget().bundlePath).toBe('/usr/local/bin/electron')
+    delete process.env.__CFBundleIdentifier
+    expect(getGrantTarget().launchedBy).toBeNull()
+  })
+
+  it('reveals the responsible bundle', () => {
+    revealGrantTarget()
+    expect(mocks.showItemInFolder).toHaveBeenCalledWith('/Applications/Disk Headroom.app')
+  })
+})
+
+describe('tray', () => {
+  it('creates and relocalizes its menu', () => {
+    const actions = { showWindow: vi.fn(), scanNow: vi.fn(), openDonate: vi.fn() }
+    const controller = createTray(actions, 'en')
+    expect(mocks.setTemplateImage).toHaveBeenCalledWith(true)
+    expect(mocks.setToolTip).toHaveBeenCalledWith('Disk Headroom')
+    expect(mocks.trayOn).toHaveBeenCalledWith('click', actions.showWindow)
+    expect(mocks.setContextMenu).toHaveBeenCalledTimes(1)
+
+    controller.setLocale('pt-BR')
+    const menu = mocks.buildFromTemplate.mock.calls.at(-1)?.[0]
+    expect(menu[0].label).toBe('Abrir Disk Headroom')
+    menu[5].click()
+    expect(mocks.quit).toHaveBeenCalled()
+  })
+
+  it('supports an empty image and development resource path', () => {
+    mocks.imageEmpty = true
+    mocks.isPackaged = false
+    createTray({ showWindow: vi.fn(), scanNow: vi.fn(), openDonate: vi.fn() }, 'es')
+    expect(mocks.setTemplateImage).not.toHaveBeenCalled()
+    expect(mocks.createFromPath).toHaveBeenCalledWith('/project/resources/trayTemplate.png')
+  })
+})

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32" role="img" aria-labelledby="title">
+  <title id="title">Disk Headroom favicon</title>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#93AE8F"/>
+      <stop offset="100%" stop-color="#4C6449"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="100" height="100" rx="24" ry="24" fill="url(#bg)"/>
+  <path d="M50,15 L67,34 L57,34 L57,51 L43,51 L43,34 L33,34 Z" fill="#FFFFFF"/>
+  <rect x="17" y="57" width="66" height="23" rx="9" fill="#FFFFFF"/>
+</svg>

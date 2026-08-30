@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="22" height="22" role="img" aria-labelledby="title desc">
+  <title id="title">Disk Headroom menu bar icon (template)</title>
+  <desc id="desc">Pure black silhouette on transparent ground for macOS template images. No color, no gradients — the OS tints this automatically for light and dark menu bars. Rasterize to trayTemplate.png (18x18), trayTemplate@2x.png (36x36), trayTemplate@3x.png (44x44).</desc>
+  <g fill="#000000">
+    <path d="M50,16 L66,34 L56,34 L56,50 L44,50 L44,34 L34,34 Z"/>
+    <rect x="18" y="56" width="64" height="22" rx="8"/>
+  </g>
+</svg>

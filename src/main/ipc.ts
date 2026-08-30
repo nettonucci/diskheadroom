@@ -1,0 +1,58 @@
+import { clipboard, ipcMain, shell } from 'electron'
+import { SPONSORS_URL } from '../shared/constants'
+import type { AppSettings, CleanRequest, ScanItem } from '../shared/types'
+import { trashPaths } from './cleaner'
+import { getDiskInfo } from './disk'
+import {
+  getGrantTarget,
+  getPermissionStatus,
+  openFullDiskAccessSettings,
+  revealGrantTarget
+} from './permissions'
+import { runScan } from './scanner'
+import { loadSettings, saveSettings } from './settings'
+import type { TrayController } from './tray'
+
+interface IpcOptions {
+  sendToRenderer: (channel: string, payload?: unknown) => void
+  getTrayController: () => TrayController | null
+}
+
+export function registerIpc(options: IpcOptions): void {
+  let lastItems = new Map<string, ScanItem>()
+
+  ipcMain.handle('disk:info', () => getDiskInfo())
+  ipcMain.handle('permissions:status', () => getPermissionStatus())
+  ipcMain.handle('permissions:open-fda', () => openFullDiskAccessSettings())
+  ipcMain.handle('permissions:grant-target', () => getGrantTarget())
+  ipcMain.handle('permissions:reveal-target', () => revealGrantTarget())
+  ipcMain.handle('settings:get', () => loadSettings())
+  ipcMain.handle('settings:set', async (_event, next: AppSettings) => {
+    await saveSettings(next)
+    options.getTrayController()?.setLocale(next.locale)
+    return next
+  })
+  ipcMain.handle('scan:run', async (_event, unusedDays: AppSettings['unusedDays']) => {
+    const result = await runScan(unusedDays, (progress) => {
+      options.sendToRenderer('scan:progress', progress)
+    })
+    lastItems = new Map(result.items.map((item) => [item.path, item]))
+    return result
+  })
+  ipcMain.handle('clean:trash', async (_event, request: CleanRequest) => {
+    const sizes = new Map<string, number>()
+    for (const path of request.paths) {
+      sizes.set(path, lastItems.get(path)?.bytes ?? 0)
+    }
+    return trashPaths(request, sizes)
+  })
+  ipcMain.handle('shell:copy-text', (_event, text: string) => {
+    clipboard.writeText(text)
+  })
+  ipcMain.handle('shell:open-external', (_event, url: string) => {
+    if (url === SPONSORS_URL || url.startsWith('https://github.com/')) {
+      return shell.openExternal(url)
+    }
+    return Promise.resolve()
+  })
+}
