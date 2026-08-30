@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="256" height="256" role="img" aria-labelledby="title desc">
+  <title id="title">Disk Headroom mark</title>
+  <desc id="desc">Rounded-square badge with a drive and rising arrow, representing reclaimed disk space.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#93AE8F"/>
+      <stop offset="100%" stop-color="#4C6449"/>
+    </linearGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="1.4" stdDeviation="1.6" flood-color="#1D2A1B" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="100" height="100" rx="22" ry="22" fill="url(#bg)"/>
+  <ellipse cx="50" cy="14" rx="34" ry="14" fill="#FFFFFF" opacity="0.08"/>
+
+  <g filter="url(#softShadow)">
+    <path d="M50,14 L68,34 L57,34 L57,52 L43,52 L43,34 L32,34 Z" fill="#FFFFFF"/>
+    <rect x="16" y="58" width="68" height="24" rx="9" fill="#FFFFFF"/>
+    <rect x="26" y="69" width="20" height="5" rx="2.5" fill="#4C6449" opacity="0.6"/>
+  </g>
+</svg>

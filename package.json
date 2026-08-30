@@ -1,0 +1,62 @@
+{
+  "name": "diskheadroom",
+  "version": "1.0.0",
+  "description": "Give your Mac storage a second wind. Scan junk files and idle apps, then move them to Trash.",
+  "main": "./out/main/index.js",
+  "author": "Netto Nucci",
+  "license": "MIT",
+  "private": true,
+  "homepage": "https://github.com/nettonucci/diskheadroom",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nettonucci/diskheadroom.git"
+  },
+  "os": [
+    "darwin"
+  ],
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:app": "electron-vite build && open -n node_modules/electron/dist/Electron.app --args \"$PWD\"",
+    "start": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "build": "npm run typecheck && electron-vite build",
+    "build:mac": "npm run build && electron-builder --mac",
+    "build:unpack": "npm run build && electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps",
+    "icons": "node scripts/generate-icons.mjs",
+    "screenshots": "electron-vite build && electron scripts/screenshots/main.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "commitlint": "commitlint --from HEAD~1 --to HEAD --verbose",
+    "release": "semantic-release",
+    "release:dry": "semantic-release --dry-run --no-ci"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.6",
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.1.11",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
+    "electron": "^35.1.2",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^3.1.0",
+    "jsdom": "^29.1.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "semantic-release": "^24.2.5",
+    "sharp": "^0.35.4",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.3",
+    "vitest": "^4.1.11"
+  }
+}

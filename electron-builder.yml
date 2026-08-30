@@ -1,0 +1,34 @@
+appId: com.nettonucci.diskheadroom
+productName: Disk Headroom
+copyright: Copyright © 2026 Netto Nucci
+directories:
+  buildResources: build
+files:
+  - 'out/**/*'
+  - 'package.json'
+extraResources:
+  - from: resources
+    to: resources
+mac:
+  category: public.app-category.utilities
+  icon: build/icon.icns
+  # Ad-hoc signature: without one, the modified bundle keeps only Electron's
+  # linker signature and macOS refuses to launch it as damaged. Replace with a
+  # Developer ID once notarized releases start.
+  identity: '-'
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    NSDocumentsFolderUsageDescription: Disk Headroom needs access to your documents folder when you choose to scan user files for reclaimable space.
+    NSDownloadsFolderUsageDescription: Disk Headroom may inspect Downloads only for size reporting if you include it in a scan.
+    NSDesktopFolderUsageDescription: Disk Headroom does not scan the Desktop by default.
+    LSApplicationCategoryType: public.app-category.utilities
+dmg:
+  artifactName: ${productName}-${version}-mac.${ext}
+  title: Disk Headroom
+npmRebuild: false

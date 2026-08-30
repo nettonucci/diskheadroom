@@ -1,0 +1,126 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const mocks = vi.hoisted(() => ({
+  handlers: new Map<string, (...args: unknown[]) => unknown>(),
+  writeText: vi.fn(),
+  openExternal: vi.fn(),
+  getDiskInfo: vi.fn(),
+  getPermissionStatus: vi.fn(),
+  openFullDiskAccessSettings: vi.fn(),
+  getGrantTarget: vi.fn(),
+  revealGrantTarget: vi.fn(),
+  loadSettings: vi.fn(),
+  saveSettings: vi.fn(),
+  runScan: vi.fn(),
+  trashPaths: vi.fn()
+}))
+
+vi.mock('electron', () => {
+  const module = {
+    clipboard: { writeText: mocks.writeText },
+    ipcMain: {
+    handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+      mocks.handlers.set(channel, handler)
+    }
+    },
+    shell: { openExternal: mocks.openExternal }
+  }
+  return { default: module, ...module }
+})
+vi.mock('../src/main/disk', () => ({ getDiskInfo: mocks.getDiskInfo }))
+vi.mock('../src/main/permissions', () => ({
+  getPermissionStatus: mocks.getPermissionStatus,
+  openFullDiskAccessSettings: mocks.openFullDiskAccessSettings,
+  getGrantTarget: mocks.getGrantTarget,
+  revealGrantTarget: mocks.revealGrantTarget
+}))
+vi.mock('../src/main/settings', () => ({
+  loadSettings: mocks.loadSettings,
+  saveSettings: mocks.saveSettings
+}))
+vi.mock('../src/main/scanner', () => ({ runScan: mocks.runScan }))
+vi.mock('../src/main/cleaner', () => ({ trashPaths: mocks.trashPaths }))
+
+import { registerIpc } from '../src/main/ipc'
+
+const call = (channel: string, ...args: unknown[]): unknown => {
+  const handler = mocks.handlers.get(channel)
+  if (!handler) throw new Error(`Missing handler ${channel}`)
+  return handler({}, ...args)
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mocks.handlers.clear()
+})
+
+describe('IPC registration', () => {
+  it('wires information and permission handlers', async () => {
+    mocks.getDiskInfo.mockResolvedValue({ mount: '/' })
+    mocks.getPermissionStatus.mockResolvedValue({ fullDiskAccess: true })
+    mocks.getGrantTarget.mockReturnValue({ displayName: 'Disk Headroom' })
+    mocks.loadSettings.mockResolvedValue({ locale: 'en' })
+
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    expect(mocks.handlers.size).toBe(11)
+    await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
+    await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
+    expect(call('permissions:open-fda')).toBeUndefined()
+    expect(call('permissions:grant-target')).toEqual({ displayName: 'Disk Headroom' })
+    call('permissions:reveal-target')
+    expect(mocks.revealGrantTarget).toHaveBeenCalled()
+    await expect(call('settings:get')).resolves.toEqual({ locale: 'en' })
+  })
+
+  it('saves settings and updates the tray locale when available', async () => {
+    const setLocale = vi.fn()
+    registerIpc({
+      sendToRenderer: vi.fn(),
+      getTrayController: () => ({ setLocale } as never)
+    })
+    const next = { unusedDays: 90, setupComplete: true, locale: 'pt-BR' }
+    await expect(call('settings:set', next)).resolves.toEqual(next)
+    expect(mocks.saveSettings).toHaveBeenCalledWith(next)
+    expect(setLocale).toHaveBeenCalledWith('pt-BR')
+  })
+
+  it('stores scan sizes, forwards progress and cleans known paths', async () => {
+    const sendToRenderer = vi.fn()
+    mocks.runScan.mockImplementation(async (_days, onProgress) => {
+      onProgress({ phase: 'progress.done', percent: 100 })
+      return {
+        items: [{ path: '/Users/test/cache', bytes: 42 }],
+        scannedAt: '2025-01-01',
+        limited: false
+      }
+    })
+    mocks.trashPaths.mockResolvedValue({ trashed: [], failed: [], bytesRequested: 42 })
+    registerIpc({ sendToRenderer, getTrayController: () => null })
+
+    await call('scan:run', 90)
+    expect(sendToRenderer).toHaveBeenCalledWith('scan:progress', {
+      phase: 'progress.done',
+      percent: 100
+    })
+    const request = { paths: ['/Users/test/cache', '/Users/test/unknown'] }
+    await call('clean:trash', request)
+    expect(mocks.trashPaths).toHaveBeenCalledWith(
+      request,
+      new Map([
+        ['/Users/test/cache', 42],
+        ['/Users/test/unknown', 0]
+      ])
+    )
+  })
+
+  it('copies text and only opens approved external URLs', async () => {
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    call('shell:copy-text', 'hello')
+    expect(mocks.writeText).toHaveBeenCalledWith('hello')
+
+    await call('shell:open-external', 'https://github.com/sponsors/nettonucci')
+    await call('shell:open-external', 'https://github.com/nettonucci/diskheadroom')
+    await call('shell:open-external', 'https://example.com')
+    expect(mocks.openExternal).toHaveBeenCalledTimes(2)
+  })
+})

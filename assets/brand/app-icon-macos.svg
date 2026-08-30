@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024" role="img" aria-labelledby="title desc">
+  <title id="title">Disk Headroom app icon</title>
+  <desc id="desc">macOS-style app icon: sage-green squircle with a white drive and rising arrow. Source for build/icon.icns.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9DB799"/>
+      <stop offset="55%" stop-color="#6E8B6A"/>
+      <stop offset="100%" stop-color="#42583F"/>
+    </linearGradient>
+    <linearGradient id="drive" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F1F3EF"/>
+    </linearGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="1.2" stdDeviation="1.8" flood-color="#1D2A1B" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="100" height="100" rx="22.3" ry="22.3" fill="url(#bg)"/>
+  <ellipse cx="50" cy="10" rx="40" ry="16" fill="#FFFFFF" opacity="0.10"/>
+
+  <g filter="url(#softShadow)">
+    <path d="M50,14 L68,34 L57,34 L57,52 L43,52 L43,34 L32,34 Z" fill="url(#drive)"/>
+    <rect x="16" y="58" width="68" height="24" rx="9" fill="url(#drive)"/>
+    <rect x="26" y="69" width="20" height="5" rx="2.5" fill="#557052" opacity="0.65"/>
+  </g>
+</svg>
