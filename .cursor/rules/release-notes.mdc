@@ -1,0 +1,15 @@
+---
+description: Sempre criar um pacote em release-notes/ para cada feature visível (posts Instagram)
+alwaysApply: true
+---
+
+# Release notes para Instagram
+
+Ao entregar uma **feature** ou mudança visível no Disk Headroom, atualize `release-notes/` **na mesma task**, antes de considerar o trabalho pronto.
+
+Siga `release-notes/INSTRUCAO.md`.
+
+- Pasta `release-notes/AAAA-MM-DD-slug/` com `post.md` (Markdown, todos os dados) e `imagens/` (arquivos copiados, não só links).
+- Atualize o índice em `release-notes/README.md`.
+- Se a UI mudou, rode `npm run screenshots` e copie as capturas novas para essa pasta.
+- Não pule isso em `feat:`. Não crie pacote só para chore/ci/test interno.
