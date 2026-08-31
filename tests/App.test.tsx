@@ -143,7 +143,6 @@ describe('App', () => {
     })
     window.diskheadroom = bridge
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<App />)
 
     expect(await screen.findByText('Reclaim storage')).toBeInTheDocument()
@@ -161,6 +160,7 @@ describe('App', () => {
     expect(screen.getByText(/1 selected/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(bridge.trashItems).toHaveBeenCalled())
     expect(await screen.findByText(/Moved 1 item/)).toBeInTheDocument()
 
@@ -245,7 +245,6 @@ describe('App', () => {
       })
     })
     window.diskheadroom = bridge
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const user = userEvent.setup()
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
@@ -257,7 +256,8 @@ describe('App', () => {
 
     await user.click(screen.getByRole('checkbox'))
     await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/Docker Desktop/))
+    expect(screen.getByRole('dialog')).toHaveTextContent(/Docker Desktop/)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(bridge.trashItems).toHaveBeenCalled())
   })
 
@@ -422,9 +422,9 @@ describe('App', () => {
     expect(bridge.getDiskInfo).toHaveBeenCalledTimes(callsWhileVisible)
     Object.defineProperty(document, 'hidden', { value: false, configurable: true })
 
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/^Move 2 items/))
+    expect(screen.getByRole('dialog')).toHaveTextContent(/Move 2 items/)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(bridge.trashItems).toHaveBeenCalled())
   })
 
@@ -448,11 +448,25 @@ describe('App', () => {
   it('does not clean when confirmation is cancelled', async () => {
     const bridge = api()
     window.diskheadroom = bridge
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
     await user.click(await screen.findByRole('button', { name: 'Move to Trash' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(bridge.trashItems).not.toHaveBeenCalled()
+  })
+
+  it('does not clean when confirmation is dismissed with Escape', async () => {
+    const bridge = api()
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+    await user.click(await screen.findByRole('button', { name: 'Move to Trash' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(bridge.trashItems).not.toHaveBeenCalled()
   })
 
@@ -507,7 +521,6 @@ describe('App', () => {
       })
     })
     window.diskheadroom = bridge
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const user = userEvent.setup()
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
@@ -515,7 +528,8 @@ describe('App', () => {
     expect(screen.getByText(/Never recorded/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
     // A batch mixing Docker with ordinary caches must still warn about Docker.
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/Docker Desktop data/))
+    expect(screen.getByRole('dialog')).toHaveTextContent(/Docker Desktop data/)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
     expect(await screen.findByText(/2 items could not be moved/)).toBeInTheDocument()
     expect(screen.getByText(/Trash is emptied/)).toBeInTheDocument()
   })
