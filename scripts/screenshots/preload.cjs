@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('diskheadroom', {
   trashItems: async () => ({ trashed: [], failed: [], bytesRequested: 0 }),
   openExternal: async () => {},
   copyText: async () => {},
+  revealItem: async () => true,
   onScanProgress: noop,
   onTrayScan: noop,
   onTrayDonate: noop

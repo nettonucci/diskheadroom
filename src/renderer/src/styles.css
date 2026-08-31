@@ -375,11 +375,42 @@ input {
 
 .item {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   gap: 12px;
-  align-items: center;
+  align-items: start;
   padding: 10px 0;
   border-top: 1px solid var(--line);
+}
+
+.item-select {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.item-select input {
+  margin-top: 4px;
+}
+
+.item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.btn.compact {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 8px;
 }
 
 .path {

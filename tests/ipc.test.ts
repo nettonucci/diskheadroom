@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   writeText: vi.fn(),
   openExternal: vi.fn(),
+  showItemInFolder: vi.fn(),
   getDiskInfo: vi.fn(),
   getPermissionStatus: vi.fn(),
   openFullDiskAccessSettings: vi.fn(),
@@ -23,7 +24,7 @@ vi.mock('electron', () => {
       mocks.handlers.set(channel, handler)
     }
     },
-    shell: { openExternal: mocks.openExternal }
+    shell: { openExternal: mocks.openExternal, showItemInFolder: mocks.showItemInFolder }
   }
   return { default: module, ...module }
 })
@@ -38,7 +39,10 @@ vi.mock('../src/main/settings', () => ({
   loadSettings: mocks.loadSettings,
   saveSettings: mocks.saveSettings
 }))
-vi.mock('../src/main/scanner', () => ({ runScan: mocks.runScan }))
+vi.mock('../src/main/scanner', async () => {
+  const actual = await vi.importActual<typeof import('../src/main/scanner')>('../src/main/scanner')
+  return { ...actual, runScan: mocks.runScan }
+})
 vi.mock('../src/main/cleaner', () => ({ trashPaths: mocks.trashPaths }))
 
 import { registerIpc } from '../src/main/ipc'
@@ -62,7 +66,7 @@ describe('IPC registration', () => {
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(11)
+    expect(mocks.handlers.size).toBe(12)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
@@ -122,5 +126,29 @@ describe('IPC registration', () => {
     await call('shell:open-external', 'https://github.com/nettonucci/diskheadroom')
     await call('shell:open-external', 'https://example.com')
     expect(mocks.openExternal).toHaveBeenCalledTimes(2)
+  })
+
+  it('reveals only paths from the current scan that pass the safety check', async () => {
+    mocks.runScan.mockResolvedValue({
+      items: [
+        { path: '/Users/test/Library/Caches/a', bytes: 10 },
+        { path: '/', bytes: 1 }
+      ],
+      scannedAt: '2025-01-01',
+      limited: false
+    })
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+
+    expect(call('shell:reveal-item', '/Users/test/Library/Caches/a')).toBe(false)
+    expect(mocks.showItemInFolder).not.toHaveBeenCalled()
+
+    await call('scan:run', 90)
+    expect(call('shell:reveal-item', '/Users/test/Library/Caches/a')).toBe(true)
+    expect(mocks.showItemInFolder).toHaveBeenCalledWith('/Users/test/Library/Caches/a')
+
+    expect(call('shell:reveal-item', '/etc/passwd')).toBe(false)
+    expect(call('shell:reveal-item', '/')).toBe(false)
+    expect(call('shell:reveal-item', 42)).toBe(false)
+    expect(mocks.showItemInFolder).toHaveBeenCalledTimes(1)
   })
 })
