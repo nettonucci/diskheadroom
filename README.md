@@ -65,6 +65,7 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Xcode (opt-in) | DerivedData, iOS DeviceSupport, Archives, CoreSimulator caches, unavailable simulators, and simulators on older runtimes — **unchecked** until you choose them |
 | Android / Gradle / CocoaPods (opt-in) | `~/.gradle/caches`, CocoaPods cache, and conservative Android SDK leftover dirs — **unchecked**; the SDK install and AVDs are never listed |
 | Docker Desktop (opt-in) | Disk image and Buildx cache — **unchecked**, warning that images, containers, and volumes can be lost |
+| Documents & Desktop (opt-in) | First-level files and folders older than the idle window and at least 100 MB — **unchecked**; the Documents and Desktop folders themselves are never listed |
 | Idle apps | `/Applications` and `~/Applications`, skipping Apple system bundles |
 | Menu bar | Open, Scan now, Donate, Quit |
 | Languages | English, Português (Brasil), Español |
