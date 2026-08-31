@@ -1,7 +1,7 @@
 # Horário do scan e falhas visíveis
 
 - **Data:** 2026-08-31
-- **Commit / PR:** (preencher após o commit)
+- **Commit / PR:** `9cd304c` / [#37](https://github.com/nettonucci/diskheadroom/pull/37)
 - **Tipo:** melhoria de UI
 - **Público:** quem revisa o que o scan achou e o que foi para a Lixeira
 - **Formato sugerido no Instagram:** único (screenshot de resultados com o horário)
