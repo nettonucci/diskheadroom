@@ -36,56 +36,64 @@ const nameKeyFor = {
   coreSimulatorCaches: 'category.coreSimulatorCaches.title'
 }
 
+// Groups render in the order their first item appears, so the opt-in developer
+// leftovers are listed last to keep them together in the developer screenshot.
+const developerLeftovers = [
+  ['unavailableSimulators', 'iPhone 12', null, '~/Library/Developer/CoreSimulator/Devices/11111111-2222-3333-4444-555555555555', 3.4 * GB],
+  ['outdatedSimulators', 'iPhone 16 Pro (iOS 18.1)', null, '~/Library/Developer/CoreSimulator/Devices/22222222-3333-4444-5555-666666666666', 2.6 * GB],
+  ['androidDevCaches', null, 'category.androidDevCaches.gradle', '~/.gradle/caches', 6.2 * GB],
+  ['androidDevCaches', null, 'category.androidDevCaches.cocoapods', '~/Library/Caches/CocoaPods', 1.1 * GB]
+]
+
+const scanItems = [
+  ...items.map(([categoryId, name, path, bytes, selectedByDefault], index) => ({
+    id: `sample-${index}`,
+    categoryId,
+    name: name ?? '',
+    nameKey: name ? undefined : nameKeyFor[categoryId],
+    path,
+    bytes: Math.round(bytes),
+    selectedByDefault,
+    optional: !selectedByDefault,
+    lastUsedAt: null,
+    daysIdle: null
+  })),
+  ...apps.map(([name, bytes, idle], index) => ({
+    id: `sample-app-${index}`,
+    categoryId: 'unusedApps',
+    name,
+    path: `/Applications/${name}.app`,
+    bytes: Math.round(bytes),
+    selectedByDefault: false,
+    optional: true,
+    lastUsedAt: days(idle),
+    daysIdle: idle
+  })),
+  ...developerLeftovers.map(([categoryId, name, nameKey, path, bytes], index) => ({
+    id: `sample-dev-${index}`,
+    categoryId,
+    name: name ?? '',
+    nameKey: nameKey ?? undefined,
+    path,
+    bytes: Math.round(bytes),
+    selectedByDefault: false,
+    optional: true,
+    lastUsedAt: null,
+    daysIdle: null
+  }))
+]
+
 const scanResult = {
   scannedAt: new Date().toISOString(),
   limited: false,
-  items: [
-    ...items.map(([categoryId, name, path, bytes, selectedByDefault], index) => ({
-      id: `sample-${index}`,
-      categoryId,
-      name: name ?? '',
-      nameKey: name ? undefined : nameKeyFor[categoryId],
-      path,
-      bytes: Math.round(bytes),
-      selectedByDefault,
-      optional: !selectedByDefault,
-      lastUsedAt: null,
-      daysIdle: null
-    })),
-    ...apps.map(([name, bytes, idle], index) => ({
-      id: `sample-app-${index}`,
-      categoryId: 'unusedApps',
-      name,
-      path: `/Applications/${name}.app`,
-      bytes: Math.round(bytes),
-      selectedByDefault: false,
-      optional: true,
-      lastUsedAt: days(idle),
-      daysIdle: idle
-    })),
-    {
-      id: 'sample-sim-unavailable',
-      categoryId: 'unavailableSimulators',
-      name: 'iPhone 12',
-      path: '~/Library/Developer/CoreSimulator/Devices/11111111-2222-3333-4444-555555555555',
-      bytes: Math.round(3.4 * GB),
-      selectedByDefault: false,
-      optional: true,
-      lastUsedAt: null,
-      daysIdle: null
-    },
-    {
-      id: 'sample-sim-outdated',
-      categoryId: 'outdatedSimulators',
-      name: 'iPhone 16 Pro (iOS 18.1)',
-      path: '~/Library/Developer/CoreSimulator/Devices/22222222-3333-4444-5555-666666666666',
-      bytes: Math.round(2.6 * GB),
-      selectedByDefault: false,
-      optional: true,
-      lastUsedAt: null,
-      daysIdle: null
-    }
-  ]
+  items: scanItems
+}
+
+// The action bar floats above the list, so the overview capture uses a short
+// result that fits the window instead of slicing a row in half.
+const compactScanResult = {
+  ...scanResult,
+  items: scanItems.filter((item) => item.categoryId === 'userCaches')
 }
 
 module.exports = {
@@ -116,5 +124,6 @@ module.exports = {
     setupComplete: true,
     locale: 'en'
   },
-  scanResult
+  scanResult,
+  compactScanResult
 }

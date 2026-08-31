@@ -399,15 +399,19 @@ code {
 
 .footer-bar {
   position: sticky;
-  bottom: -36px;
+  bottom: 8px;
+  z-index: 5;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-top: 4px;
-  padding: 14px 0 18px;
-  background: var(--bg);
-  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  backdrop-filter: blur(24px);
+  box-shadow: var(--shadow);
 }
 
 select {

@@ -87,7 +87,10 @@ describe('path safety', () => {
     ['/Users/test/Library/Caches/x', true],
     ['/Applications/Foo.app', true],
     ['/Users/test/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw', true],
-    ['/Users/test/.docker/buildx', true]
+    ['/Users/test/.gradle/caches', true],
+    ['/Users/test/Library/Caches/CocoaPods', true],
+    ['/Users/test/.android/cache', true],
+    ['/Users/test/Library/Android/sdk/cache', true]
   ])('classifies %s', (path, safe) => {
     expect(isSafePath(path)).toBe(safe)
   })
@@ -161,8 +164,9 @@ describe('runScan', () => {
       'Never'
     ])
     expect(result.items.every((item) => item.bytes > 0)).toBe(true)
-    expect(progress).toHaveBeenCalledTimes(9)
+    expect(progress).toHaveBeenCalledTimes(10)
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.packageManagers', percent: 44 })
+    expect(progress).toHaveBeenCalledWith({ phase: 'progress.androidDev', percent: 68 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.docker', percent: 72 })
     expect(progress).toHaveBeenLastCalledWith({ phase: 'progress.done', percent: 100 })
   })
@@ -395,6 +399,50 @@ describe('runScan', () => {
     )
     expect(packageItems.every((item) => item.bytes > 0)).toBe(true)
     expect(result.items.some((item) => item.path === missingNpm)).toBe(false)
+  })
+
+  it('scans known Android, Gradle and CocoaPods leftover caches as opt-in', async () => {
+    const home = '/Users/test'
+    const caches = `${home}/Library/Caches`
+    const gradle = `${home}/.gradle/caches`
+    const cocoapods = `${caches}/CocoaPods`
+    const sdkCache = `${home}/Library/Android/sdk/cache`
+    const sdkRoot = `${home}/Library/Android/sdk`
+    const avd = `${home}/.android/avd`
+    const missingAndroidCache = `${home}/.android/cache`
+
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === caches) return ['CocoaPods', 'good']
+      if (path === gradle || path === cocoapods || path === sdkCache) return ['payload']
+      if (path === '/Applications' || path === `${home}/Applications`) return []
+      return []
+    })
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path === missingAndroidCache || path === sdkRoot || path === avd) throw new Error('missing')
+      if (path.endsWith('/payload') || path.endsWith('/good')) return file(200)
+      return directory
+    })
+
+    const result = await runScan(90, vi.fn())
+    const userCacheNames = result.items
+      .filter((item) => item.categoryId === 'userCaches')
+      .map((item) => item.name)
+    const mobileItems = result.items.filter((item) => item.categoryId === 'androidDevCaches')
+
+    expect(userCacheNames).toEqual(['good'])
+    expect(mobileItems.map((item) => item.nameKey)).toEqual([
+      'category.androidDevCaches.gradle',
+      'category.androidDevCaches.cocoapods',
+      'category.androidDevCaches.sdkCache'
+    ])
+    expect(mobileItems.map((item) => item.path)).toEqual([gradle, cocoapods, sdkCache])
+    expect(mobileItems.every((item) => item.selectedByDefault === false && item.optional === true)).toBe(
+      true
+    )
+    expect(mobileItems.every((item) => item.bytes > 0)).toBe(true)
+    expect(result.items.some((item) => item.path === missingAndroidCache)).toBe(false)
+    expect(result.items.some((item) => item.path === sdkRoot)).toBe(false)
+    expect(result.items.some((item) => item.path === avd)).toBe(false)
   })
 
   it('returns an empty limited result when roots are inaccessible', async () => {
