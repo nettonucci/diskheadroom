@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-labelledby="title desc">
+  <title id="title">Disk Headroom social preview</title>
+  <desc id="desc">1280x640 banner for GitHub social preview / Open Graph image.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7D9A7A"/>
+      <stop offset="55%" stop-color="#557052"/>
+      <stop offset="100%" stop-color="#2E3F2C"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="28%" r="60%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="640" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1280" height="640" fill="url(#glow)"/>
+
+  <g transform="translate(530,110) scale(2.2)">
+    <rect x="0" y="0" width="100" height="100" rx="22" ry="22" fill="#FFFFFF" opacity="0.98"/>
+    <path d="M50,14 L68,34 L57,34 L57,52 L43,52 L43,34 L32,34 Z" fill="#4C6449"/>
+    <rect x="16" y="58" width="68" height="24" rx="9" fill="#4C6449"/>
+  </g>
+
+  <text x="640" y="430" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif" font-size="72" font-weight="700" letter-spacing="-1" fill="#FFFFFF">Disk Headroom</text>
+
+  <text x="640" y="480" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="26" fill="#E7EFE5" opacity="0.85">A small, local menu-bar app that shows you what can go.</text>
+</svg>

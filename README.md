@@ -225,7 +225,10 @@ src/shared/        Types, constants, translations
 assets/brand/      Source SVGs for every icon and logo
 build/             Entitlements and generated app icon
 resources/         Generated menu bar template images
+release-notes/     Per-feature Markdown + images for Instagram posts
 ```
+
+Feature work must add a package under `release-notes/` (see `release-notes/INSTRUCAO.md`).
 
 ## Brand assets
 
