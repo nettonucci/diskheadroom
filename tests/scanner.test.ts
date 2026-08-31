@@ -82,7 +82,9 @@ describe('path safety', () => {
     ['/sbin/foo', false],
     ['/private/var/db/TCC.db', false],
     ['/Users/test/Library/Caches/x', true],
-    ['/Applications/Foo.app', true]
+    ['/Applications/Foo.app', true],
+    ['/Users/test/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw', true],
+    ['/Users/test/.docker/buildx', true]
   ])('classifies %s', (path, safe) => {
     expect(isSafePath(path)).toBe(safe)
   })
@@ -153,9 +155,46 @@ describe('runScan', () => {
       'Never'
     ])
     expect(result.items.every((item) => item.bytes > 0)).toBe(true)
-    expect(progress).toHaveBeenCalledTimes(8)
+    expect(progress).toHaveBeenCalledTimes(9)
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.packageManagers', percent: 44 })
+    expect(progress).toHaveBeenCalledWith({ phase: 'progress.docker', percent: 72 })
     expect(progress).toHaveBeenLastCalledWith({ phase: 'progress.done', percent: 100 })
+  })
+
+  it('scans documented Docker Desktop leftovers as opt-in and skips missing paths', async () => {
+    const home = '/Users/test'
+    const caches = `${home}/Library/Caches`
+    const dockerRaw = `${home}/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw`
+    const dockerQcow = `${home}/Library/Containers/com.docker.docker/Data/vms/0/Docker.qcow2`
+    const dockerContainer = `${home}/Library/Containers/com.docker.docker`
+    const buildx = `${home}/.docker/buildx`
+
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === caches) return ['good']
+      if (path === buildx) return ['payload']
+      if (path === '/Applications' || path === `${home}/Applications`) return []
+      return []
+    })
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path === dockerQcow || path === dockerContainer) throw new Error('missing')
+      if (path === dockerRaw) return file(4096)
+      if (path.endsWith('/payload') || path.endsWith('/good')) return file(200)
+      return directory
+    })
+
+    const result = await runScan(90, vi.fn())
+    const dockerItems = result.items.filter((item) => item.categoryId === 'dockerDesktop')
+
+    expect(dockerItems.map((item) => item.nameKey)).toEqual([
+      'category.dockerDesktop.diskImage',
+      'category.dockerDesktop.buildx'
+    ])
+    expect(dockerItems.map((item) => item.path)).toEqual([dockerRaw, buildx])
+    expect(dockerItems.every((item) => item.selectedByDefault === false && item.optional === true)).toBe(
+      true
+    )
+    expect(result.items.some((item) => item.path === dockerContainer)).toBe(false)
+    expect(result.items.some((item) => item.path === dockerQcow)).toBe(false)
   })
 
   it('scans known package-manager roots as opt-in and skips them in user caches', async () => {

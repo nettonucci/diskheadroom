@@ -87,9 +87,31 @@ function AppShell(): JSX.Element {
     bootstrapped.current = true
   }, [])
 
+  const refreshDisk = useCallback(async () => {
+    setDisk(await window.diskheadroom.getDiskInfo())
+  }, [])
+
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  // Space is freed outside this window — emptying the Trash in Finder, another
+  // app writing files — and macOS sends no event for it, so the panel would keep
+  // showing a stale number until the next relaunch.
+  useEffect(() => {
+    function sync(): void {
+      if (document.hidden) return
+      void refreshDisk()
+    }
+    const timer = window.setInterval(sync, 5000)
+    window.addEventListener('focus', sync)
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', sync)
+      document.removeEventListener('visibilitychange', sync)
+    }
+  }, [refreshDisk])
 
   const startScan = useCallback(async () => {
     if (!settings || scanning) return
@@ -132,6 +154,7 @@ function AppShell(): JSX.Element {
   }, [result, selected])
 
   const selectedBytes = selectedItems.reduce((sum, item) => sum + item.bytes, 0)
+  const foundBytes = (result?.items ?? []).reduce((sum, item) => sum + item.bytes, 0)
 
   async function markSetupDone(): Promise<void> {
     if (!settings) return
@@ -154,8 +177,17 @@ function AppShell(): JSX.Element {
 
   async function cleanSelected(): Promise<void> {
     if (selectedItems.length === 0) return
+    const includesDocker = selectedItems.some((item) => item.categoryId === 'dockerDesktop')
+    const confirmKey =
+      selectedItems.length === 1
+        ? includesDocker
+          ? 'results.confirmDockerOne'
+          : 'results.confirmOne'
+        : includesDocker
+          ? 'results.confirmDockerOther'
+          : 'results.confirmOther'
     const confirmed = window.confirm(
-      t(selectedItems.length === 1 ? 'results.confirmOne' : 'results.confirmOther', {
+      t(confirmKey, {
         count: selectedItems.length,
         size: formatBytes(selectedBytes)
       })
@@ -248,6 +280,9 @@ function AppShell(): JSX.Element {
             t={t}
             locale={locale}
             result={result}
+            disk={disk}
+            usedPct={usedPct}
+            foundBytes={foundBytes}
             selected={selected}
             selectedBytes={selectedBytes}
             selectedCount={selectedItems.length}
@@ -413,6 +448,88 @@ function PermissionRow(props: {
   )
 }
 
+function DiskPanel(props: {
+  t: Translator
+  disk: DiskInfo | null
+  usedPct: number
+  foundBytes?: number
+  selectedBytes?: number
+}): JSX.Element | null {
+  const disk = props.disk
+  if (!disk) return null
+
+  const selectedBytes = props.selectedBytes ?? 0
+  // The selected slice is carved out of the used segment so the bar shows what
+  // would move to the free side, instead of two totals that no longer add up.
+  const selectedPct = Math.min(props.usedPct, (selectedBytes / disk.totalBytes) * 100)
+
+  return (
+    <div className="card disk-panel">
+      <div className="disk-head">
+        <div>
+          <h3>{props.t('disk.title')}</h3>
+          <p className="muted">{props.t('disk.autoRefresh')}</p>
+        </div>
+        <strong className="disk-headline">
+          {props.t('dashboard.diskFree', {
+            free: formatBytes(disk.freeBytes),
+            total: formatBytes(disk.totalBytes)
+          })}
+        </strong>
+      </div>
+      <div className="disk-bar">
+        <span className="seg used" style={{ width: `${props.usedPct - selectedPct}%` }} />
+        <span className="seg selected" style={{ width: `${selectedPct}%` }} />
+      </div>
+      <div className="disk-stats">
+        <DiskStat
+          label={props.t('disk.usedLabel')}
+          value={formatBytes(disk.usedBytes)}
+          detail={props.t('disk.percentUsed', { percent: props.usedPct })}
+          tone="used"
+        />
+        <DiskStat
+          label={props.t('disk.freeLabel')}
+          value={formatBytes(disk.freeBytes)}
+          detail={props.t('disk.percentFree', { percent: Math.max(0, 100 - props.usedPct) })}
+          tone="free"
+        />
+        {props.foundBytes !== undefined && (
+          <DiskStat label={props.t('disk.foundLabel')} value={formatBytes(props.foundBytes)} />
+        )}
+        {selectedBytes > 0 && (
+          <DiskStat
+            label={props.t('disk.selectedLabel')}
+            value={formatBytes(selectedBytes)}
+            detail={props.t('disk.afterCleanup', {
+              size: formatBytes(disk.freeBytes + selectedBytes)
+            })}
+            tone="selected"
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DiskStat(props: {
+  label: string
+  value: string
+  detail?: string
+  tone?: 'used' | 'free' | 'selected'
+}): JSX.Element {
+  return (
+    <div className="disk-stat">
+      <span className="disk-stat-label">
+        {props.tone && <i className={`dot ${props.tone}`} aria-hidden="true" />}
+        {props.label}
+      </span>
+      <strong>{props.value}</strong>
+      {props.detail && <small className="muted">{props.detail}</small>}
+    </div>
+  )
+}
+
 function DashboardView(props: {
   t: Translator
   disk: DiskInfo | null
@@ -430,21 +547,8 @@ function DashboardView(props: {
           <h2>{props.t('dashboard.title')}</h2>
           <p>{props.t('dashboard.description', { days: props.unusedDays })}</p>
         </div>
-        {props.disk && (
-          <div className="meter">
-            <strong>
-              {props.t('dashboard.diskFree', {
-                free: formatBytes(props.disk.freeBytes),
-                total: formatBytes(props.disk.totalBytes)
-              })}
-            </strong>
-            <div className="meter-bar">
-              <span style={{ width: `${props.usedPct}%` }} />
-            </div>
-            <small>{props.t('dashboard.diskUsed', { percent: props.usedPct })}</small>
-          </div>
-        )}
       </div>
+      <DiskPanel t={props.t} disk={props.disk} usedPct={props.usedPct} />
       {props.limited && (
         <div className="notice">{props.t('dashboard.limited')}</div>
       )}
@@ -480,6 +584,9 @@ function ResultsView(props: {
   t: Translator
   locale: Locale
   result: ScanResult
+  disk: DiskInfo | null
+  usedPct: number
+  foundBytes: number
   selected: Record<string, boolean>
   selectedBytes: number
   selectedCount: number
@@ -505,10 +612,22 @@ function ResultsView(props: {
           <p>{props.t('results.description')}</p>
         </div>
       </div>
+      <DiskPanel
+        t={props.t}
+        disk={props.disk}
+        usedPct={props.usedPct}
+        foundBytes={props.foundBytes}
+        selectedBytes={props.selectedBytes}
+      />
       {props.result.limited && (
         <div className="notice">{props.t('results.limited')}</div>
       )}
-      {props.cleanMessage && <div className="card muted">{props.cleanMessage}</div>}
+      {props.cleanMessage && (
+        <div className="card">
+          <p className="muted">{props.cleanMessage}</p>
+          <p className="muted">{props.t('results.trashHint')}</p>
+        </div>
+      )}
       {Array.from(grouped.entries()).map(([categoryId, items]) => {
         const ids = items.map((item) => item.id)
         const allOn = ids.every((id) => props.selected[id])
@@ -528,6 +647,9 @@ function ResultsView(props: {
                 </button>
               </div>
             </div>
+            {categoryId === 'dockerDesktop' && (
+              <div className="notice">{props.t('category.dockerDesktop.warning')}</div>
+            )}
             {items
               .slice()
               .sort((a, b) => b.bytes - a.bytes)

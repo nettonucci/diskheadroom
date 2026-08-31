@@ -26,7 +26,7 @@ describe('shared helpers', () => {
     expect(LOCALES).toEqual(['en', 'pt-BR', 'es'])
     expect(LOCALE_NAMES['pt-BR']).toContain('Português')
     expect(NAV).toHaveLength(4)
-    expect(Object.keys(CATEGORY_META)).toHaveLength(8)
+    expect(Object.keys(CATEGORY_META)).toHaveLength(9)
     expect(UNUSED_DAY_OPTIONS).toContain(DEFAULT_UNUSED_DAYS)
   })
 })

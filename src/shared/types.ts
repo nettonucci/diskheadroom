@@ -9,6 +9,7 @@ export type ScanCategoryId =
   | 'trash'
   | 'xcodeDerivedData'
   | 'iosDeviceSupport'
+  | 'dockerDesktop'
   | 'unusedApps'
 
 export interface ScanItem {

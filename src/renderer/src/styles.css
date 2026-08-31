@@ -126,34 +126,103 @@ select {
   line-height: 1.45;
 }
 
-.meter {
-  min-width: 260px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 16px 18px;
+.disk-panel {
+  padding: 20px 22px 18px;
 }
 
-.meter-bar {
-  height: 8px;
+.disk-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.disk-head p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.disk-headline {
+  font-size: 20px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.disk-bar {
+  display: flex;
+  height: 12px;
   border-radius: 99px;
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
-  margin: 10px 0 8px;
+  margin: 16px 0 18px;
 }
 
-.meter-bar span {
-  display: block;
+.disk-bar .seg {
   height: 100%;
+  transition: width 0.35s ease;
+}
+
+.disk-bar .seg.used {
   background: linear-gradient(90deg, var(--accent), #c5d5b8);
 }
 
-.meter strong {
-  font-size: 13px;
+.disk-bar .seg.selected {
+  background: var(--warn);
 }
 
-.meter small {
+.disk-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px;
+}
+
+.disk-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.disk-stat strong {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.disk-stat small {
+  font-size: 11px;
+}
+
+.disk-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
+  font-size: 12px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.dot.used {
+  background: var(--accent);
+}
+
+.dot.free {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.dot.selected {
+  background: var(--warn);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disk-bar .seg {
+    transition: none;
+  }
 }
 
 .row {

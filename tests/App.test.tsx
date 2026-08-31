@@ -168,6 +168,77 @@ describe('App', () => {
     await waitFor(() => expect(bridge.runScan).toHaveBeenCalledTimes(2))
   })
 
+  it('shows Docker Desktop leftovers unchecked with a warning before trash', async () => {
+    const dockerResult = {
+      ...result,
+      items: [
+        {
+          id: 'docker',
+          categoryId: 'dockerDesktop' as const,
+          name: '',
+          nameKey: 'category.dockerDesktop.diskImage' as const,
+          path: '/Users/test/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw',
+          bytes: 8192,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: null,
+          daysIdle: null
+        }
+      ]
+    }
+    const bridge = api({
+      runScan: vi.fn().mockResolvedValue(dockerResult),
+      trashItems: vi.fn().mockResolvedValue({
+        trashed: [dockerResult.items[0].path],
+        failed: [],
+        bytesRequested: 8192
+      })
+    })
+    window.diskheadroom = bridge
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+
+    expect(await screen.findByText('Docker Desktop disk image')).toBeInTheDocument()
+    expect(screen.getByText(/High impact/)).toBeInTheDocument()
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
+
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/Docker Desktop/))
+    await waitFor(() => expect(bridge.trashItems).toHaveBeenCalled())
+  })
+
+  it('keeps the disk panel on results and rereads free space when refocused', async () => {
+    const bridge = api({
+      getDiskInfo: vi
+        .fn()
+        .mockResolvedValueOnce(disk)
+        .mockResolvedValue({ ...disk, usedBytes: 300, freeBytes: 700 })
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByText('400 B free of 1000 B')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Scan this Mac' }))
+
+    expect(await screen.findByText('Review before cleaning')).toBeInTheDocument()
+    expect(screen.getByText('Startup disk')).toBeInTheDocument()
+    expect(screen.getByText('Found in this scan')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Select group' }))
+    expect(screen.getByText('Selected to remove')).toBeInTheDocument()
+    expect(screen.getByText(/free after cleanup/)).toBeInTheDocument()
+
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    expect(await screen.findByText('700 B free of 1000 B')).toBeInTheDocument()
+  })
+
   it('does not clean when confirmation is cancelled', async () => {
     const bridge = api()
     window.diskheadroom = bridge

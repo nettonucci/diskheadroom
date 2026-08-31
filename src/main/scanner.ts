@@ -78,6 +78,9 @@ export async function runScan(unusedDays: UnusedDays, onProgress: ProgressFn): P
     ))
   )
 
+  onProgress({ phase: 'progress.docker', percent: 72 })
+  items.push(...(await scanDockerDesktop(home)))
+
   onProgress({ phase: 'progress.apps', percent: 80 })
   items.push(...(await scanUnusedApps(unusedDays)))
 
@@ -147,6 +150,41 @@ const PACKAGE_MANAGER_ROOTS: PackageManagerRoot[] = [
   { segments: ['go', 'pkg', 'mod'], nameKey: 'category.packageManagerCaches.goModules' },
   { segments: ['Library', 'Caches', 'go-build'], nameKey: 'category.packageManagerCaches.goBuild' }
 ]
+
+type DockerDesktopRoot = { segments: string[]; nameKey: TranslationKey }
+
+/** Documented Docker Desktop leftovers only — never the whole Containers bundle. */
+const DOCKER_DESKTOP_ROOTS: DockerDesktopRoot[] = [
+  {
+    segments: ['Library', 'Containers', 'com.docker.docker', 'Data', 'vms', '0', 'data', 'Docker.raw'],
+    nameKey: 'category.dockerDesktop.diskImage'
+  },
+  {
+    segments: ['Library', 'Containers', 'com.docker.docker', 'Data', 'vms', '0', 'Docker.qcow2'],
+    nameKey: 'category.dockerDesktop.diskImage'
+  },
+  {
+    segments: ['Library', 'Containers', 'com.docker.docker', 'Data', 'vms', '0', 'data', 'Docker.qcow2'],
+    nameKey: 'category.dockerDesktop.diskImage'
+  },
+  { segments: ['.docker', 'buildx'], nameKey: 'category.dockerDesktop.buildx' }
+]
+
+async function scanDockerDesktop(home: string): Promise<ScanItem[]> {
+  const items: ScanItem[] = []
+  for (const root of DOCKER_DESKTOP_ROOTS) {
+    items.push(
+      ...(await scanIfExists(
+        join(home, ...root.segments),
+        'dockerDesktop',
+        root.nameKey,
+        false,
+        true
+      ))
+    )
+  }
+  return items
+}
 
 async function scanPackageManagerCaches(home: string): Promise<ScanItem[]> {
   const items: ScanItem[] = []
