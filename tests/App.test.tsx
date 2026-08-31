@@ -72,6 +72,7 @@ function api(overrides: Partial<Api> = {}): Api {
     }),
     openExternal: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
+    revealItem: vi.fn().mockResolvedValue(true),
     onScanProgress: vi.fn(() => () => {}),
     onTrayScan: vi.fn(() => () => {}),
     onTrayDonate: vi.fn(() => () => {}),
@@ -166,6 +167,22 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: 'Scan again' }))
     await waitFor(() => expect(bridge.runScan).toHaveBeenCalledTimes(2))
+  })
+
+  it('reveals a result in Finder and copies its path with feedback', async () => {
+    const bridge = api()
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+    expect(await screen.findByText('Cache A')).toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: 'Reveal in Finder' })[0])
+    expect(bridge.revealItem).toHaveBeenCalledWith('/Users/test/Library/Caches/a')
+
+    await user.click(screen.getAllByRole('button', { name: 'Copy path' })[1])
+    expect(bridge.copyText).toHaveBeenCalledWith('/Applications/Old App.app')
+    expect(await screen.findByText('Path copied')).toBeInTheDocument()
   })
 
   it('filters results by name or path and only selects visible group items', async () => {

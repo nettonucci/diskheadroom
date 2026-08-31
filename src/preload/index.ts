@@ -25,6 +25,7 @@ const api = {
     ipcRenderer.invoke('clean:trash', request),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
   copyText: (text: string): Promise<void> => ipcRenderer.invoke('shell:copy-text', text),
+  revealItem: (path: string): Promise<boolean> => ipcRenderer.invoke('shell:reveal-item', path),
   onScanProgress: (callback: (progress: ScanProgress) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: ScanProgress): void => {
       callback(progress)

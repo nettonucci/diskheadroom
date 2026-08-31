@@ -14,3 +14,4 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-08-31 | Documents e Desktop antigos e grandes | [2026-08-31-documents-desktop](./2026-08-31-documents-desktop/post.md) |
 | 2026-08-31 | Filtro por nome ou caminho nos resultados | [2026-08-31-filtro-resultados](./2026-08-31-filtro-resultados/post.md) |
 | 2026-08-31 | Diálogo de confirmação dentro do app | [2026-08-31-dialogo-confirmacao](./2026-08-31-dialogo-confirmacao/post.md) |
+| 2026-08-31 | Mostrar no Finder e copiar caminho | [2026-08-31-reveal-copiar-caminho](./2026-08-31-reveal-copiar-caminho/post.md) |

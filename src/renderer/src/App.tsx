@@ -644,6 +644,64 @@ function DashboardView(props: {
   )
 }
 
+function ResultItemRow(props: {
+  t: Translator
+  locale: Locale
+  item: ScanItem
+  checked: boolean
+  onToggle: (item: ScanItem, value: boolean) => void
+}): JSX.Element {
+  const { t, item } = props
+  const [copied, setCopied] = useState(false)
+
+  async function copyPath(): Promise<void> {
+    await window.diskheadroom.copyText(item.path)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="item">
+      <label className="item-select">
+        <input
+          type="checkbox"
+          checked={props.checked}
+          onChange={(event) => props.onToggle(item, event.target.checked)}
+        />
+        <span>
+          <strong>{item.nameKey ? t(item.nameKey) : item.name}</strong>
+          <div className="path">{item.path}</div>
+          {(item.categoryId === 'unusedApps' || item.categoryId === 'idleUserFolders') && (
+            <div className="muted">
+              {t('results.lastUsed', {
+                date: item.lastUsedAt
+                  ? formatDate(item.lastUsedAt, props.locale)
+                  : t('results.never')
+              })}
+              {item.daysIdle !== null ? ` · ${t('results.idleDays', { days: item.daysIdle })}` : ''}
+            </div>
+          )}
+        </span>
+      </label>
+      <div className="item-side">
+        <strong>{formatBytes(item.bytes)}</strong>
+        <div className="item-actions">
+          <button
+            className="btn compact"
+            type="button"
+            onClick={() => void window.diskheadroom.revealItem(item.path)}
+          >
+            {t('results.reveal')}
+          </button>
+          <button className="btn compact" type="button" onClick={() => void copyPath()}>
+            {copied ? t('results.copied') : t('results.copy')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function itemMatchesFilter(item: ScanItem, query: string, t: Translator): boolean {
   const needle = query.trim().toLowerCase()
   if (!needle) return true
@@ -742,30 +800,14 @@ function ResultsView(props: {
               .slice()
               .sort((a, b) => b.bytes - a.bytes)
               .map((item) => (
-                <label className="item" key={item.id}>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(props.selected[item.id])}
-                    onChange={(event) => props.onToggle(item, event.target.checked)}
-                  />
-                  <span>
-                    <strong>{item.nameKey ? props.t(item.nameKey) : item.name}</strong>
-                    <div className="path">{item.path}</div>
-                    {(item.categoryId === 'unusedApps' || item.categoryId === 'idleUserFolders') && (
-                      <div className="muted">
-                        {props.t('results.lastUsed', {
-                          date: item.lastUsedAt
-                            ? formatDate(item.lastUsedAt, props.locale)
-                            : props.t('results.never')
-                        })}
-                        {item.daysIdle !== null
-                          ? ` · ${props.t('results.idleDays', { days: item.daysIdle })}`
-                          : ''}
-                      </div>
-                    )}
-                  </span>
-                  <strong>{formatBytes(item.bytes)}</strong>
-                </label>
+                <ResultItemRow
+                  key={item.id}
+                  t={props.t}
+                  locale={props.locale}
+                  item={item}
+                  checked={Boolean(props.selected[item.id])}
+                  onToggle={props.onToggle}
+                />
               ))}
           </div>
         )
