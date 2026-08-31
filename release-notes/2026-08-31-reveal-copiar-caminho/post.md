@@ -1,7 +1,7 @@
 # Mostrar no Finder e copiar caminho
 
 - **Data:** 2026-08-31
-- **Commit / PR:** (preencher no merge)
+- **Commit / PR:** `2744920` / [#35](https://github.com/nettonucci/diskheadroom/pull/35)
 - **Tipo:** feat
 - **Público:** quem quer conferir o caminho real antes de mandar para a Lixeira
 - **Formato sugerido no Instagram:** único (screenshot de resultados com os botões na linha)
