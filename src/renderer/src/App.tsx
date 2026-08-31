@@ -115,6 +115,8 @@ function AppShell(): JSX.Element {
   const [result, setResult] = useState<ScanResult | null>(null)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [cleanMessage, setCleanMessage] = useState<string | null>(null)
+  const [cleanFailed, setCleanFailed] = useState<{ path: string; error: string }[]>([])
+  const [scanFailed, setScanFailed] = useState(false)
   const [busyClean, setBusyClean] = useState(false)
   const [confirmCleanOpen, setConfirmCleanOpen] = useState(false)
   const bootstrapped = useRef(false)
@@ -175,6 +177,8 @@ function AppShell(): JSX.Element {
     if (!settings || scanning) return
     setScanning(true)
     setCleanMessage(null)
+    setCleanFailed([])
+    setScanFailed(false)
     setProgress({ phase: 'progress.starting', percent: 2 })
     // Rescans triggered from the results list would otherwise run with no visible
     // sign of work; the dashboard is where the progress bar lives.
@@ -188,6 +192,8 @@ function AppShell(): JSX.Element {
       }
       setSelected(initial)
       setView('results')
+    } catch {
+      setScanFailed(true)
     } finally {
       setScanning(false)
     }
@@ -251,6 +257,7 @@ function AppShell(): JSX.Element {
       const recovered = selectedItems
         .filter((item) => outcome.trashed.includes(item.path))
         .reduce((sum, item) => sum + item.bytes, 0)
+      setCleanFailed(outcome.failed)
       setCleanMessage(
         t(outcome.trashed.length === 1 ? 'results.cleanedOne' : 'results.cleanedOther', {
           count: outcome.trashed.length,
@@ -322,6 +329,7 @@ function AppShell(): JSX.Element {
             progress={progress}
             unusedDays={settings?.unusedDays ?? 90}
             limited={Boolean(perms && !perms.fullDiskAccess)}
+            scanFailed={scanFailed}
             onScan={() => void startScan()}
           />
         )}
@@ -338,6 +346,7 @@ function AppShell(): JSX.Element {
             selectedCount={selectedItems.length}
             busyClean={busyClean}
             cleanMessage={cleanMessage}
+            cleanFailed={cleanFailed}
             onToggle={(item, value) => setSelected((current) => ({ ...current, [item.id]: value }))}
             onToggleCategory={(ids, value) => {
               setSelected((current) => {
@@ -359,6 +368,7 @@ function AppShell(): JSX.Element {
             progress={progress}
             unusedDays={settings?.unusedDays ?? 90}
             limited={Boolean(perms && !perms.fullDiskAccess)}
+            scanFailed={scanFailed}
             onScan={() => void startScan()}
           />
         )}
@@ -602,6 +612,7 @@ function DashboardView(props: {
   progress: ScanProgress | null
   unusedDays: number
   limited: boolean
+  scanFailed: boolean
   onScan: () => void
 }): JSX.Element {
   return (
@@ -615,6 +626,11 @@ function DashboardView(props: {
       <DiskPanel t={props.t} disk={props.disk} usedPct={props.usedPct} />
       {props.limited && (
         <div className="notice">{props.t('dashboard.limited')}</div>
+      )}
+      {props.scanFailed && (
+        <div className="notice" role="alert">
+          {props.t('dashboard.scanFailed')}
+        </div>
       )}
       <div className="row">
         <button
@@ -721,6 +737,7 @@ function ResultsView(props: {
   selectedCount: number
   busyClean: boolean
   cleanMessage: string | null
+  cleanFailed: { path: string; error: string }[]
   onToggle: (item: ScanItem, value: boolean) => void
   onToggleCategory: (ids: string[], value: boolean) => void
   onClean: () => void
@@ -743,6 +760,11 @@ function ResultsView(props: {
         <div>
           <h2>{props.t('results.title')}</h2>
           <p>{props.t('results.description')}</p>
+          <p className="muted">
+            {props.t('results.scannedAt', {
+              date: formatDate(props.result.scannedAt, props.locale, true)
+            })}
+          </p>
         </div>
       </div>
       <DiskPanel
@@ -758,6 +780,18 @@ function ResultsView(props: {
       {props.cleanMessage && (
         <div className="card">
           <p className="muted">{props.cleanMessage}</p>
+          {props.cleanFailed.length > 0 && (
+            <>
+              <p className="muted">{props.t('results.failedTitle')}</p>
+              <ul className="failed-list">
+                {props.cleanFailed.map((item) => (
+                  <li key={item.path} className="path">
+                    {item.path}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <p className="muted">{props.t('results.trashHint')}</p>
         </div>
       )}

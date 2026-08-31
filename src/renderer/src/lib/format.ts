@@ -13,10 +13,11 @@ export function formatBytes(bytes: number): string {
 
 import type { Locale } from '../../../shared/i18n'
 
-export function formatDate(iso: string, locale: Locale): string {
+export function formatDate(iso: string, locale: Locale, withTime = false): string {
   return new Date(iso).toLocaleDateString(locale, {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
+    ...(withTime ? { hour: 'numeric', minute: '2-digit' } : {})
   })
 }

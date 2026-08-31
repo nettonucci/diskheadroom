@@ -52,4 +52,16 @@ describe('formatting', () => {
       day: 'numeric'
     })
   })
+
+  it('includes time when formatting a scan timestamp', () => {
+    vi.spyOn(Date.prototype, 'toLocaleDateString').mockReturnValue('localized-time')
+    expect(formatDate('2025-01-02T12:00:00Z', 'en', true)).toBe('localized-time')
+    expect(Date.prototype.toLocaleDateString).toHaveBeenCalledWith('en', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    })
+  })
 })
