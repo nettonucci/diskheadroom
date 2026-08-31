@@ -90,7 +90,11 @@ describe('path safety', () => {
     ['/Users/test/.gradle/caches', true],
     ['/Users/test/Library/Caches/CocoaPods', true],
     ['/Users/test/.android/cache', true],
-    ['/Users/test/Library/Android/sdk/cache', true]
+    ['/Users/test/Library/Android/sdk/cache', true],
+    ['/Users/test/Documents', false],
+    ['/Users/test/Desktop', false],
+    ['/Users/test/Documents/Archive 2022', true],
+    ['/Users/test/Desktop/OldBackup.iso', true]
   ])('classifies %s', (path, safe) => {
     expect(isSafePath(path)).toBe(safe)
   })
@@ -164,10 +168,11 @@ describe('runScan', () => {
       'Never'
     ])
     expect(result.items.every((item) => item.bytes > 0)).toBe(true)
-    expect(progress).toHaveBeenCalledTimes(10)
+    expect(progress).toHaveBeenCalledTimes(11)
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.packageManagers', percent: 44 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.androidDev', percent: 68 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.docker', percent: 72 })
+    expect(progress).toHaveBeenCalledWith({ phase: 'progress.documentsDesktop', percent: 76 })
     expect(progress).toHaveBeenLastCalledWith({ phase: 'progress.done', percent: 100 })
   })
 
@@ -399,6 +404,116 @@ describe('runScan', () => {
     )
     expect(packageItems.every((item) => item.bytes > 0)).toBe(true)
     expect(result.items.some((item) => item.path === missingNpm)).toBe(false)
+  })
+
+  it('scans old large first-level Documents and Desktop items as opt-in', async () => {
+    const home = '/Users/test'
+    const caches = `${home}/Library/Caches`
+    const documents = `${home}/Documents`
+    const desktop = `${home}/Desktop`
+    const oldLarge = `${documents}/Archive 2022`
+    const oldFolder = `${documents}/OldProject`
+    const nested = `${oldFolder}/nested.bin`
+    const oldSmall = `${documents}/notes.pdf`
+    const recentLarge = `${documents}/Current.dmg`
+    const desktopDump = `${desktop}/OldBackup.iso`
+    const mb = 1024 * 1024
+    const oldMs = Date.now() - 400 * 86400000
+    const recentMs = Date.now() - 2 * 86400000
+
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === caches) return ['good']
+      if (path === documents) return ['Archive 2022', 'OldProject', 'notes.pdf', 'Current.dmg']
+      if (path === desktop) return ['OldBackup.iso']
+      if (path === oldFolder) return ['nested.bin']
+      if (path === '/Applications' || path === `${home}/Applications`) return []
+      return []
+    })
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path === oldLarge) return { ...file(250 * mb), mtimeMs: oldMs }
+      if (path === oldFolder) return { ...directory, mtimeMs: oldMs }
+      if (path === nested) return { ...file(180 * mb), mtimeMs: oldMs }
+      if (path === oldSmall) return { ...file(20 * mb), mtimeMs: oldMs }
+      if (path === recentLarge) return { ...file(400 * mb), mtimeMs: recentMs }
+      if (path === desktopDump) return { ...file(120 * mb), mtimeMs: oldMs }
+      if (path.endsWith('/good')) return file(200)
+      return directory
+    })
+
+    const result = await runScan(90, vi.fn())
+    const idle = result.items.filter((item) => item.categoryId === 'idleUserFolders')
+
+    expect(idle.map((item) => item.name)).toEqual(['Archive 2022', 'OldProject', 'OldBackup.iso'])
+    expect(idle.map((item) => item.path)).toEqual([oldLarge, oldFolder, desktopDump])
+    expect(idle.every((item) => item.selectedByDefault === false && item.optional === true)).toBe(true)
+    expect(idle.every((item) => item.daysIdle !== null && item.daysIdle >= 90)).toBe(true)
+    expect(result.items.some((item) => item.path === documents)).toBe(false)
+    expect(result.items.some((item) => item.path === desktop)).toBe(false)
+    expect(result.items.some((item) => item.path === oldSmall)).toBe(false)
+    expect(result.items.some((item) => item.path === recentLarge)).toBe(false)
+    expect(result.items.some((item) => item.path === nested)).toBe(false)
+  })
+
+  it('skips missing Documents and Desktop roots', async () => {
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === '/Users/test/Library/Caches') return ['good']
+      if (path === '/Users/test/Documents' || path === '/Users/test/Desktop') throw new Error('missing')
+      if (path === '/Applications' || path === '/Users/test/Applications') return []
+      return []
+    })
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path.endsWith('/good')) return file(200)
+      return directory
+    })
+
+    const result = await runScan(90, vi.fn())
+    expect(result.items.some((item) => item.categoryId === 'idleUserFolders')).toBe(false)
+  })
+
+  it('skips Documents children that cannot be statted', async () => {
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === '/Users/test/Library/Caches') return ['good']
+      if (path === '/Users/test/Documents') return ['gone.bin']
+      if (path === '/Users/test/Desktop') throw new Error('missing')
+      if (path === '/Applications' || path === '/Users/test/Applications') return []
+      return []
+    })
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path === '/Users/test/Documents/gone.bin') throw new Error('gone')
+      if (path.endsWith('/good')) return file(200)
+      return directory
+    })
+
+    const result = await runScan(90, vi.fn())
+    expect(result.items.some((item) => item.path.endsWith('gone.bin'))).toBe(false)
+  })
+
+  it('keeps the largest idle Documents and Desktop items up to the cap', async () => {
+    const desktop = '/Users/test/Desktop'
+    const oldMs = Date.now() - 400 * 86400000
+    const mb = 1024 * 1024
+
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === '/Users/test/Library/Caches') return ['good']
+      if (path === '/Users/test/Documents') throw new Error('missing')
+      if (path === desktop) return Array.from({ length: 26 }, (_, index) => `dump-${index}.bin`)
+      if (path === '/Applications' || path === '/Users/test/Applications') return []
+      return []
+    })
+    mocks.lstat.mockImplementation(async (path: string) => {
+      const match = /dump-(\d+)\.bin$/.exec(path)
+      if (match) return { ...file((100 + Number(match[1])) * mb), mtimeMs: oldMs }
+      if (path.endsWith('/good')) return file(200)
+      return directory
+    })
+
+    const result = await runScan(90, vi.fn())
+    const idle = result.items.filter((item) => item.categoryId === 'idleUserFolders')
+
+    expect(idle).toHaveLength(24)
+    expect(idle[0].name).toBe('dump-25.bin')
+    expect(idle.some((item) => item.name === 'dump-0.bin')).toBe(false)
+    expect(idle.some((item) => item.name === 'dump-1.bin')).toBe(false)
   })
 
   it('scans known Android, Gradle and CocoaPods leftover caches as opt-in', async () => {

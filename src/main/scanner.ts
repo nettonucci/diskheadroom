@@ -13,6 +13,10 @@ const execFileAsync = promisify(execFile)
 
 const BLOCKED_PREFIXES = ['/System', '/usr/sbin', '/bin', '/sbin', '/private/var/db']
 
+/** First-level Documents/Desktop children below this size stay off the list. */
+const IDLE_USER_MIN_BYTES = 100 * 1024 * 1024
+const IDLE_USER_LIMIT = 24
+
 /** Top-level ~/Library/Caches names scanned as Homebrew or package-manager leftovers. */
 const USER_CACHE_SKIP = new Set([
   'CocoaPods',
@@ -69,6 +73,9 @@ export async function runScan(unusedDays: UnusedDays, onProgress: ProgressFn): P
 
   onProgress({ phase: 'progress.docker', percent: 72 })
   items.push(...(await scanDockerDesktop(home)))
+
+  onProgress({ phase: 'progress.documentsDesktop', percent: 76 })
+  items.push(...(await scanIdleUserFolders(home, unusedDays)))
 
   onProgress({ phase: 'progress.apps', percent: 80 })
   items.push(...(await scanUnusedApps(unusedDays)))
@@ -393,6 +400,53 @@ async function scanIfExists(
   ]
 }
 
+async function scanIdleUserFolders(home: string, unusedDays: UnusedDays): Promise<ScanItem[]> {
+  const now = Date.now()
+  const thresholdMs = unusedDays * 24 * 60 * 60 * 1000
+  const items: ScanItem[] = []
+
+  for (const folder of ['Documents', 'Desktop'] as const) {
+    const root = join(home, folder)
+    let names: string[] = []
+    try {
+      names = await readdir(root)
+    } catch {
+      continue
+    }
+
+    for (const name of names) {
+      const path = join(root, name)
+      if (!isSafePath(path)) continue
+
+      let info
+      try {
+        info = await lstat(path)
+      } catch {
+        continue
+      }
+      if (info.isSymbolicLink()) continue
+      if (!Number.isFinite(info.mtimeMs) || now - info.mtimeMs < thresholdMs) continue
+
+      const bytes = await directorySize(path)
+      if (bytes < IDLE_USER_MIN_BYTES) continue
+
+      items.push({
+        id: idFor(path),
+        categoryId: 'idleUserFolders',
+        name,
+        path,
+        bytes,
+        selectedByDefault: false,
+        optional: true,
+        lastUsedAt: new Date(info.mtimeMs).toISOString(),
+        daysIdle: Math.floor((now - info.mtimeMs) / (24 * 60 * 60 * 1000))
+      })
+    }
+  }
+
+  return items.sort((left, right) => right.bytes - left.bytes).slice(0, IDLE_USER_LIMIT)
+}
+
 async function scanUnusedApps(unusedDays: UnusedDays): Promise<ScanItem[]> {
   const roots = ['/Applications', join(homedir(), 'Applications')]
   const now = Date.now()
@@ -475,7 +529,9 @@ async function readPlistValue(appPath: string, key: string): Promise<string> {
 
 export function isSafePath(target: string): boolean {
   const resolved = resolvePath(target)
-  if (resolved === '/' || resolved === homedir()) return false
+  const home = homedir()
+  if (resolved === '/' || resolved === home) return false
+  if (resolved === join(home, 'Documents') || resolved === join(home, 'Desktop')) return false
   return !BLOCKED_PREFIXES.some((prefix) => resolved === prefix || resolved.startsWith(`${prefix}/`))
 }
 

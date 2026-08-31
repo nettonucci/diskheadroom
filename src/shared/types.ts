@@ -15,6 +15,7 @@ export type ScanCategoryId =
   | 'coreSimulatorCaches'
   | 'dockerDesktop'
   | 'androidDevCaches'
+  | 'idleUserFolders'
   | 'unusedApps'
 
 export interface ScanItem {

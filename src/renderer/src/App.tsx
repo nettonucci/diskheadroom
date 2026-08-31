@@ -667,7 +667,7 @@ function ResultsView(props: {
                   <span>
                     <strong>{item.nameKey ? props.t(item.nameKey) : item.name}</strong>
                     <div className="path">{item.path}</div>
-                    {item.categoryId === 'unusedApps' && (
+                    {(item.categoryId === 'unusedApps' || item.categoryId === 'idleUserFolders') && (
                       <div className="muted">
                         {props.t('results.lastUsed', {
                           date: item.lastUsedAt

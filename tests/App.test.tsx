@@ -307,6 +307,35 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
   })
 
+  it('shows old Documents and Desktop items unchecked with a warning', async () => {
+    const documentsResult = {
+      ...result,
+      items: [
+        {
+          id: 'archive',
+          categoryId: 'idleUserFolders' as const,
+          name: 'Archive 2022',
+          path: '/Users/test/Documents/Archive 2022',
+          bytes: 250 * 1024 * 1024,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: '2022-04-01T00:00:00.000Z',
+          daysIdle: 1400
+        }
+      ]
+    }
+    window.diskheadroom = api({ runScan: vi.fn().mockResolvedValue(documentsResult) })
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+
+    expect(await screen.findByRole('heading', { name: 'Documents & Desktop' })).toBeInTheDocument()
+    expect(screen.getByText('Archive 2022')).toBeInTheDocument()
+    expect(screen.getByText(/These are your files, not caches/)).toBeInTheDocument()
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
+  })
+
   it('keeps the disk panel on results and rereads free space when refocused', async () => {
     const bridge = api({
       getDiskInfo: vi

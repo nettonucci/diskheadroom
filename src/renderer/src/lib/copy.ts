@@ -57,6 +57,10 @@ export const CATEGORY_META: Record<
     title: 'category.androidDevCaches.title',
     hint: 'category.androidDevCaches.hint'
   },
+  idleUserFolders: {
+    title: 'category.idleUserFolders.title',
+    hint: 'category.idleUserFolders.hint'
+  },
   unusedApps: {
     title: 'category.unusedApps.title',
     hint: 'category.unusedApps.hint'
@@ -65,7 +69,8 @@ export const CATEGORY_META: Record<
 
 export const CATEGORY_WARNING: Partial<Record<ScanCategoryId, TranslationKey>> = {
   dockerDesktop: 'category.dockerDesktop.warning',
-  outdatedSimulators: 'category.outdatedSimulators.warning'
+  outdatedSimulators: 'category.outdatedSimulators.warning',
+  idleUserFolders: 'category.idleUserFolders.warning'
 }
 
 export const NAV: { id: ViewId; label: TranslationKey }[] = [
