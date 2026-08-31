@@ -7,6 +7,7 @@ const sample = require('./sample-data.cjs')
 // window mounts in a known state instead of relying on in-app navigation.
 const mode = process.argv.find((arg) => arg.startsWith('--capture-mode='))?.split('=')[1]
 const firstRun = mode === 'first-run'
+const scanResult = mode === 'overview' ? sample.compactScanResult : sample.scanResult
 
 let settings = { ...sample.settings, setupComplete: !firstRun }
 const permissions = firstRun ? sample.permissionsMissing : sample.permissionsGranted
@@ -24,7 +25,7 @@ contextBridge.exposeInMainWorld('diskheadroom', {
     settings = { ...next }
     return settings
   },
-  runScan: async () => sample.scanResult,
+  runScan: async () => scanResult,
   trashItems: async () => ({ trashed: [], failed: [], bytesRequested: 0 }),
   openExternal: async () => {},
   copyText: async () => {},

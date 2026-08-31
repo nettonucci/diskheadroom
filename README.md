@@ -29,7 +29,7 @@ All work stays on your Mac. There is no account, no telemetry, and no cloud.
 
 ## Who it is for
 
-People who want a little more room on a Mac they already own — developers with Xcode leftovers, Homebrew users with a fat cache, or anyone whose SSD has been quietly filling up.
+People who want a little more room on a Mac they already own — developers with Xcode, Android, or CocoaPods leftovers, Homebrew users with a fat cache, or anyone whose SSD has been quietly filling up.
 
 If you need forensic deletion, secure erase, or Windows/Linux, this is not that tool.
 
@@ -37,14 +37,14 @@ If you need forensic deletion, secure erase, or Windows/Linux, this is not that 
 
 | Scan | Review before cleaning |
 | --- | --- |
-| <img src="docs/screenshots/scan.png" alt="Scan screen showing free space on the startup disk" width="440"> | <img src="docs/screenshots/results.png" alt="Scan results grouped by category with checkboxes and total selected" width="440"> |
+| <img src="docs/screenshots/scan.png" alt="Scan screen showing free space on the startup disk" width="440"> | <img src="docs/screenshots/results.png" alt="Scan results grouped by category with checkboxes, and a floating bar with the total selected and the Move to Trash button" width="440"> |
 
 | System access | Settings |
 | --- | --- |
 | <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with idle app window and language pickers" width="440"> |
 
 <p align="center">
-  <img src="docs/screenshots/developer.png" alt="Optional developer groups showing unavailable simulators and simulators on older runtimes, all unchecked, with a warning that those simulators still work" width="560">
+  <img src="docs/screenshots/developer.png" alt="Optional developer groups showing simulators on older runtimes and Android, Gradle and CocoaPods caches, all unchecked, with a warning that those simulators still work" width="560">
 </p>
 
 <p align="center">
@@ -63,6 +63,7 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Homebrew | `~/Library/Caches/Homebrew` when present |
 | Trash | Current Trash contents (so you can empty with eyes open) |
 | Xcode (opt-in) | DerivedData, iOS DeviceSupport, Archives, CoreSimulator caches, unavailable simulators, and simulators on older runtimes — **unchecked** until you choose them |
+| Android / Gradle / CocoaPods (opt-in) | `~/.gradle/caches`, CocoaPods cache, and conservative Android SDK leftover dirs — **unchecked**; the SDK install and AVDs are never listed |
 | Docker Desktop (opt-in) | Disk image and Buildx cache — **unchecked**, warning that images, containers, and volumes can be lost |
 | Idle apps | `/Applications` and `~/Applications`, skipping Apple system bundles |
 | Menu bar | Open, Scan now, Donate, Quit |

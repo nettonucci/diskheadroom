@@ -74,8 +74,9 @@ app.whenReady().then(async () => {
 
   ready.destroy()
 
-  // Results need more vertical room to show a full category plus the action bar.
-  const results = await openWindow('ready', 900)
+  // The overview runs on a short result so the disk panel, one full category and
+  // the floating action bar all fit without the bar covering half a row.
+  const results = await openWindow('overview', 900)
   await results.webContents.executeJavaScript(
     "document.querySelector('.main .row button.btn.primary').click()"
   )
@@ -85,7 +86,7 @@ app.whenReady().then(async () => {
 
   // The opt-in developer groups sit at the bottom of the list. A shorter window
   // scrolled to the end frames them without cutting through a neighbouring card.
-  const developer = await openWindow('ready', 620)
+  const developer = await openWindow('ready', 700)
   await developer.webContents.executeJavaScript(
     "document.querySelector('.main .row button.btn.primary').click()"
   )

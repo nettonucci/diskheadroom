@@ -53,6 +53,10 @@ export const CATEGORY_META: Record<
     title: 'category.dockerDesktop.title',
     hint: 'category.dockerDesktop.hint'
   },
+  androidDevCaches: {
+    title: 'category.androidDevCaches.title',
+    hint: 'category.androidDevCaches.hint'
+  },
   unusedApps: {
     title: 'category.unusedApps.title',
     hint: 'category.unusedApps.hint'

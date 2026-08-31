@@ -15,6 +15,7 @@ const BLOCKED_PREFIXES = ['/System', '/usr/sbin', '/bin', '/sbin', '/private/var
 
 /** Top-level ~/Library/Caches names scanned as Homebrew or package-manager leftovers. */
 const USER_CACHE_SKIP = new Set([
+  'CocoaPods',
   'Homebrew',
   'bun',
   'go-build',
@@ -62,6 +63,9 @@ export async function runScan(unusedDays: UnusedDays, onProgress: ProgressFn): P
 
   onProgress({ phase: 'progress.xcode', percent: 64 })
   items.push(...(await scanXcodeLeftovers(home)))
+
+  onProgress({ phase: 'progress.androidDev', percent: 68 })
+  items.push(...(await scanAndroidDevCaches(home)))
 
   onProgress({ phase: 'progress.docker', percent: 72 })
   items.push(...(await scanDockerDesktop(home)))
@@ -323,6 +327,37 @@ async function scanPackageManagerCaches(home: string): Promise<ScanItem[]> {
       ...(await scanIfExists(
         join(home, ...root.segments),
         'packageManagerCaches',
+        root.nameKey,
+        false,
+        true
+      ))
+    )
+  }
+  return items
+}
+
+type AndroidDevRoot = { segments: string[]; nameKey: TranslationKey }
+
+/**
+ * Known leftover roots only — never ~/Library/Android/sdk, ~/.android/avd,
+ * or a home-wide search for build/ folders.
+ */
+const ANDROID_DEV_ROOTS: AndroidDevRoot[] = [
+  { segments: ['.gradle', 'caches'], nameKey: 'category.androidDevCaches.gradle' },
+  { segments: ['.gradle', 'wrapper', 'dists'], nameKey: 'category.androidDevCaches.gradleWrapper' },
+  { segments: ['Library', 'Caches', 'CocoaPods'], nameKey: 'category.androidDevCaches.cocoapods' },
+  { segments: ['.android', 'cache'], nameKey: 'category.androidDevCaches.androidCache' },
+  { segments: ['Library', 'Android', 'sdk', '.temp'], nameKey: 'category.androidDevCaches.sdkTemp' },
+  { segments: ['Library', 'Android', 'sdk', 'cache'], nameKey: 'category.androidDevCaches.sdkCache' }
+]
+
+async function scanAndroidDevCaches(home: string): Promise<ScanItem[]> {
+  const items: ScanItem[] = []
+  for (const root of ANDROID_DEV_ROOTS) {
+    items.push(
+      ...(await scanIfExists(
+        join(home, ...root.segments),
+        'androidDevCaches',
         root.nameKey,
         false,
         true
