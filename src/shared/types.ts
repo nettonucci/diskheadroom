@@ -5,6 +5,7 @@ export type ScanCategoryId =
   | 'userCaches'
   | 'userLogs'
   | 'homebrewCache'
+  | 'packageManagerCaches'
   | 'trash'
   | 'xcodeDerivedData'
   | 'iosDeviceSupport'
