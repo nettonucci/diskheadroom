@@ -17,7 +17,7 @@ It is not a “one-click miracle cleaner.” You review every group, optional de
 
 ## What it does
 
-- Measures free space on the startup disk
+- Measures free space on the startup disk and keeps that reading current while open
 - Scans conservative junk locations in your home library
 - Lists applications that have not been opened in 30, 90, 180, or 365 days (90 by default)
 - Shows sizes and paths before anything is touched
@@ -53,11 +53,13 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 
 | Area | Details |
 | --- | --- |
+| Startup disk | Used, free, and total on both screens, rechecked while the window is open so emptying the Trash shows up without a relaunch |
 | User caches | Top-level folders under `~/Library/Caches` |
 | Logs | `~/Library/Logs` |
 | Homebrew | `~/Library/Caches/Homebrew` when present |
 | Trash | Current Trash contents (so you can empty with eyes open) |
 | Xcode (opt-in) | DerivedData and iOS DeviceSupport — **unchecked** until you choose them |
+| Docker Desktop (opt-in) | Disk image and Buildx cache — **unchecked**, warning that images, containers, and volumes can be lost |
 | Idle apps | `/Applications` and `~/Applications`, skipping Apple system bundles |
 | Menu bar | Open, Scan now, Donate, Quit |
 | Languages | English, Português (Brasil), Español |
@@ -115,8 +117,8 @@ Why this exists: user caches, Mail-adjacent libraries, and similar paths are pro
 
 1. Finish the permissions screen (or continue with a limited scan).
 2. On **Scan**, review startup-disk usage and press **Scan this Mac**.
-3. On results, tick the items you actually want gone. Idle apps and Xcode folders stay off until you opt in.
-4. Press **Move to Trash** and confirm. Restore from Trash if you change your mind.
+3. On results, tick the items you actually want gone. Idle apps, Xcode folders, and Docker Desktop data stay off until you opt in.
+4. Press **Move to Trash** and confirm. Restore from Trash if you change your mind — and remember the disk only gains space once the Trash is emptied.
 5. Close the window whenever you like — the app remains in the menu bar until **Quit Disk Headroom**.
 
 Idle-app window (30 / 90 / 180 / 365 days) lives under **Settings**. Last-used dates come from Spotlight metadata (`kMDItemLastUsedDate`). Apps Apple ships are skipped.

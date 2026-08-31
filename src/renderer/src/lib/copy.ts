@@ -33,6 +33,10 @@ export const CATEGORY_META: Record<
     title: 'category.iosDeviceSupport.title',
     hint: 'category.iosDeviceSupport.hint'
   },
+  dockerDesktop: {
+    title: 'category.dockerDesktop.title',
+    hint: 'category.dockerDesktop.hint'
+  },
   unusedApps: {
     title: 'category.unusedApps.title',
     hint: 'category.unusedApps.hint'
