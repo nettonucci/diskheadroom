@@ -2,6 +2,7 @@
   color-scheme: dark;
   --bg: #1c1c1e;
   --bg-elevated: rgba(44, 44, 46, 0.72);
+  --bg-dialog: #2e2e30;
   --bg-sidebar: rgba(28, 28, 30, 0.55);
   --line: rgba(255, 255, 255, 0.08);
   --text: #f5f5f7;
@@ -413,6 +414,49 @@ code {
   padding: 12px 14px;
   margin-bottom: 16px;
   font-size: 13px;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(10px);
+}
+
+/* The window itself is vibrant, so a translucent card would let the list
+   underneath bleed through the confirmation text. */
+.dialog {
+  width: min(440px, 100%);
+  background: var(--bg-dialog);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 20px 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.dialog h3 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 620;
+}
+
+.dialog .notice,
+.dialog .muted {
+  margin-bottom: 18px;
+}
+
+.dialog .muted {
+  color: #dcdce0;
+  font-size: 14px;
+}
+
+.dialog .row {
+  justify-content: flex-end;
 }
 
 .footer-bar {

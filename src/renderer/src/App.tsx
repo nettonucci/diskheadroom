@@ -5,6 +5,7 @@ import {
   LOCALE_NAMES,
   translator,
   type Locale,
+  type TranslationKey,
   type Translator
 } from '../../shared/i18n'
 import type {
@@ -22,6 +23,58 @@ import markUrl from '@brand/mark-color.svg'
 
 function Spinner(): JSX.Element {
   return <span className="spinner" aria-hidden="true" />
+}
+
+function confirmCopyKey(items: ScanItem[]): TranslationKey {
+  const includesDocker = items.some((item) => item.categoryId === 'dockerDesktop')
+  if (items.length === 1) {
+    return includesDocker ? 'results.confirmDockerOne' : 'results.confirmOne'
+  }
+  return includesDocker ? 'results.confirmDockerOther' : 'results.confirmOther'
+}
+
+function ConfirmDialog(props: {
+  title: string
+  message: string
+  warning: boolean
+  confirmLabel: string
+  cancelLabel: string
+  onConfirm: () => void
+  onCancel: () => void
+}): JSX.Element {
+  useEffect(() => {
+    function onKey(event: KeyboardEvent): void {
+      if (event.key === 'Escape') props.onCancel()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [props.onCancel])
+
+  return (
+    <div className="dialog-backdrop" onClick={props.onCancel} role="presentation">
+      <div
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="clean-confirm-title"
+        aria-describedby="clean-confirm-message"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h3 id="clean-confirm-title">{props.title}</h3>
+        <p id="clean-confirm-message" className={props.warning ? 'notice' : 'muted'}>
+          {props.message}
+        </p>
+        <div className="row">
+          <button className="btn" type="button" autoFocus onClick={props.onCancel}>
+            {props.cancelLabel}
+          </button>
+          <button className="btn danger" type="button" onClick={props.onConfirm}>
+            {props.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // Keeps a button visibly working until its IPC round trip settles.
@@ -63,6 +116,7 @@ function AppShell(): JSX.Element {
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [cleanMessage, setCleanMessage] = useState<string | null>(null)
   const [busyClean, setBusyClean] = useState(false)
+  const [confirmCleanOpen, setConfirmCleanOpen] = useState(false)
   const bootstrapped = useRef(false)
   const locale = settings?.locale ?? 'en'
   const t = translator(locale)
@@ -179,24 +233,16 @@ function AppShell(): JSX.Element {
     setSettings(next)
   }
 
+  const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
+
+  function requestClean(): void {
+    if (selectedItems.length === 0) return
+    setConfirmCleanOpen(true)
+  }
+
   async function cleanSelected(): Promise<void> {
     if (selectedItems.length === 0) return
-    const includesDocker = selectedItems.some((item) => item.categoryId === 'dockerDesktop')
-    const confirmKey =
-      selectedItems.length === 1
-        ? includesDocker
-          ? 'results.confirmDockerOne'
-          : 'results.confirmOne'
-        : includesDocker
-          ? 'results.confirmDockerOther'
-          : 'results.confirmOther'
-    const confirmed = window.confirm(
-      t(confirmKey, {
-        count: selectedItems.length,
-        size: formatBytes(selectedBytes)
-      })
-    )
-    if (!confirmed) return
+    setConfirmCleanOpen(false)
     setBusyClean(true)
     try {
       const outcome = await window.diskheadroom.trashItems({
@@ -300,7 +346,7 @@ function AppShell(): JSX.Element {
                 return next
               })
             }}
-            onClean={() => void cleanSelected()}
+            onClean={requestClean}
             onRescan={() => void startScan()}
           />
         )}
@@ -327,6 +373,20 @@ function AppShell(): JSX.Element {
         )}
         {view === 'donate' && <DonateView t={t} />}
       </main>
+      {confirmCleanOpen && (
+        <ConfirmDialog
+          title={t('results.confirmTitle')}
+          message={t(confirmCopyKey(selectedItems), {
+            count: selectedItems.length,
+            size: formatBytes(selectedBytes)
+          })}
+          warning={selectedItems.some((item) => item.categoryId === 'dockerDesktop')}
+          confirmLabel={t('results.confirmAction')}
+          cancelLabel={t('results.confirmCancel')}
+          onConfirm={() => void cleanSelected()}
+          onCancel={cancelCleanConfirm}
+        />
+      )}
     </div>
   )
 }
