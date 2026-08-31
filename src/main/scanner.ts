@@ -13,6 +13,19 @@ const execFileAsync = promisify(execFile)
 
 const BLOCKED_PREFIXES = ['/System', '/usr/sbin', '/bin', '/sbin', '/private/var/db']
 
+/** Top-level ~/Library/Caches names scanned as Homebrew or package-manager leftovers. */
+const USER_CACHE_SKIP = new Set([
+  'Homebrew',
+  'bun',
+  'go-build',
+  'npm',
+  'pip',
+  'pnpm',
+  'uv',
+  'Yarn',
+  'yarn'
+])
+
 type ProgressFn = (progress: ScanProgress) => void
 
 export async function runScan(unusedDays: UnusedDays, onProgress: ProgressFn): Promise<ScanResult> {
@@ -39,12 +52,15 @@ export async function runScan(unusedDays: UnusedDays, onProgress: ProgressFn): P
     ))
   )
 
-  onProgress({ phase: 'progress.trash', percent: 48 })
+  onProgress({ phase: 'progress.packageManagers', percent: 44 })
+  items.push(...(await scanPackageManagerCaches(home)))
+
+  onProgress({ phase: 'progress.trash', percent: 52 })
   items.push(
     ...(await scanIfExists(join(home, '.Trash'), 'trash', 'category.trash.title', true, false))
   )
 
-  onProgress({ phase: 'progress.xcode', percent: 60 })
+  onProgress({ phase: 'progress.xcode', percent: 64 })
   items.push(
     ...(await scanIfExists(
       join(home, 'Library', 'Developer', 'Xcode', 'DerivedData'),
@@ -62,7 +78,7 @@ export async function runScan(unusedDays: UnusedDays, onProgress: ProgressFn): P
     ))
   )
 
-  onProgress({ phase: 'progress.apps', percent: 78 })
+  onProgress({ phase: 'progress.apps', percent: 80 })
   items.push(...(await scanUnusedApps(unusedDays)))
 
   onProgress({ phase: 'progress.done', percent: 100 })
@@ -90,7 +106,7 @@ async function scanChildren(
 
   const items: ScanItem[] = []
   for (const name of names.slice(0, limit)) {
-    if (name === 'Homebrew') continue
+    if (USER_CACHE_SKIP.has(name)) continue
     const path = join(root, name)
     if (!isSafePath(path)) continue
     const bytes = await directorySize(path)
@@ -106,6 +122,44 @@ async function scanChildren(
       lastUsedAt: null,
       daysIdle: null
     })
+  }
+  return items
+}
+
+type PackageManagerRoot = { segments: string[]; nameKey: TranslationKey }
+
+const PACKAGE_MANAGER_ROOTS: PackageManagerRoot[] = [
+  { segments: ['.npm'], nameKey: 'category.packageManagerCaches.npm' },
+  { segments: ['Library', 'Caches', 'npm'], nameKey: 'category.packageManagerCaches.npm' },
+  { segments: ['Library', 'Caches', 'Yarn'], nameKey: 'category.packageManagerCaches.yarn' },
+  { segments: ['.yarn', 'berry', 'cache'], nameKey: 'category.packageManagerCaches.yarn' },
+  { segments: ['.cache', 'yarn'], nameKey: 'category.packageManagerCaches.yarn' },
+  { segments: ['Library', 'Caches', 'pnpm'], nameKey: 'category.packageManagerCaches.pnpm' },
+  { segments: ['Library', 'pnpm', 'store'], nameKey: 'category.packageManagerCaches.pnpm' },
+  { segments: ['.local', 'share', 'pnpm', 'store'], nameKey: 'category.packageManagerCaches.pnpm' },
+  { segments: ['.bun', 'install', 'cache'], nameKey: 'category.packageManagerCaches.bun' },
+  { segments: ['Library', 'Caches', 'pip'], nameKey: 'category.packageManagerCaches.pip' },
+  { segments: ['.cache', 'pip'], nameKey: 'category.packageManagerCaches.pip' },
+  { segments: ['Library', 'Caches', 'uv'], nameKey: 'category.packageManagerCaches.uv' },
+  { segments: ['.cache', 'uv'], nameKey: 'category.packageManagerCaches.uv' },
+  { segments: ['.cargo', 'registry'], nameKey: 'category.packageManagerCaches.cargoRegistry' },
+  { segments: ['.cargo', 'git'], nameKey: 'category.packageManagerCaches.cargoGit' },
+  { segments: ['go', 'pkg', 'mod'], nameKey: 'category.packageManagerCaches.goModules' },
+  { segments: ['Library', 'Caches', 'go-build'], nameKey: 'category.packageManagerCaches.goBuild' }
+]
+
+async function scanPackageManagerCaches(home: string): Promise<ScanItem[]> {
+  const items: ScanItem[] = []
+  for (const root of PACKAGE_MANAGER_ROOTS) {
+    items.push(
+      ...(await scanIfExists(
+        join(home, ...root.segments),
+        'packageManagerCaches',
+        root.nameKey,
+        false,
+        true
+      ))
+    )
   }
   return items
 }

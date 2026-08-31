@@ -153,8 +153,46 @@ describe('runScan', () => {
       'Never'
     ])
     expect(result.items.every((item) => item.bytes > 0)).toBe(true)
-    expect(progress).toHaveBeenCalledTimes(7)
+    expect(progress).toHaveBeenCalledTimes(8)
+    expect(progress).toHaveBeenCalledWith({ phase: 'progress.packageManagers', percent: 44 })
     expect(progress).toHaveBeenLastCalledWith({ phase: 'progress.done', percent: 100 })
+  })
+
+  it('scans known package-manager roots as opt-in and skips them in user caches', async () => {
+    const home = '/Users/test'
+    const caches = `${home}/Library/Caches`
+    const pnpm = `${caches}/pnpm`
+    const cargoRegistry = `${home}/.cargo/registry`
+    const missingNpm = `${home}/.npm`
+
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === caches) return ['pnpm', 'good']
+      if (path === pnpm || path === cargoRegistry) return ['payload']
+      if (path === '/Applications' || path === `${home}/Applications`) return []
+      return []
+    })
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path === missingNpm) throw new Error('missing')
+      if (path.endsWith('/payload') || path.endsWith('/good')) return file(200)
+      return directory
+    })
+
+    const result = await runScan(90, vi.fn())
+    const userCacheNames = result.items
+      .filter((item) => item.categoryId === 'userCaches')
+      .map((item) => item.name)
+    const packageItems = result.items.filter((item) => item.categoryId === 'packageManagerCaches')
+
+    expect(userCacheNames).toEqual(['good'])
+    expect(packageItems.map((item) => item.nameKey)).toEqual([
+      'category.packageManagerCaches.pnpm',
+      'category.packageManagerCaches.cargoRegistry'
+    ])
+    expect(packageItems.every((item) => item.selectedByDefault === false && item.optional === true)).toBe(
+      true
+    )
+    expect(packageItems.every((item) => item.bytes > 0)).toBe(true)
+    expect(result.items.some((item) => item.path === missingNpm)).toBe(false)
   })
 
   it('returns an empty limited result when roots are inaccessible', async () => {

@@ -17,6 +17,10 @@ export const CATEGORY_META: Record<
     title: 'category.homebrewCache.title',
     hint: 'category.homebrewCache.hint'
   },
+  packageManagerCaches: {
+    title: 'category.packageManagerCaches.title',
+    hint: 'category.packageManagerCaches.hint'
+  },
   trash: {
     title: 'category.trash.title',
     hint: 'category.trash.hint'
