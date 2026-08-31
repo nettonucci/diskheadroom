@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/renderer/src/App'
@@ -151,6 +151,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Scan this Mac' }))
 
     expect(await screen.findByText('Review before cleaning')).toBeInTheDocument()
+    expect(screen.getByText(/^Scanned /)).toBeInTheDocument()
     expect(screen.getByText('Cache A')).toBeInTheDocument()
     expect(screen.getByText('Old App')).toBeInTheDocument()
     expect(screen.getByText(/Last used/)).toBeInTheDocument()
@@ -548,7 +549,24 @@ describe('App', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent(/Docker Desktop data/)
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
     expect(await screen.findByText(/2 items could not be moved/)).toBeInTheDocument()
+    expect(screen.getByText('These items stayed in place:')).toBeInTheDocument()
+    const failed = screen.getByRole('list')
+    expect(within(failed).getByText('/Applications/Old App.app')).toBeInTheDocument()
+    expect(within(failed).getByText('/Users/test/Library/Caches/d')).toBeInTheDocument()
     expect(screen.getByText(/Trash is emptied/)).toBeInTheDocument()
+  })
+
+  it('shows a recoverable error when the scan throws', async () => {
+    const bridge = api({
+      runScan: vi.fn().mockRejectedValue(new Error('scan crashed'))
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('The scan did not finish')
+    expect(screen.queryByText('Review before cleaning')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Scan this Mac' })).toBeEnabled()
   })
 
   it('updates settings, opens permissions, and opens external links', async () => {
