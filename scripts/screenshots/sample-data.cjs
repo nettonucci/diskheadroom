@@ -16,7 +16,9 @@ const items = [
   ['homebrewCache', null, '~/Library/Caches/Homebrew', 3.1 * GB, true],
   ['trash', null, '~/.Trash', 5.8 * GB, true],
   ['xcodeDerivedData', null, '~/Library/Developer/Xcode/DerivedData', 14.2 * GB, false],
-  ['iosDeviceSupport', null, '~/Library/Developer/Xcode/iOS DeviceSupport', 9.6 * GB, false]
+  ['iosDeviceSupport', null, '~/Library/Developer/Xcode/iOS DeviceSupport', 9.6 * GB, false],
+  ['xcodeArchives', null, '~/Library/Developer/Xcode/Archives', 4.1 * GB, false],
+  ['coreSimulatorCaches', null, '~/Library/Developer/CoreSimulator/Caches', 1.8 * GB, false]
 ]
 
 const apps = [
@@ -29,7 +31,9 @@ const nameKeyFor = {
   homebrewCache: 'category.homebrewCache.title',
   trash: 'category.trash.title',
   xcodeDerivedData: 'category.xcodeDerivedData.title',
-  iosDeviceSupport: 'category.iosDeviceSupport.title'
+  iosDeviceSupport: 'category.iosDeviceSupport.title',
+  xcodeArchives: 'category.xcodeArchives.title',
+  coreSimulatorCaches: 'category.coreSimulatorCaches.title'
 }
 
 const scanResult = {
@@ -58,7 +62,29 @@ const scanResult = {
       optional: true,
       lastUsedAt: days(idle),
       daysIdle: idle
-    }))
+    })),
+    {
+      id: 'sample-sim-unavailable',
+      categoryId: 'unavailableSimulators',
+      name: 'iPhone 12',
+      path: '~/Library/Developer/CoreSimulator/Devices/11111111-2222-3333-4444-555555555555',
+      bytes: Math.round(3.4 * GB),
+      selectedByDefault: false,
+      optional: true,
+      lastUsedAt: null,
+      daysIdle: null
+    },
+    {
+      id: 'sample-sim-outdated',
+      categoryId: 'outdatedSimulators',
+      name: 'iPhone 16 Pro (iOS 18.1)',
+      path: '~/Library/Developer/CoreSimulator/Devices/22222222-3333-4444-5555-666666666666',
+      bytes: Math.round(2.6 * GB),
+      selectedByDefault: false,
+      optional: true,
+      lastUsedAt: null,
+      daysIdle: null
+    }
   ]
 }
 

@@ -44,6 +44,10 @@ If you need forensic deletion, secure erase, or Windows/Linux, this is not that 
 | <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with idle app window and language pickers" width="440"> |
 
 <p align="center">
+  <img src="docs/screenshots/developer.png" alt="Optional developer groups showing unavailable simulators and simulators on older runtimes, all unchecked, with a warning that those simulators still work" width="560">
+</p>
+
+<p align="center">
   <img src="docs/screenshots/donate.png" alt="Donate screen linking to GitHub Sponsors" width="560">
 </p>
 
@@ -58,7 +62,7 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Logs | `~/Library/Logs` |
 | Homebrew | `~/Library/Caches/Homebrew` when present |
 | Trash | Current Trash contents (so you can empty with eyes open) |
-| Xcode (opt-in) | DerivedData and iOS DeviceSupport — **unchecked** until you choose them |
+| Xcode (opt-in) | DerivedData, iOS DeviceSupport, Archives, CoreSimulator caches, unavailable simulators, and simulators on older runtimes — **unchecked** until you choose them |
 | Docker Desktop (opt-in) | Disk image and Buildx cache — **unchecked**, warning that images, containers, and volumes can be lost |
 | Idle apps | `/Applications` and `~/Applications`, skipping Apple system bundles |
 | Menu bar | Open, Scan now, Donate, Quit |

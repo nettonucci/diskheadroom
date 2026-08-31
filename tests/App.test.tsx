@@ -211,6 +211,60 @@ describe('App', () => {
     await waitFor(() => expect(bridge.trashItems).toHaveBeenCalled())
   })
 
+  it('shows extra Xcode leftovers unchecked by default', async () => {
+    const xcodeResult = {
+      ...result,
+      items: [
+        {
+          id: 'archives',
+          categoryId: 'xcodeArchives' as const,
+          name: '',
+          nameKey: 'category.xcodeArchives.title' as const,
+          path: '/Users/test/Library/Developer/Xcode/Archives',
+          bytes: 4096,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: null,
+          daysIdle: null
+        },
+        {
+          id: 'sim',
+          categoryId: 'unavailableSimulators' as const,
+          name: 'iPhone 14',
+          path: '/Users/test/Library/Developer/CoreSimulator/Devices/11111111-2222-3333-4444-555555555555',
+          bytes: 2048,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: null,
+          daysIdle: null
+        },
+        {
+          id: 'caches',
+          categoryId: 'coreSimulatorCaches' as const,
+          name: '',
+          nameKey: 'category.coreSimulatorCaches.title' as const,
+          path: '/Users/test/Library/Developer/CoreSimulator/Caches',
+          bytes: 1024,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: null,
+          daysIdle: null
+        }
+      ]
+    }
+    window.diskheadroom = api({ runScan: vi.fn().mockResolvedValue(xcodeResult) })
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+
+    expect(await screen.findByRole('heading', { name: 'Xcode Archives' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Unavailable simulators' })).toBeInTheDocument()
+    expect(screen.getByText('iPhone 14')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'CoreSimulator caches' })).toBeInTheDocument()
+    expect(screen.getAllByRole('checkbox').every((box) => !(box as HTMLInputElement).checked)).toBe(true)
+    expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
+  })
+
   it('keeps the disk panel on results and rereads free space when refocused', async () => {
     const bridge = api({
       getDiskInfo: vi

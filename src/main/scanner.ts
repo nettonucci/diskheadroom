@@ -61,22 +61,7 @@ export async function runScan(unusedDays: UnusedDays, onProgress: ProgressFn): P
   )
 
   onProgress({ phase: 'progress.xcode', percent: 64 })
-  items.push(
-    ...(await scanIfExists(
-      join(home, 'Library', 'Developer', 'Xcode', 'DerivedData'),
-      'xcodeDerivedData',
-      'category.xcodeDerivedData.title',
-      false,
-      true
-    )),
-    ...(await scanIfExists(
-      join(home, 'Library', 'Developer', 'Xcode', 'iOS DeviceSupport'),
-      'iosDeviceSupport',
-      'category.iosDeviceSupport.title',
-      false,
-      true
-    ))
-  )
+  items.push(...(await scanXcodeLeftovers(home)))
 
   onProgress({ phase: 'progress.docker', percent: 72 })
   items.push(...(await scanDockerDesktop(home)))
@@ -150,6 +135,151 @@ const PACKAGE_MANAGER_ROOTS: PackageManagerRoot[] = [
   { segments: ['go', 'pkg', 'mod'], nameKey: 'category.packageManagerCaches.goModules' },
   { segments: ['Library', 'Caches', 'go-build'], nameKey: 'category.packageManagerCaches.goBuild' }
 ]
+
+type XcodeLeftoverRoot = { segments: string[]; categoryId: ScanCategoryId; nameKey: TranslationKey }
+
+/** Known leftover roots only — never ~/Library/Developer or the whole CoreSimulator tree. */
+const XCODE_LEFTOVER_ROOTS: XcodeLeftoverRoot[] = [
+  {
+    segments: ['Library', 'Developer', 'Xcode', 'DerivedData'],
+    categoryId: 'xcodeDerivedData',
+    nameKey: 'category.xcodeDerivedData.title'
+  },
+  {
+    segments: ['Library', 'Developer', 'Xcode', 'iOS DeviceSupport'],
+    categoryId: 'iosDeviceSupport',
+    nameKey: 'category.iosDeviceSupport.title'
+  },
+  {
+    segments: ['Library', 'Developer', 'Xcode', 'Archives'],
+    categoryId: 'xcodeArchives',
+    nameKey: 'category.xcodeArchives.title'
+  },
+  {
+    segments: ['Library', 'Developer', 'CoreSimulator', 'Caches'],
+    categoryId: 'coreSimulatorCaches',
+    nameKey: 'category.coreSimulatorCaches.title'
+  }
+]
+
+const SIMULATOR_UDID = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/
+const SIMULATOR_RUNTIME = /SimRuntime\.([A-Za-z]+)-(\d+(?:-\d+)*)$/
+
+type SimctlDevice = { udid?: string; name?: string; isAvailable?: boolean }
+type SimctlList = { devices?: Record<string, SimctlDevice[]> }
+type SimulatorRuntime = { platform: string; version: number[]; label: string }
+
+async function scanXcodeLeftovers(home: string): Promise<ScanItem[]> {
+  const items: ScanItem[] = []
+  for (const root of XCODE_LEFTOVER_ROOTS) {
+    items.push(
+      ...(await scanIfExists(
+        join(home, ...root.segments),
+        root.categoryId,
+        root.nameKey,
+        false,
+        true
+      ))
+    )
+  }
+  items.push(...(await scanSimulatorDevices(home)))
+  return items
+}
+
+async function scanSimulatorDevices(home: string): Promise<ScanItem[]> {
+  const groups = await listSimulatorDevices()
+  if (!groups) return []
+
+  const newestPerPlatform = new Map<string, number[]>()
+  for (const identifier of Object.keys(groups)) {
+    const runtime = parseSimulatorRuntime(identifier)
+    if (!runtime) continue
+    const current = newestPerPlatform.get(runtime.platform)
+    if (!current || compareVersions(runtime.version, current) > 0) {
+      newestPerPlatform.set(runtime.platform, runtime.version)
+    }
+  }
+
+  const items: ScanItem[] = []
+  const seen = new Set<string>()
+  for (const [identifier, devices] of Object.entries(groups)) {
+    if (!Array.isArray(devices)) continue
+    const runtime = parseSimulatorRuntime(identifier)
+    for (const device of devices) {
+      const udid = device.udid?.trim() ?? ''
+      if (!SIMULATOR_UDID.test(udid) || seen.has(udid)) continue
+
+      const unavailable = device.isAvailable !== true
+      // A runtime the user still targets is never listed; only older ones are,
+      // and even then they stay unchecked because they remain fully usable.
+      const outdated =
+        !unavailable &&
+        runtime !== null &&
+        compareVersions(runtime.version, newestPerPlatform.get(runtime.platform) ?? runtime.version) < 0
+      if (!unavailable && !outdated) continue
+
+      seen.add(udid)
+      const path = join(home, 'Library', 'Developer', 'CoreSimulator', 'Devices', udid)
+      if (!isSafePath(path)) continue
+      const bytes = await directorySize(path)
+      if (bytes <= 0) continue
+
+      const deviceName = device.name?.trim() || udid
+      items.push({
+        id: idFor(path),
+        name: outdated && runtime ? `${deviceName} (${runtime.label})` : deviceName,
+        path,
+        categoryId: outdated ? 'outdatedSimulators' : 'unavailableSimulators',
+        bytes,
+        selectedByDefault: false,
+        optional: true,
+        lastUsedAt: null,
+        daysIdle: null
+      })
+    }
+  }
+  return items
+}
+
+async function listSimulatorDevices(): Promise<Record<string, SimctlDevice[]> | null> {
+  let stdout = ''
+  try {
+    const result = await execFileAsync('xcrun', ['simctl', 'list', 'devices', '-j'])
+    stdout = result.stdout
+  } catch {
+    return null
+  }
+
+  let parsed: SimctlList
+  try {
+    parsed = JSON.parse(stdout) as SimctlList
+  } catch {
+    return null
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+
+  const groups = parsed.devices
+  if (!groups || typeof groups !== 'object' || Array.isArray(groups)) return null
+  return groups
+}
+
+function parseSimulatorRuntime(identifier: string): SimulatorRuntime | null {
+  const match = SIMULATOR_RUNTIME.exec(identifier)
+  if (!match) return null
+  const version = match[2].split('-').map(Number)
+  if (version.some((part) => !Number.isFinite(part))) return null
+  return { platform: match[1], version, label: `${match[1]} ${version.join('.')}` }
+}
+
+function compareVersions(left: number[], right: number[]): number {
+  const length = Math.max(left.length, right.length)
+  for (let index = 0; index < length; index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0)
+    if (difference !== 0) return difference
+  }
+  return 0
+}
 
 type DockerDesktopRoot = { segments: string[]; nameKey: TranslationKey }
 

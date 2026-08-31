@@ -111,6 +111,23 @@ describe('disk', () => {
     })
   })
 
+  it('derives used space from the APFS container instead of the sealed system volume', async () => {
+    callbackResult(
+      'Filesystem 1024-blocks Used Available Capacity iused ifree %iused Mounted on\n/dev/disk3s1s1 482797652 16701344 95931472 15% 458726 959314720 0% /'
+    )
+    await expect(getDiskInfo()).resolves.toEqual({
+      mount: '/',
+      totalBytes: 482797652 * 1024,
+      usedBytes: (482797652 - 95931472) * 1024,
+      freeBytes: 95931472 * 1024
+    })
+  })
+
+  it('never reports negative usage when available exceeds the total', async () => {
+    callbackResult('header\n/dev/disk 10 4 12 0% 1 2 1% /')
+    await expect(getDiskInfo()).resolves.toMatchObject({ usedBytes: 0 })
+  })
+
   it('rejects malformed output', async () => {
     callbackResult('Filesystem')
     await expect(getDiskInfo()).rejects.toThrow('Unable to read disk capacity')

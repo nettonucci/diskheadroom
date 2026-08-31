@@ -83,5 +83,19 @@ app.whenReady().then(async () => {
   await capture(results, 'results')
   results.destroy()
 
+  // The opt-in developer groups sit at the bottom of the list. A shorter window
+  // scrolled to the end frames them without cutting through a neighbouring card.
+  const developer = await openWindow('ready', 620)
+  await developer.webContents.executeJavaScript(
+    "document.querySelector('.main .row button.btn.primary').click()"
+  )
+  await wait(700)
+  await developer.webContents.executeJavaScript(
+    "const main = document.querySelector('.main'); main.scrollTop = main.scrollHeight"
+  )
+  await wait(400)
+  await capture(developer, 'developer')
+  developer.destroy()
+
   app.quit()
 })
