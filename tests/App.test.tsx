@@ -237,6 +237,37 @@ describe('App', () => {
       window.dispatchEvent(new Event('focus'))
     })
     expect(await screen.findByText('700 B free of 1000 B')).toBeInTheDocument()
+
+    // A hidden window should not keep polling df in the background.
+    const callsWhileVisible = bridge.getDiskInfo.mock.calls.length
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    expect(bridge.getDiskInfo).toHaveBeenCalledTimes(callsWhileVisible)
+    Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/^Move 2 items/))
+    await waitFor(() => expect(bridge.trashItems).toHaveBeenCalled())
+  })
+
+  it('stays usable when the capacity reading fails', async () => {
+    const bridge = api({ getDiskInfo: vi.fn().mockRejectedValue(new Error('df unavailable')) })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByText('Reclaim storage')).toBeInTheDocument()
+    expect(screen.queryByText('Startup disk')).not.toBeInTheDocument()
+
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await user.click(screen.getByRole('button', { name: 'Scan this Mac' }))
+    expect(await screen.findByText('Review before cleaning')).toBeInTheDocument()
+    expect(screen.queryByText('Startup disk')).not.toBeInTheDocument()
   })
 
   it('does not clean when confirmation is cancelled', async () => {
@@ -278,7 +309,15 @@ describe('App', () => {
           daysIdle: null
         },
         { ...result.items[0], id: 'c', name: 'Cache C', path: '/Users/test/Library/Caches/c' },
-        { ...result.items[0], id: 'd', name: 'Cache D', path: '/Users/test/Library/Caches/d' }
+        { ...result.items[0], id: 'd', name: 'Cache D', path: '/Users/test/Library/Caches/d' },
+        {
+          ...result.items[0],
+          id: 'e',
+          categoryId: 'dockerDesktop' as const,
+          name: '',
+          nameKey: 'category.dockerDesktop.buildx' as const,
+          path: '/Users/test/.docker/buildx'
+        }
       ]
     }
     const bridge = api({
@@ -300,7 +339,10 @@ describe('App', () => {
     expect(await screen.findByText('Trash')).toBeInTheDocument()
     expect(screen.getByText(/Never recorded/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
+    // A batch mixing Docker with ordinary caches must still warn about Docker.
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/Docker Desktop data/))
     expect(await screen.findByText(/2 items could not be moved/)).toBeInTheDocument()
+    expect(screen.getByText(/Trash is emptied/)).toBeInTheDocument()
   })
 
   it('updates settings, opens permissions, and opens external links', async () => {

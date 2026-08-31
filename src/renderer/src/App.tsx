@@ -70,7 +70,9 @@ function AppShell(): JSX.Element {
   const refresh = useCallback(async () => {
     const [nextSettings, nextDisk, nextPerms, nextTarget] = await Promise.all([
       window.diskheadroom.getSettings(),
-      window.diskheadroom.getDiskInfo(),
+      // A failed capacity reading must not take the rest of the UI down with it:
+      // the panel can be missing, the app still scans and cleans.
+      window.diskheadroom.getDiskInfo().catch(() => null),
       window.diskheadroom.getPermissions(),
       window.diskheadroom.getGrantTarget()
     ])
@@ -88,7 +90,9 @@ function AppShell(): JSX.Element {
   }, [])
 
   const refreshDisk = useCallback(async () => {
-    setDisk(await window.diskheadroom.getDiskInfo())
+    const next = await window.diskheadroom.getDiskInfo().catch(() => null)
+    // Keep the previous reading on a transient failure rather than blanking the panel.
+    if (next) setDisk(next)
   }, [])
 
   useEffect(() => {
