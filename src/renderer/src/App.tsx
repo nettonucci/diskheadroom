@@ -16,7 +16,7 @@ import type {
   ScanProgress,
   ScanResult
 } from '../../shared/types'
-import { CATEGORY_META, NAV, type ViewId } from './lib/copy'
+import { CATEGORY_META, CATEGORY_WARNING, NAV, type ViewId } from './lib/copy'
 import { formatBytes, formatDate } from './lib/format'
 import markUrl from '@brand/mark-color.svg'
 
@@ -651,8 +651,8 @@ function ResultsView(props: {
                 </button>
               </div>
             </div>
-            {categoryId === 'dockerDesktop' && (
-              <div className="notice">{props.t('category.dockerDesktop.warning')}</div>
+            {CATEGORY_WARNING[categoryId] && (
+              <div className="notice">{props.t(CATEGORY_WARNING[categoryId])}</div>
             )}
             {items
               .slice()

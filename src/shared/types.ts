@@ -9,6 +9,10 @@ export type ScanCategoryId =
   | 'trash'
   | 'xcodeDerivedData'
   | 'iosDeviceSupport'
+  | 'xcodeArchives'
+  | 'unavailableSimulators'
+  | 'outdatedSimulators'
+  | 'coreSimulatorCaches'
   | 'dockerDesktop'
   | 'unusedApps'
 

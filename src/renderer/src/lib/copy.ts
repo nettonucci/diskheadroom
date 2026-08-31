@@ -33,6 +33,22 @@ export const CATEGORY_META: Record<
     title: 'category.iosDeviceSupport.title',
     hint: 'category.iosDeviceSupport.hint'
   },
+  xcodeArchives: {
+    title: 'category.xcodeArchives.title',
+    hint: 'category.xcodeArchives.hint'
+  },
+  unavailableSimulators: {
+    title: 'category.unavailableSimulators.title',
+    hint: 'category.unavailableSimulators.hint'
+  },
+  outdatedSimulators: {
+    title: 'category.outdatedSimulators.title',
+    hint: 'category.outdatedSimulators.hint'
+  },
+  coreSimulatorCaches: {
+    title: 'category.coreSimulatorCaches.title',
+    hint: 'category.coreSimulatorCaches.hint'
+  },
   dockerDesktop: {
     title: 'category.dockerDesktop.title',
     hint: 'category.dockerDesktop.hint'
@@ -41,6 +57,11 @@ export const CATEGORY_META: Record<
     title: 'category.unusedApps.title',
     hint: 'category.unusedApps.hint'
   }
+}
+
+export const CATEGORY_WARNING: Partial<Record<ScanCategoryId, TranslationKey>> = {
+  dockerDesktop: 'category.dockerDesktop.warning',
+  outdatedSimulators: 'category.outdatedSimulators.warning'
 }
 
 export const NAV: { id: ViewId; label: TranslationKey }[] = [

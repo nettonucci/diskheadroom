@@ -13,14 +13,16 @@ export async function getDiskInfo(): Promise<DiskInfo> {
   }
 
   const parts = data.split(/\s+/)
-  const totalKiB = Number(parts[1])
-  const usedKiB = Number(parts[2])
-  const availKiB = Number(parts[3])
+  const totalBytes = Number(parts[1]) * 1024
+  const freeBytes = Number(parts[3]) * 1024
 
   return {
     mount: parts[8] ?? '/',
-    totalBytes: totalKiB * 1024,
-    usedBytes: usedKiB * 1024,
-    freeBytes: availKiB * 1024
+    totalBytes,
+    // On APFS, df reports "/" as the sealed system volume, so its Used column
+    // counts only the system snapshot while capacity and Available describe the
+    // whole container. Deriving used from the container keeps the panel honest.
+    usedBytes: Math.max(0, totalBytes - freeBytes),
+    freeBytes
   }
 }
