@@ -9,7 +9,7 @@ import {
   openFullDiskAccessSettings,
   revealGrantTarget
 } from './permissions'
-import { runScan } from './scanner'
+import { isSafePath, runScan } from './scanner'
 import { loadSettings, saveSettings } from './settings'
 import type { TrayController } from './tray'
 
@@ -48,6 +48,13 @@ export function registerIpc(options: IpcOptions): void {
   })
   ipcMain.handle('shell:copy-text', (_event, text: string) => {
     clipboard.writeText(text)
+  })
+  ipcMain.handle('shell:reveal-item', (_event, itemPath: unknown) => {
+    if (typeof itemPath !== 'string' || !lastItems.has(itemPath) || !isSafePath(itemPath)) {
+      return false
+    }
+    shell.showItemInFolder(itemPath)
+    return true
   })
   ipcMain.handle('shell:open-external', (_event, url: string) => {
     if (url === SPONSORS_URL || url.startsWith('https://github.com/')) {
