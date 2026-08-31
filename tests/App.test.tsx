@@ -168,6 +168,56 @@ describe('App', () => {
     await waitFor(() => expect(bridge.runScan).toHaveBeenCalledTimes(2))
   })
 
+  it('filters results by name or path and only selects visible group items', async () => {
+    const mixed = {
+      ...result,
+      items: [
+        result.items[0],
+        {
+          ...result.items[0],
+          id: 'c',
+          name: 'Cache C',
+          path: '/Users/test/Library/Caches/unique-token',
+          bytes: 1024,
+          selectedByDefault: true
+        },
+        result.items[1]
+      ]
+    }
+    window.diskheadroom = api({ runScan: vi.fn().mockResolvedValue(mixed) })
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+    expect(await screen.findByText('Cache A')).toBeInTheDocument()
+
+    const filter = screen.getByRole('searchbox', { name: 'Filter by name or path' })
+    await user.type(filter, 'old app')
+    expect(screen.queryByText('Cache A')).not.toBeInTheDocument()
+    expect(screen.getByText('Old App')).toBeInTheDocument()
+
+    await user.clear(filter)
+    expect(screen.getByText('Cache A')).toBeInTheDocument()
+    expect(screen.getByText('Cache C')).toBeInTheDocument()
+
+    await user.type(filter, 'UNIQUE-TOKEN')
+    expect(screen.queryByText('Cache A')).not.toBeInTheDocument()
+    expect(screen.getByText('Cache C')).toBeInTheDocument()
+    expect(screen.getByText(/2 selected/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Clear group' }))
+    expect(screen.getByText(/1 selected/)).toBeInTheDocument()
+
+    await user.clear(filter)
+    expect(screen.getByText('Cache A')).toBeInTheDocument()
+    expect(screen.getByText('Cache C')).toBeInTheDocument()
+    expect(screen.getByText(/1 selected/)).toBeInTheDocument()
+
+    await user.type(filter, 'zzz-missing')
+    expect(screen.getByText('Nothing matches that filter')).toBeInTheDocument()
+    expect(screen.queryByText('Cache A')).not.toBeInTheDocument()
+    expect(screen.queryByText('Old App')).not.toBeInTheDocument()
+  })
+
   it('shows Docker Desktop leftovers unchecked with a warning before trash', async () => {
     const dockerResult = {
       ...result,

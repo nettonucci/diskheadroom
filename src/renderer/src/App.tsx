@@ -584,6 +584,13 @@ function DashboardView(props: {
   )
 }
 
+function itemMatchesFilter(item: ScanItem, query: string, t: Translator): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  const name = (item.nameKey ? t(item.nameKey) : item.name).toLowerCase()
+  return name.includes(needle) || item.path.toLowerCase().includes(needle)
+}
+
 function ResultsView(props: {
   t: Translator
   locale: Locale
@@ -601,12 +608,16 @@ function ResultsView(props: {
   onClean: () => void
   onRescan: () => void
 }): JSX.Element {
+  const [query, setQuery] = useState('')
   const grouped = new Map<ScanItem['categoryId'], ScanItem[]>()
   for (const item of props.result.items) {
+    if (!itemMatchesFilter(item, query, props.t)) continue
     const list = grouped.get(item.categoryId) ?? []
     list.push(item)
     grouped.set(item.categoryId, list)
   }
+  const visibleCount = Array.from(grouped.values()).reduce((sum, items) => sum + items.length, 0)
+  const filtering = query.trim().length > 0
 
   return (
     <section>
@@ -632,7 +643,20 @@ function ResultsView(props: {
           <p className="muted">{props.t('results.trashHint')}</p>
         </div>
       )}
+      {props.result.items.length > 0 && (
+        <div className="results-filter">
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={props.t('results.filterPlaceholder')}
+            aria-label={props.t('results.filterPlaceholder')}
+          />
+        </div>
+      )}
       {Array.from(grouped.entries()).map(([categoryId, items]) => {
+        // Select/clear group only toggles the rows currently on screen, so a
+        // filter cannot silently change hidden items in the same category.
         const ids = items.map((item) => item.id)
         const allOn = ids.every((id) => props.selected[id])
         const bytes = items.reduce((sum, item) => sum + item.bytes, 0)
@@ -690,6 +714,12 @@ function ResultsView(props: {
         <div className="card">
           <h3>{props.t('results.emptyTitle')}</h3>
           <p className="muted">{props.t('results.emptyHint')}</p>
+        </div>
+      )}
+      {filtering && visibleCount === 0 && props.result.items.length > 0 && (
+        <div className="card">
+          <h3>{props.t('results.filterEmptyTitle')}</h3>
+          <p className="muted">{props.t('results.filterEmptyHint')}</p>
         </div>
       )}
       <div className="footer-bar">

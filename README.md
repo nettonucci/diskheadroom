@@ -37,7 +37,7 @@ If you need forensic deletion, secure erase, or Windows/Linux, this is not that 
 
 | Scan | Review before cleaning |
 | --- | --- |
-| <img src="docs/screenshots/scan.png" alt="Scan screen showing free space on the startup disk" width="440"> | <img src="docs/screenshots/results.png" alt="Scan results grouped by category with checkboxes, and a floating bar with the total selected and the Move to Trash button" width="440"> |
+| <img src="docs/screenshots/scan.png" alt="Scan screen showing free space on the startup disk" width="440"> | <img src="docs/screenshots/results.png" alt="Scan results with a name-or-path filter, grouped checkboxes, and a floating bar with the total selected and the Move to Trash button" width="440"> |
 
 | System access | Settings |
 | --- | --- |

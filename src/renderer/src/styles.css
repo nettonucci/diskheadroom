@@ -34,7 +34,8 @@ body {
 }
 
 button,
-select {
+select,
+input {
   font: inherit;
 }
 
@@ -341,6 +342,23 @@ select {
   justify-content: space-between;
   gap: 16px;
   align-items: center;
+}
+
+.results-filter {
+  margin: 0 0 16px;
+}
+
+.results-filter input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.results-filter input::placeholder {
+  color: var(--muted);
 }
 
 .category {
