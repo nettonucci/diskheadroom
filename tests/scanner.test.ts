@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -6,9 +7,17 @@ const mocks = vi.hoisted(() => ({
   readdir: vi.fn(),
   readlink: vi.fn(),
   stat: vi.fn(),
+  createReadStream: vi.fn(),
   getPermissionStatus: vi.fn()
 }))
 
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+  return {
+    ...actual,
+    createReadStream: mocks.createReadStream
+  }
+})
 vi.mock('node:child_process', () => ({
   default: { execFile: mocks.execFile },
   execFile: mocks.execFile
@@ -30,7 +39,7 @@ vi.mock('../src/main/permissions', () => ({
   getPermissionStatus: mocks.getPermissionStatus
 }))
 
-import { isSafePath, runScan } from '../src/main/scanner'
+import { computeFileSha256, isSafePath, runScan, scanDuplicateFiles } from '../src/main/scanner'
 import { DEFAULT_SCAN_CATEGORIES } from '../src/shared/constants'
 
 const directory = {
@@ -70,6 +79,9 @@ beforeEach(() => {
   })
   mocks.readlink.mockResolvedValue('/Users/test/target')
   mocks.stat.mockResolvedValue({ mtimeMs: Date.now() - 200 * 86400000 })
+  mocks.createReadStream.mockImplementation((filePath: string) => {
+    return Readable.from([Buffer.from(filePath)])
+  })
   mocks.execFile.mockImplementation((_command, _args, callback) => {
     callback(new Error('unavailable'))
   })
@@ -169,11 +181,12 @@ describe('runScan', () => {
       'Never'
     ])
     expect(result.items.every((item) => item.bytes > 0)).toBe(true)
-    expect(progress).toHaveBeenCalledTimes(11)
+    expect(progress).toHaveBeenCalledTimes(12)
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.packageManagers', percent: 44 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.androidDev', percent: 68 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.docker', percent: 72 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.documentsDesktop', percent: 76 })
+    expect(progress).toHaveBeenCalledWith({ phase: 'progress.duplicates', percent: 82 })
     expect(progress).toHaveBeenLastCalledWith({ phase: 'progress.done', percent: 100 })
   })
 
@@ -195,7 +208,7 @@ describe('runScan', () => {
     })
     expect(result.items.some((item) => item.categoryId === 'unusedApps')).toBe(false)
     expect(mocks.execFile.mock.calls.some(([command]) => command === 'mdls')).toBe(false)
-    expect(progress).toHaveBeenCalledWith({ phase: 'progress.apps', percent: 80 })
+    expect(progress).toHaveBeenCalledWith({ phase: 'progress.apps', percent: 88 })
   })
 
   it('touches no scan root when every category is disabled', async () => {
@@ -211,7 +224,7 @@ describe('runScan', () => {
     expect(mocks.lstat).not.toHaveBeenCalled()
     expect(mocks.execFile).not.toHaveBeenCalled()
     // Every phase is still announced so the progress bar does not look stuck.
-    expect(progress).toHaveBeenCalledTimes(11)
+    expect(progress).toHaveBeenCalledTimes(12)
   })
 
   it('scans Xcode Archives, CoreSimulator caches and unavailable simulators as opt-in', async () => {
@@ -641,5 +654,122 @@ describe('runScan', () => {
     const result = await runScan(90, vi.fn())
     expect(result.items).toHaveLength(1)
     expect(result.items[0]).toMatchObject({ name: 'FreshUnknown', lastUsedAt: null })
+  })
+
+  it('scans duplicate files in user-specified folders with streaming SHA-256', async () => {
+    const downloads = '/Users/test/Downloads'
+    const subfolder = `${downloads}/Sub`
+    const file1 = `${downloads}/pic1.png`
+    const file2 = `${downloads}/pic2.png`
+    const file3 = `${subfolder}/pic3.png`
+    const diffFile = `${downloads}/diff.png`
+    const zeroFile = `${downloads}/zero.png`
+    const dotFile = `${downloads}/.DS_Store`
+    const symlinkFile = `${downloads}/link.png`
+
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === downloads) {
+        return ['pic1.png', 'pic2.png', 'Sub', 'diff.png', 'zero.png', '.DS_Store', 'link.png']
+      }
+      if (path === subfolder) {
+        return ['pic3.png']
+      }
+      return []
+    })
+
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path === zeroFile) return file(0)
+      if (path === symlinkFile) return symlink
+      if (path === dotFile) return file(100)
+      if (path === subfolder) return directory
+      if (path === file1 || path === file2 || path === file3 || path === diffFile) return file(5000)
+      return directory
+    })
+
+    // file1, file2, file3 have identical content ("same-bytes"), diffFile has ("different-bytes")
+    mocks.createReadStream.mockImplementation((filePath: string) => {
+      if (filePath === diffFile) {
+        return Readable.from([Buffer.from('different-bytes')])
+      }
+      return Readable.from([Buffer.from('same-bytes')])
+    })
+
+    const duplicates = await scanDuplicateFiles([downloads])
+    expect(duplicates).toHaveLength(3)
+    expect(duplicates[0]).toMatchObject({
+      name: 'pic1.png',
+      path: file1,
+      bytes: 5000,
+      categoryId: 'duplicateFiles',
+      selectedByDefault: false,
+      optional: true
+    })
+    expect(duplicates[1]).toMatchObject({
+      name: 'pic2.png',
+      path: file2,
+      bytes: 5000,
+      categoryId: 'duplicateFiles',
+      selectedByDefault: false,
+      optional: true
+    })
+    expect(duplicates[2]).toMatchObject({
+      name: 'pic3.png',
+      path: file3,
+      bytes: 5000,
+      categoryId: 'duplicateFiles',
+      selectedByDefault: false,
+      optional: true
+    })
+  })
+
+  it('handles stream errors gracefully during SHA-256 calculation', async () => {
+    const broken = '/Users/test/Downloads/broken.bin'
+    mocks.createReadStream.mockImplementation(() => {
+      const s = new Readable({
+        read() {
+          this.destroy(new Error('stream failed'))
+        }
+      })
+      return s
+    })
+
+    const hash = await computeFileSha256(broken)
+    expect(hash).toBeNull()
+  })
+
+  it('includes duplicate files in runScan when category is enabled', async () => {
+    const downloads = '/Users/test/Downloads'
+    const file1 = `${downloads}/doc1.pdf`
+    const file2 = `${downloads}/doc2.pdf`
+
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === downloads) return ['doc1.pdf', 'doc2.pdf']
+      if (path === '/Users/test/Library/Caches') return ['good']
+      if (path === '/Applications' || path === '/Users/test/Applications') return []
+      return []
+    })
+
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path === file1 || path === file2) return file(1024)
+      if (path.endsWith('/good')) return file(200)
+      return directory
+    })
+
+    mocks.createReadStream.mockImplementation(() => {
+      return Readable.from([Buffer.from('identical-pdf-content')])
+    })
+
+    const result = await runScan(
+      90,
+      vi.fn(),
+      { ...DEFAULT_SCAN_CATEGORIES, duplicateFiles: true },
+      [downloads]
+    )
+
+    const dupItems = result.items.filter((item) => item.categoryId === 'duplicateFiles')
+    expect(dupItems).toHaveLength(2)
+    expect(dupItems[0].path).toBe(file1)
+    expect(dupItems[1].path).toBe(file2)
+    expect(dupItems[0].bytes).toBe(1024)
   })
 })

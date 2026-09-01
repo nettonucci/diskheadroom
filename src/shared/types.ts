@@ -21,6 +21,7 @@ export type ScanCategoryId =
   | 'dockerDesktop'
   | 'androidDevCaches'
   | 'idleUserFolders'
+  | 'duplicateFiles'
   | 'unusedApps'
 
 export interface ScanItem {
@@ -74,6 +75,7 @@ export interface AppSettings {
   setupComplete: boolean
   locale: Locale
   scanCategories: ScanCategoryFlags
+  duplicateFolders: string[]
   lowDiskAlert: LowDiskAlertSettings
   launchAtLogin: boolean
   scanReminder: ScanReminderSettings

@@ -40,10 +40,13 @@ const api = {
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
   setSettings: (settings: AppSettings): Promise<AppSettings> =>
     ipcRenderer.invoke('settings:set', settings),
+  pickFolders: (): Promise<string[]> => ipcRenderer.invoke('dialog:pick-folders'),
   runScan: (
     unusedDays: AppSettings['unusedDays'],
-    categories: AppSettings['scanCategories']
-  ): Promise<ScanResult> => ipcRenderer.invoke('scan:run', unusedDays, categories),
+    categories: AppSettings['scanCategories'],
+    duplicateFolders?: AppSettings['duplicateFolders']
+  ): Promise<ScanResult> =>
+    ipcRenderer.invoke('scan:run', unusedDays, categories, duplicateFolders),
   trashItems: (request: CleanRequest): Promise<CleanResult> =>
     ipcRenderer.invoke('clean:trash', request),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),

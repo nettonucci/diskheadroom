@@ -17,6 +17,7 @@ export const SCAN_CATEGORY_IDS = [
   'androidDev',
   'docker',
   'idleUserFolders',
+  'duplicateFiles',
   'unusedApps'
 ] as const
 export type ScanCategoryFlag = (typeof SCAN_CATEGORY_IDS)[number]
@@ -32,7 +33,26 @@ export const DEFAULT_SCAN_CATEGORIES: ScanCategoryFlags = {
   androidDev: true,
   docker: true,
   idleUserFolders: true,
+  duplicateFiles: false,
   unusedApps: true
+}
+
+export const DEFAULT_DUPLICATE_FOLDERS: string[] = []
+
+export function mergeDuplicateFolders(input: unknown): string[] {
+  if (!Array.isArray(input)) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const item of input) {
+    if (typeof item === 'string') {
+      const trimmed = item.trim()
+      if (trimmed && !seen.has(trimmed)) {
+        seen.add(trimmed)
+        result.push(trimmed)
+      }
+    }
+  }
+  return result
 }
 
 // Settings saved before a phase existed omit its flag, and the renderer can send

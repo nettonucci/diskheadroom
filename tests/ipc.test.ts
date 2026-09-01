@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   writeText: vi.fn(),
   openExternal: vi.fn(),
   showItemInFolder: vi.fn(),
+  showOpenDialog: vi.fn(),
   getDiskInfo: vi.fn(),
   getPermissionStatus: vi.fn(),
   openFullDiskAccessSettings: vi.fn(),
@@ -20,10 +21,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('electron', () => {
   const module = {
     clipboard: { writeText: mocks.writeText },
+    dialog: { showOpenDialog: mocks.showOpenDialog },
     ipcMain: {
-    handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
-      mocks.handlers.set(channel, handler)
-    }
+      handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+        mocks.handlers.set(channel, handler)
+      }
     },
     shell: { openExternal: mocks.openExternal, showItemInFolder: mocks.showItemInFolder }
   }
@@ -68,7 +70,7 @@ describe('IPC registration', () => {
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(12)
+    expect(mocks.handlers.size).toBe(13)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
@@ -76,6 +78,15 @@ describe('IPC registration', () => {
     call('permissions:reveal-target')
     expect(mocks.revealGrantTarget).toHaveBeenCalled()
     await expect(call('settings:get')).resolves.toEqual({ locale: 'en' })
+  })
+
+  it('handles dialog:pick-folders for selecting folders', async () => {
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    mocks.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/Users/test/Downloads'] })
+    await expect(call('dialog:pick-folders')).resolves.toEqual(['/Users/test/Downloads'])
+
+    mocks.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] })
+    await expect(call('dialog:pick-folders')).resolves.toEqual([])
   })
 
   it('saves settings and updates the tray locale when available', async () => {
@@ -90,13 +101,15 @@ describe('IPC registration', () => {
       unusedDays: 90,
       setupComplete: true,
       locale: 'pt-BR',
-      scanCategories: { unusedApps: false }
+      scanCategories: { unusedApps: false },
+      duplicateFolders: ['/Users/test/Downloads']
     }
     const saved = await call('settings:set', next)
     expect(saved).toEqual(
       expect.objectContaining({
         locale: 'pt-BR',
         scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true }),
+        duplicateFolders: ['/Users/test/Downloads'],
         lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
         launchAtLogin: false,
         scanReminder: { enabled: false, intervalDays: 7 }
@@ -141,7 +154,7 @@ describe('IPC registration', () => {
     mocks.trashPaths.mockResolvedValue({ trashed: [], failed: [], bytesRequested: 42 })
     registerIpc({ sendToRenderer, getTrayController: () => null, onScanCompleted })
 
-    await call('scan:run', 90, { unusedApps: false })
+    await call('scan:run', 90, { unusedApps: false }, ['/Users/test/Downloads'])
     expect(onScanCompleted).toHaveBeenCalledTimes(1)
     expect(sendToRenderer).toHaveBeenCalledWith('scan:progress', {
       phase: 'progress.done',
@@ -150,7 +163,8 @@ describe('IPC registration', () => {
     expect(mocks.runScan).toHaveBeenCalledWith(
       90,
       expect.any(Function),
-      expect.objectContaining({ unusedApps: false, userCaches: true })
+      expect.objectContaining({ unusedApps: false, userCaches: true }),
+      ['/Users/test/Downloads']
     )
     const request = { paths: ['/Users/test/cache', '/Users/test/unknown'] }
     await call('clean:trash', request)

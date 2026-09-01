@@ -198,7 +198,11 @@ function AppShell(): JSX.Element {
     // sign of work; the dashboard is where the progress bar lives.
     setView('dashboard')
     try {
-      const next = await window.diskheadroom.runScan(settings.unusedDays, settings.scanCategories)
+      const next = await window.diskheadroom.runScan(
+        settings.unusedDays,
+        settings.scanCategories,
+        settings.duplicateFolders
+      )
       setResult(next)
       const initial: Record<string, boolean> = {}
       for (const item of next.items) {
@@ -260,6 +264,10 @@ function AppShell(): JSX.Element {
     await updateSettings((current) => ({
       scanCategories: { ...current.scanCategories, [id]: enabled }
     }))
+  }
+
+  async function updateDuplicateFolders(duplicateFolders: string[]): Promise<void> {
+    await updateSettings(() => ({ duplicateFolders }))
   }
 
   async function updateLowDiskAlert(patch: Partial<LowDiskAlertSettings>): Promise<void> {
@@ -423,6 +431,7 @@ function AppShell(): JSX.Element {
             onUnusedDays={(value) => void updateUnusedDays(value)}
             onLocale={(value) => void updateLocale(value)}
             onScanCategory={(id, enabled) => void updateScanCategory(id, enabled)}
+            onDuplicateFolders={(folders) => void updateDuplicateFolders(folders)}
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
             onScanReminder={(patch) => void updateScanReminder(patch)}
@@ -939,6 +948,7 @@ function SettingsView(props: {
   onUnusedDays: (value: UnusedDays) => void
   onLocale: (value: Locale) => void
   onScanCategory: (id: ScanCategoryFlag, enabled: boolean) => void
+  onDuplicateFolders: (folders: string[]) => void
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
   onLaunchAtLogin: (enabled: boolean) => void
   onScanReminder: (patch: Partial<ScanReminderSettings>) => void
@@ -989,6 +999,52 @@ function SettingsView(props: {
             </option>
           ))}
         </select>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.duplicateFoldersTitle')}</h3>
+        <p className="muted">{props.t('settings.duplicateFoldersHint')}</p>
+        <div style={{ marginTop: '0.75rem', marginBottom: '0.75rem' }}>
+          <button
+            className="btn"
+            type="button"
+            onClick={async () => {
+              const picked = await window.diskheadroom.pickFolders()
+              if (picked.length > 0) {
+                const merged = Array.from(new Set([...props.settings.duplicateFolders, ...picked]))
+                props.onDuplicateFolders(merged)
+              }
+            }}
+          >
+            {props.t('settings.addFolder')}
+          </button>
+        </div>
+        {props.settings.duplicateFolders.length === 0 ? (
+          <p className="muted">{props.t('settings.noDuplicateFolders')}</p>
+        ) : (
+          <ul className="failed-list" style={{ marginTop: '0.5rem' }}>
+            {props.settings.duplicateFolders.map((folder) => (
+              <li
+                key={folder}
+                className="path"
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span style={{ wordBreak: 'break-all', marginRight: '0.5rem' }}>{folder}</span>
+                <button
+                  className="btn"
+                  type="button"
+                  style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}
+                  onClick={() =>
+                    props.onDuplicateFolders(
+                      props.settings.duplicateFolders.filter((f) => f !== folder)
+                    )
+                  }
+                >
+                  {props.t('settings.removeFolder')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div className="card">
         <h3>{props.t('settings.launchAtLoginTitle')}</h3>
