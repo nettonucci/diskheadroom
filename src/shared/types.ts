@@ -1,4 +1,4 @@
-import type { ScanCategoryFlags, UnusedDays } from './constants'
+import type { LowDiskAlertSettings, ScanCategoryFlags, UnusedDays } from './constants'
 import type { Locale, TranslationKey } from './i18n'
 
 export type ScanCategoryId =
@@ -69,6 +69,19 @@ export interface AppSettings {
   setupComplete: boolean
   locale: Locale
   scanCategories: ScanCategoryFlags
+  lowDiskAlert: LowDiskAlertSettings
+}
+
+/** Development-only snapshot behind the Debug tab. Never registered in a packaged build. */
+export interface LowDiskDebugStatus {
+  disk: DiskInfo
+  realFreeBytes: number
+  simulatedFreePercent: number | null
+  alert: LowDiskAlertSettings
+  belowThreshold: boolean
+  lastFiredAt: number | null
+  cooldownMs: number
+  notificationsSupported: boolean
 }
 
 export interface CleanRequest {

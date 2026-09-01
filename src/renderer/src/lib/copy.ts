@@ -96,4 +96,5 @@ export const NAV: { id: ViewId; label: TranslationKey }[] = [
   { id: 'donate', label: 'nav.donate' }
 ]
 
-export type ViewId = 'dashboard' | 'permissions' | 'settings' | 'donate' | 'results'
+// 'debug' is reachable only from the development-only nav button in App.tsx.
+export type ViewId = 'dashboard' | 'permissions' | 'settings' | 'donate' | 'results' | 'debug'

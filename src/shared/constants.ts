@@ -47,3 +47,58 @@ export function mergeScanCategories(
   }
   return next
 }
+
+export const LOW_DISK_ALERT_KINDS = ['percent', 'gigabytes'] as const
+export type LowDiskAlertKind = (typeof LOW_DISK_ALERT_KINDS)[number]
+
+export interface LowDiskAlertSettings {
+  enabled: boolean
+  kind: LowDiskAlertKind
+  value: number
+}
+
+export const DEFAULT_LOW_DISK_ALERT: LowDiskAlertSettings = {
+  enabled: false,
+  kind: 'percent',
+  value: 10
+}
+
+export const LOW_DISK_ALERT_PRESETS: ReadonlyArray<Omit<LowDiskAlertSettings, 'enabled'>> = [
+  { kind: 'percent', value: 5 },
+  { kind: 'percent', value: 10 },
+  { kind: 'percent', value: 15 },
+  { kind: 'gigabytes', value: 5 },
+  { kind: 'gigabytes', value: 10 },
+  { kind: 'gigabytes', value: 20 }
+]
+
+export const LOW_DISK_ALERT_COOLDOWN_MS = 12 * 60 * 60 * 1000
+export const LOW_DISK_ALERT_INTERVAL_MS = 60 * 1000
+export const GIGABYTE_BYTES = 1024 ** 3
+
+// Older settings.json files omit the alert block. IPC can send anything, so
+// unknown kinds or non-numeric values fall back to the conservative default.
+export function mergeLowDiskAlert(input: unknown): LowDiskAlertSettings {
+  const next = { ...DEFAULT_LOW_DISK_ALERT }
+  if (!input || typeof input !== 'object') return next
+  const raw = input as Partial<LowDiskAlertSettings>
+  if (typeof raw.enabled === 'boolean') next.enabled = raw.enabled
+  if (raw.kind === 'percent' || raw.kind === 'gigabytes') next.kind = raw.kind
+  if (typeof raw.value === 'number' && Number.isFinite(raw.value) && raw.value > 0) {
+    next.value = Math.round(raw.value)
+  }
+  return next
+}
+
+export function lowDiskAlertPresetKey(kind: LowDiskAlertKind, value: number): string {
+  return `${kind}:${value}`
+}
+
+export function parseLowDiskAlertPreset(value: string): Omit<LowDiskAlertSettings, 'enabled'> | null {
+  const [kind, raw] = value.split(':')
+  const amount = Number(raw)
+  if ((kind !== 'percent' && kind !== 'gigabytes') || !Number.isFinite(amount) || amount <= 0) {
+    return null
+  }
+  return { kind, value: amount }
+}

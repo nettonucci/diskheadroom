@@ -67,7 +67,7 @@ app.whenReady().then(async () => {
   await capture(ready, 'scan')
 
   await show(ready, 'settings')
-  ready.setSize(WIDTH, 900)
+  ready.setSize(WIDTH, 1240)
   await wait(200)
   await capture(ready, 'settings')
   ready.setSize(WIDTH, HEIGHT)

@@ -78,9 +78,11 @@ describe('IPC registration', () => {
 
   it('saves settings and updates the tray locale when available', async () => {
     const setLocale = vi.fn()
+    const onSettingsChanged = vi.fn()
     registerIpc({
       sendToRenderer: vi.fn(),
-      getTrayController: () => ({ setLocale } as never)
+      getTrayController: () => ({ setLocale } as never),
+      onSettingsChanged
     })
     const next = {
       unusedDays: 90,
@@ -88,9 +90,17 @@ describe('IPC registration', () => {
       locale: 'pt-BR',
       scanCategories: { unusedApps: false }
     }
-    await expect(call('settings:set', next)).resolves.toEqual(next)
-    expect(mocks.saveSettings).toHaveBeenCalledWith(next)
+    const saved = await call('settings:set', next)
+    expect(saved).toEqual(
+      expect.objectContaining({
+        locale: 'pt-BR',
+        scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true }),
+        lowDiskAlert: { enabled: false, kind: 'percent', value: 10 }
+      })
+    )
+    expect(mocks.saveSettings).toHaveBeenCalledWith(saved)
     expect(setLocale).toHaveBeenCalledWith('pt-BR')
+    expect(onSettingsChanged).toHaveBeenCalledWith(saved)
   })
 
   it('stores scan sizes, forwards progress and cleans known paths', async () => {
