@@ -1,7 +1,7 @@
 # Abrir ao entrar no Mac e lembrete de scan
 
 - **Data:** 2026-09-01
-- **Commit / PR:** issue [#15](https://github.com/nettonucci/diskheadroom/issues/15)
+- **Commit / PR:** `069527b` / [#49](https://github.com/nettonucci/diskheadroom/pull/49)
 - **Tipo:** feat
 - **Público:** quem já deixa o Disk Headroom na barra de menus e quer o hábito de revisar, sem limpeza automática
 - **Formato sugerido no Instagram:** carrossel (1. Ajustes com os novos toggles, 2. aviso de lembrete)
