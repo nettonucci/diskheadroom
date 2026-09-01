@@ -20,6 +20,7 @@ const settings = {
   setupComplete: true,
   locale: 'en' as const,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
+  largeFileMinBytes: 500 * 1024 * 1024 as const,
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
   scanReminder: { enabled: false, intervalDays: 7 as const }
@@ -298,6 +299,48 @@ describe('App', () => {
     await user.click(screen.getByRole('checkbox'))
     await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
     expect(screen.getByRole('dialog')).toHaveTextContent(/Docker Desktop/)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(bridge.trashItems).toHaveBeenCalled())
+  })
+
+  it('shows large home files unchecked with a warning before trash', async () => {
+    const largeFilesResult = {
+      ...result,
+      items: [
+        {
+          id: 'large-file',
+          categoryId: 'largeFiles' as const,
+          name: 'large_archive.iso',
+          path: '/Users/test/Downloads/large_archive.iso',
+          bytes: 1024 * 1024 * 1024,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: null,
+          daysIdle: null
+        }
+      ]
+    }
+    const bridge = api({
+      runScan: vi.fn().mockResolvedValue(largeFilesResult),
+      trashItems: vi.fn().mockResolvedValue({
+        trashed: [largeFilesResult.items[0].path],
+        failed: [],
+        bytesRequested: 1024 * 1024 * 1024
+      })
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+
+    expect(await screen.findByText('large_archive.iso')).toBeInTheDocument()
+    expect(screen.getByText(/individual files in your home folder/)).toBeInTheDocument()
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
+
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent(/Move 1 item \(1.0 GB\) to Trash/)
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(bridge.trashItems).toHaveBeenCalled())
   })
@@ -604,6 +647,12 @@ describe('App', () => {
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ unusedDays: 180 }))
     )
+    fireEvent.change(screen.getByDisplayValue('500 MB'), { target: { value: String(1024 * 1024 * 1024) } })
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ largeFileMinBytes: 1024 * 1024 * 1024 })
+      )
+    )
     await user.click(screen.getByRole('checkbox', { name: 'Start Disk Headroom at login' }))
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ launchAtLogin: true }))
@@ -685,7 +734,9 @@ describe('App', () => {
     act(() => donate?.())
     expect(await screen.findByText('Keep the lights on')).toBeInTheDocument()
     act(() => scan?.())
-    await waitFor(() => expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES))
+    await waitFor(() =>
+      expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES, 500 * 1024 * 1024)
+    )
   })
 
   it('drives the low disk alert from the development-only Debug tab', async () => {

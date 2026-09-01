@@ -6,8 +6,10 @@ import {
   REPO_URL,
   LOW_DISK_ALERT_PRESETS,
   SCAN_REMINDER_INTERVAL_DAYS,
+  LARGE_FILE_MIN_BYTES_OPTIONS,
   lowDiskAlertPresetKey,
   parseLowDiskAlertPreset,
+  type LargeFileMinBytes,
   type LowDiskAlertSettings,
   type ScanCategoryFlag,
   type ScanReminderSettings,
@@ -198,7 +200,11 @@ function AppShell(): JSX.Element {
     // sign of work; the dashboard is where the progress bar lives.
     setView('dashboard')
     try {
-      const next = await window.diskheadroom.runScan(settings.unusedDays, settings.scanCategories)
+      const next = await window.diskheadroom.runScan(
+        settings.unusedDays,
+        settings.scanCategories,
+        settings.largeFileMinBytes
+      )
       setResult(next)
       const initial: Record<string, boolean> = {}
       for (const item of next.items) {
@@ -250,6 +256,10 @@ function AppShell(): JSX.Element {
 
   async function updateUnusedDays(unusedDays: UnusedDays): Promise<void> {
     await updateSettings(() => ({ unusedDays }))
+  }
+
+  async function updateLargeFileMinBytes(largeFileMinBytes: LargeFileMinBytes): Promise<void> {
+    await updateSettings(() => ({ largeFileMinBytes }))
   }
 
   async function updateLocale(nextLocale: Locale): Promise<void> {
@@ -421,6 +431,7 @@ function AppShell(): JSX.Element {
             t={t}
             settings={settings}
             onUnusedDays={(value) => void updateUnusedDays(value)}
+            onLargeFileMinBytes={(value) => void updateLargeFileMinBytes(value)}
             onLocale={(value) => void updateLocale(value)}
             onScanCategory={(id, enabled) => void updateScanCategory(id, enabled)}
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
@@ -937,6 +948,7 @@ function SettingsView(props: {
   t: Translator
   settings: AppSettings
   onUnusedDays: (value: UnusedDays) => void
+  onLargeFileMinBytes: (value: LargeFileMinBytes) => void
   onLocale: (value: Locale) => void
   onScanCategory: (id: ScanCategoryFlag, enabled: boolean) => void
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
@@ -975,6 +987,20 @@ function SettingsView(props: {
             </label>
           ))}
         </div>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.largeFilesTitle')}</h3>
+        <p className="muted">{props.t('settings.largeFilesHint')}</p>
+        <select
+          value={props.settings.largeFileMinBytes}
+          onChange={(event) => props.onLargeFileMinBytes(Number(event.target.value) as LargeFileMinBytes)}
+        >
+          {LARGE_FILE_MIN_BYTES_OPTIONS.map((bytes) => (
+            <option key={bytes} value={bytes}>
+              {formatBytes(bytes)}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="card">
         <h3>{props.t('settings.idleTitle')}</h3>

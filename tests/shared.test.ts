@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_UNUSED_DAYS,
   UNUSED_DAY_OPTIONS,
-  mergeScanCategories
+  DEFAULT_LARGE_FILE_MIN_BYTES,
+  LARGE_FILE_MIN_BYTES_OPTIONS,
+  mergeScanCategories,
+  mergeLargeFileMinBytes
 } from '../src/shared/constants'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
 import { CATEGORY_META, NAV } from '../src/renderer/src/lib/copy'
@@ -30,19 +33,30 @@ describe('shared helpers', () => {
     expect(LOCALES).toEqual(['en', 'pt-BR', 'es'])
     expect(LOCALE_NAMES['pt-BR']).toContain('Português')
     expect(NAV).toHaveLength(4)
-    expect(Object.keys(CATEGORY_META)).toHaveLength(15)
+    expect(Object.keys(CATEGORY_META)).toHaveLength(16)
     expect(UNUSED_DAY_OPTIONS).toContain(DEFAULT_UNUSED_DAYS)
+    expect(LARGE_FILE_MIN_BYTES_OPTIONS).toContain(DEFAULT_LARGE_FILE_MIN_BYTES)
   })
 
-  it('keeps every scan category on when flags are missing or malformed', () => {
+  it('merges scan categories respecting defaults (largeFiles off by default)', () => {
     expect(mergeScanCategories(undefined).unusedApps).toBe(true)
+    expect(mergeScanCategories(undefined).largeFiles).toBe(false)
     expect(mergeScanCategories(null).unusedApps).toBe(true)
+    expect(mergeScanCategories(null).largeFiles).toBe(false)
     expect(mergeScanCategories('all' as never).unusedApps).toBe(true)
     expect(mergeScanCategories({ unusedApps: 'no' } as never).unusedApps).toBe(true)
-    expect(mergeScanCategories({ unusedApps: false })).toMatchObject({
+    expect(mergeScanCategories({ unusedApps: false, largeFiles: true })).toMatchObject({
       unusedApps: false,
+      largeFiles: true,
       userCaches: true
     })
+  })
+
+  it('merges large file min bytes floor safely', () => {
+    expect(mergeLargeFileMinBytes(undefined)).toBe(DEFAULT_LARGE_FILE_MIN_BYTES)
+    expect(mergeLargeFileMinBytes(null as never)).toBe(DEFAULT_LARGE_FILE_MIN_BYTES)
+    expect(mergeLargeFileMinBytes(100 * 1024 * 1024)).toBe(100 * 1024 * 1024)
+    expect(mergeLargeFileMinBytes(9999 as never)).toBe(DEFAULT_LARGE_FILE_MIN_BYTES)
   })
 })
 

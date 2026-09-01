@@ -30,7 +30,7 @@ vi.mock('../src/main/permissions', () => ({
   getPermissionStatus: mocks.getPermissionStatus
 }))
 
-import { isSafePath, runScan } from '../src/main/scanner'
+import { isSafePath, runScan, scanLargeHomeFiles } from '../src/main/scanner'
 import { DEFAULT_SCAN_CATEGORIES } from '../src/shared/constants'
 
 const directory = {
@@ -169,11 +169,12 @@ describe('runScan', () => {
       'Never'
     ])
     expect(result.items.every((item) => item.bytes > 0)).toBe(true)
-    expect(progress).toHaveBeenCalledTimes(11)
+    expect(progress).toHaveBeenCalledTimes(12)
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.packageManagers', percent: 44 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.androidDev', percent: 68 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.docker', percent: 72 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.documentsDesktop', percent: 76 })
+    expect(progress).toHaveBeenCalledWith({ phase: 'progress.largeFiles', percent: 80 })
     expect(progress).toHaveBeenLastCalledWith({ phase: 'progress.done', percent: 100 })
   })
 
@@ -195,7 +196,7 @@ describe('runScan', () => {
     })
     expect(result.items.some((item) => item.categoryId === 'unusedApps')).toBe(false)
     expect(mocks.execFile.mock.calls.some(([command]) => command === 'mdls')).toBe(false)
-    expect(progress).toHaveBeenCalledWith({ phase: 'progress.apps', percent: 80 })
+    expect(progress).toHaveBeenCalledWith({ phase: 'progress.apps', percent: 86 })
   })
 
   it('touches no scan root when every category is disabled', async () => {
@@ -211,7 +212,7 @@ describe('runScan', () => {
     expect(mocks.lstat).not.toHaveBeenCalled()
     expect(mocks.execFile).not.toHaveBeenCalled()
     // Every phase is still announced so the progress bar does not look stuck.
-    expect(progress).toHaveBeenCalledTimes(11)
+    expect(progress).toHaveBeenCalledTimes(12)
   })
 
   it('scans Xcode Archives, CoreSimulator caches and unavailable simulators as opt-in', async () => {
@@ -641,5 +642,97 @@ describe('runScan', () => {
     const result = await runScan(90, vi.fn())
     expect(result.items).toHaveLength(1)
     expect(result.items[0]).toMatchObject({ name: 'FreshUnknown', lastUsedAt: null })
+  })
+
+  describe('large files scanner', () => {
+    it('discovers files exceeding the threshold, ignores smaller ones, skips symlinks and blocked directories', async () => {
+      const home = '/Users/test'
+      const largeIso = '/Users/test/Downloads/huge.iso'
+      const smallTxt = '/Users/test/Downloads/small.txt'
+      const symlinkFile = '/Users/test/Downloads/link.iso'
+      const gitBlob = '/Users/test/Projects/.git/large.pack'
+      const trashFile = '/Users/test/.Trash/deleted.zip'
+      const libCache = '/Users/test/Library/Caches/big.db'
+
+      mocks.readdir.mockImplementation(async (path: string) => {
+        if (path === home) return ['Downloads', 'Projects', '.git', '.Trash', 'Library']
+        if (path === '/Users/test/Downloads') return ['huge.iso', 'small.txt', 'link.iso']
+        if (path === '/Users/test/Projects') return ['.git']
+        if (path === '/Users/test/Projects/.git') return ['large.pack']
+        if (path === '/Users/test/.Trash') return ['deleted.zip']
+        if (path === '/Users/test/Library') return ['Caches']
+        return []
+      })
+
+      mocks.lstat.mockImplementation(async (path: string) => {
+        if (
+          path === home ||
+          path === '/Users/test/Downloads' ||
+          path === '/Users/test/Projects' ||
+          path === '/Users/test/Library'
+        ) {
+          return directory
+        }
+        if (path === largeIso) return file(600 * 1024 * 1024)
+        if (path === smallTxt) return file(10 * 1024 * 1024)
+        if (path === symlinkFile) return symlink
+        if (path === gitBlob) return file(700 * 1024 * 1024)
+        if (path === trashFile) return file(800 * 1024 * 1024)
+        if (path === libCache) return file(900 * 1024 * 1024)
+        throw new Error('not found')
+      })
+
+      const items = await scanLargeHomeFiles(home, 500 * 1024 * 1024)
+      expect(items).toHaveLength(1)
+      expect(items[0]).toMatchObject({
+        name: 'huge.iso',
+        path: largeIso,
+        bytes: 600 * 1024 * 1024,
+        categoryId: 'largeFiles',
+        selectedByDefault: false,
+        optional: true
+      })
+    })
+
+    it('respects maxDepth and visited directory limits', async () => {
+      const home = '/Users/test'
+      // Path depth: /Users/test/d1/d2/d3/d4/d5/d6/d7/deep.bin -> depth is 7 from home
+      mocks.readdir.mockImplementation(async (path: string) => {
+        if (path === home) return ['d1']
+        if (path === '/Users/test/d1') return ['d2']
+        if (path === '/Users/test/d1/d2') return ['d3']
+        if (path === '/Users/test/d1/d2/d3') return ['d4']
+        if (path === '/Users/test/d1/d2/d3/d4') return ['d5']
+        if (path === '/Users/test/d1/d2/d3/d4/d5') return ['d6']
+        if (path === '/Users/test/d1/d2/d3/d4/d5/d6') return ['d7']
+        if (path === '/Users/test/d1/d2/d3/d4/d5/d6/d7') return ['deep.bin']
+        return []
+      })
+      mocks.lstat.mockImplementation(async (path: string) => {
+        if (path.endsWith('.bin')) return file(600 * 1024 * 1024)
+        return directory
+      })
+
+      // Depth 6 maxDepth shouldn't reach d7/deep.bin
+      const items = await scanLargeHomeFiles(home, 500 * 1024 * 1024, 6)
+      expect(items).toHaveLength(0)
+    })
+
+    it('runs largeFiles in runScan only when category is enabled', async () => {
+      const progressPhases: string[] = []
+      const onProgress = (p: { phase: string; percent: number }) => progressPhases.push(p.phase)
+
+      mocks.readdir.mockResolvedValue([])
+      mocks.lstat.mockResolvedValue(directory)
+
+      // 1. With largeFiles disabled (default)
+      const resOff = await runScan(90, onProgress, { ...DEFAULT_SCAN_CATEGORIES, largeFiles: false })
+      expect(resOff.items.some((item) => item.categoryId === 'largeFiles')).toBe(false)
+
+      // 2. With largeFiles enabled
+      progressPhases.length = 0
+      const resOn = await runScan(90, onProgress, { ...DEFAULT_SCAN_CATEGORIES, largeFiles: true }, 500 * 1024 * 1024)
+      expect(progressPhases).toContain('progress.largeFiles')
+    })
   })
 })

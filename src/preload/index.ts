@@ -42,8 +42,10 @@ const api = {
     ipcRenderer.invoke('settings:set', settings),
   runScan: (
     unusedDays: AppSettings['unusedDays'],
-    categories: AppSettings['scanCategories']
-  ): Promise<ScanResult> => ipcRenderer.invoke('scan:run', unusedDays, categories),
+    categories?: AppSettings['scanCategories'],
+    largeFileMinBytes?: AppSettings['largeFileMinBytes']
+  ): Promise<ScanResult> =>
+    ipcRenderer.invoke('scan:run', unusedDays, categories, largeFileMinBytes),
   trashItems: (request: CleanRequest): Promise<CleanResult> =>
     ipcRenderer.invoke('clean:trash', request),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),

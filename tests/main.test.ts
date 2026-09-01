@@ -91,7 +91,7 @@ import {
 import { applyLaunchAtLogin, shouldShowWindowOnLaunch } from '../src/main/loginItem'
 import { loadSettings, saveSettings } from '../src/main/settings'
 import { createTray } from '../src/main/tray'
-import { DEFAULT_SCAN_CATEGORIES } from '../src/shared/constants'
+import { DEFAULT_LARGE_FILE_MIN_BYTES, DEFAULT_SCAN_CATEGORIES } from '../src/shared/constants'
 
 function callbackResult(stdout: string, error: Error | null = null): void {
   mocks.execFile.mockImplementationOnce((_cmd, _args, callback) => callback(error, { stdout, stderr: '' }))
@@ -158,6 +158,7 @@ describe('settings', () => {
       setupComplete: false,
       locale: 'pt-BR',
       scanCategories: DEFAULT_SCAN_CATEGORIES,
+      largeFileMinBytes: DEFAULT_LARGE_FILE_MIN_BYTES,
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
       scanReminder: { enabled: false, intervalDays: 7 }

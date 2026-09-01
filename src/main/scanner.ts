@@ -5,7 +5,9 @@ import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
 import { promisify } from 'node:util'
 import {
+  DEFAULT_LARGE_FILE_MIN_BYTES,
   DEFAULT_SCAN_CATEGORIES,
+  type LargeFileMinBytes,
   type ScanCategoryFlags,
   type UnusedDays
 } from '../shared/constants'
@@ -20,6 +22,10 @@ const BLOCKED_PREFIXES = ['/System', '/usr/sbin', '/bin', '/sbin', '/private/var
 /** First-level Documents/Desktop children below this size stay off the list. */
 const IDLE_USER_MIN_BYTES = 100 * 1024 * 1024
 const IDLE_USER_LIMIT = 24
+
+const LARGE_FILES_MAX_DEPTH = 6
+const LARGE_FILES_MAX_DIRS = 2000
+const LARGE_FILES_LIMIT = 50
 
 /** Top-level ~/Library/Caches names scanned as Homebrew or package-manager leftovers. */
 const USER_CACHE_SKIP = new Set([
@@ -40,7 +46,8 @@ type ProgressFn = (progress: ScanProgress) => void
 export async function runScan(
   unusedDays: UnusedDays,
   onProgress: ProgressFn,
-  categories: ScanCategoryFlags = DEFAULT_SCAN_CATEGORIES
+  categories: ScanCategoryFlags = DEFAULT_SCAN_CATEGORIES,
+  largeFileMinBytes: LargeFileMinBytes = DEFAULT_LARGE_FILE_MIN_BYTES
 ): Promise<ScanResult> {
   const items: ScanItem[] = []
   const perms = await getPermissionStatus()
@@ -106,7 +113,12 @@ export async function runScan(
     items.push(...(await scanIdleUserFolders(home, unusedDays)))
   }
 
-  onProgress({ phase: 'progress.apps', percent: 80 })
+  onProgress({ phase: 'progress.largeFiles', percent: 80 })
+  if (categories.largeFiles) {
+    items.push(...(await scanLargeHomeFiles(home, largeFileMinBytes)))
+  }
+
+  onProgress({ phase: 'progress.apps', percent: 86 })
   if (categories.unusedApps) {
     items.push(...(await scanUnusedApps(unusedDays)))
   }
@@ -476,6 +488,103 @@ async function scanIdleUserFolders(home: string, unusedDays: UnusedDays): Promis
   }
 
   return items.sort((left, right) => right.bytes - left.bytes).slice(0, IDLE_USER_LIMIT)
+}
+
+/**
+ * Recursively scans under the user's home folder for files exceeding minBytes.
+ * Depth, directory visits and returned item count are capped to keep the walk bounded.
+ * Skips .Trash, .git, symlinks, and BLOCKED_PREFIXES.
+ */
+export async function scanLargeHomeFiles(
+  home: string,
+  minBytes: number = DEFAULT_LARGE_FILE_MIN_BYTES,
+  maxDepth = LARGE_FILES_MAX_DEPTH,
+  limit = LARGE_FILES_LIMIT
+): Promise<ScanItem[]> {
+  const items: ScanItem[] = []
+  const seen = new Set<string>()
+  let visitedDirs = 0
+
+  async function walk(dir: string, depth: number): Promise<void> {
+    if (depth > maxDepth || visitedDirs >= LARGE_FILES_MAX_DIRS) return
+
+    let realDir = dir
+    try {
+      const lst = await lstat(dir)
+      if (lst.isSymbolicLink()) {
+        const link = await readlink(dir).catch(() => dir)
+        realDir = isAbsolute(link) ? link : resolvePath(dirname(dir), link)
+      }
+    } catch {
+      return
+    }
+
+    if (seen.has(realDir)) return
+    seen.add(realDir)
+    visitedDirs++
+
+    let entries: string[] = []
+    try {
+      entries = await readdir(dir)
+    } catch {
+      return
+    }
+
+    for (const name of entries) {
+      if (visitedDirs >= LARGE_FILES_MAX_DIRS) break
+      if (name === '.Trash' || name === '.git') continue
+
+      const fullPath = join(dir, name)
+      if (
+        BLOCKED_PREFIXES.some((prefix) => fullPath === prefix || fullPath.startsWith(`${prefix}/`))
+      ) {
+        continue
+      }
+
+      let info
+      try {
+        info = await lstat(fullPath)
+      } catch {
+        continue
+      }
+
+      if (info.isSymbolicLink()) {
+        continue
+      }
+
+      if (info.isDirectory()) {
+        await walk(fullPath, depth + 1)
+      } else if (info.isFile()) {
+        if (info.size >= minBytes && isSafePath(fullPath)) {
+          let lastUsedAt: string | null = null
+          let daysIdle: number | null = null
+          if (Number.isFinite(info.mtimeMs)) {
+            lastUsedAt = new Date(info.mtimeMs).toISOString()
+            daysIdle = Math.max(
+              0,
+              Math.floor((Date.now() - info.mtimeMs) / (24 * 60 * 60 * 1000))
+            )
+          }
+
+          items.push({
+            id: idFor(fullPath),
+            categoryId: 'largeFiles',
+            name,
+            path: fullPath,
+            bytes: info.size,
+            selectedByDefault: false,
+            optional: true,
+            lastUsedAt,
+            daysIdle
+          })
+        }
+      }
+    }
+  }
+
+  await walk(home, 0)
+
+  return items.sort((left, right) => right.bytes - left.bytes).slice(0, limit)
 }
 
 async function scanUnusedApps(unusedDays: UnusedDays): Promise<ScanItem[]> {
