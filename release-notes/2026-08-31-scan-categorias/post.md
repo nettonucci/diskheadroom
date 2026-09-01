@@ -1,7 +1,7 @@
 # Toggles por categoria no scan
 
 - **Data:** 2026-08-31
-- **Commit / PR:** [#38](https://github.com/nettonucci/diskheadroom/pull/38)
+- **Commit / PR:** `69f1d74` / [#38](https://github.com/nettonucci/diskheadroom/pull/38)
 - **Tipo:** feat
 - **Público:** quem só quer caches, quem não usa Xcode/Docker, quem acha apps inativos lentos
 - **Formato sugerido no Instagram:** único (screenshot de Ajustes com as categorias)
