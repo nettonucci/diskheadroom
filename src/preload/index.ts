@@ -5,10 +5,31 @@ import type {
   CleanResult,
   DiskInfo,
   GrantTarget,
+  LowDiskDebugStatus,
   PermissionStatus,
   ScanProgress,
   ScanResult
 } from '../shared/types'
+
+export interface DebugApi {
+  lowDiskStatus: () => Promise<LowDiskDebugStatus>
+  simulateFreePercent: (percent: number | null) => Promise<LowDiskDebugStatus>
+  runLowDiskCheck: () => Promise<LowDiskDebugStatus>
+  resetLowDiskCooldown: () => Promise<LowDiskDebugStatus>
+  sendLowDiskNotification: () => Promise<{ shown: boolean; status: LowDiskDebugStatus }>
+}
+
+// Dropped from the bundle on a production build, so a packaged app exposes no
+// debug surface at all.
+const debug: DebugApi | null = import.meta.env.DEV
+  ? {
+      lowDiskStatus: () => ipcRenderer.invoke('debug:low-disk-status'),
+      simulateFreePercent: (percent) => ipcRenderer.invoke('debug:low-disk-simulate', percent),
+      runLowDiskCheck: () => ipcRenderer.invoke('debug:low-disk-check'),
+      resetLowDiskCooldown: () => ipcRenderer.invoke('debug:low-disk-reset'),
+      sendLowDiskNotification: () => ipcRenderer.invoke('debug:low-disk-notify')
+    }
+  : null
 
 const api = {
   getDiskInfo: (): Promise<DiskInfo> => ipcRenderer.invoke('disk:info'),
@@ -44,7 +65,8 @@ const api = {
     const listener = (): void => callback()
     ipcRenderer.on('tray:donate', listener)
     return () => ipcRenderer.removeListener('tray:donate', listener)
-  }
+  },
+  debug
 }
 
 export type DiskHeadroomApi = typeof api

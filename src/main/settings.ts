@@ -2,8 +2,10 @@ import { app } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
+  DEFAULT_LOW_DISK_ALERT,
   DEFAULT_SCAN_CATEGORIES,
   DEFAULT_UNUSED_DAYS,
+  mergeLowDiskAlert,
   mergeScanCategories
 } from '../shared/constants'
 import { resolveLocale } from '../shared/i18n'
@@ -15,7 +17,8 @@ const defaults = (): AppSettings => ({
   unusedDays: DEFAULT_UNUSED_DAYS,
   setupComplete: false,
   locale: resolveLocale(app.getLocale()),
-  scanCategories: { ...DEFAULT_SCAN_CATEGORIES }
+  scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
+    lowDiskAlert: { ...DEFAULT_LOW_DISK_ALERT }
 })
 
 export async function loadSettings(): Promise<AppSettings> {
@@ -26,7 +29,8 @@ export async function loadSettings(): Promise<AppSettings> {
       ...defaults(),
       ...parsed,
       locale: parsed.locale ? resolveLocale(parsed.locale) : defaults().locale,
-      scanCategories: mergeScanCategories(parsed.scanCategories)
+      scanCategories: mergeScanCategories(parsed.scanCategories),
+      lowDiskAlert: mergeLowDiskAlert(parsed.lowDiskAlert)
     }
   } catch {
     return defaults()

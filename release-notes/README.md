@@ -17,3 +17,4 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-08-31 | Mostrar no Finder e copiar caminho | [2026-08-31-reveal-copiar-caminho](./2026-08-31-reveal-copiar-caminho/post.md) |
 | 2026-08-31 | Horário do scan e falhas visíveis | [2026-08-31-scan-falhas-timestamp](./2026-08-31-scan-falhas-timestamp/post.md) |
 | 2026-08-31 | Toggles por categoria no scan | [2026-08-31-scan-categorias](./2026-08-31-scan-categorias/post.md) |
+| 2026-09-01 | Alerta local de disco cheio | [2026-09-01-alerta-disco-local](./2026-09-01-alerta-disco-local/post.md) |

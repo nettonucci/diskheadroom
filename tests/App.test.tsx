@@ -19,7 +19,8 @@ const settings = {
   unusedDays: 90 as const,
   setupComplete: true,
   locale: 'en' as const,
-  scanCategories: { ...DEFAULT_SCAN_CATEGORIES }
+  scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
+  lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 }
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -50,6 +51,17 @@ const result = {
   ]
 }
 
+const debugStatus = {
+  disk: { mount: '/', totalBytes: 1000, freeBytes: 400, usedBytes: 600 },
+  realFreeBytes: 400,
+  simulatedFreePercent: null,
+  alert: { enabled: true, kind: 'percent' as const, value: 10 },
+  belowThreshold: false,
+  lastFiredAt: null,
+  cooldownMs: 12 * 60 * 60 * 1000,
+  notificationsSupported: true
+}
+
 type Api = Window['diskheadroom']
 
 function api(overrides: Partial<Api> = {}): Api {
@@ -75,6 +87,13 @@ function api(overrides: Partial<Api> = {}): Api {
     openExternal: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
     revealItem: vi.fn().mockResolvedValue(true),
+    debug: {
+      lowDiskStatus: vi.fn().mockResolvedValue(debugStatus),
+      simulateFreePercent: vi.fn().mockResolvedValue({ ...debugStatus, simulatedFreePercent: 5 }),
+      runLowDiskCheck: vi.fn().mockResolvedValue(debugStatus),
+      resetLowDiskCooldown: vi.fn().mockResolvedValue(debugStatus),
+      sendLowDiskNotification: vi.fn().mockResolvedValue({ shown: true, status: debugStatus })
+    },
     onScanProgress: vi.fn(() => () => {}),
     onTrayScan: vi.fn(() => () => {}),
     onTrayDonate: vi.fn(() => () => {}),
@@ -583,6 +602,24 @@ describe('App', () => {
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ unusedDays: 180 }))
     )
+    await user.click(screen.getByRole('checkbox', { name: 'Notify me when free space is low' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lowDiskAlert: expect.objectContaining({ enabled: true, kind: 'percent', value: 10 })
+        })
+      )
+    )
+    fireEvent.change(screen.getByLabelText('Alert when free space is below'), {
+      target: { value: 'gigabytes:10' }
+    })
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lowDiskAlert: expect.objectContaining({ kind: 'gigabytes', value: 10 })
+        })
+      )
+    )
     await user.click(screen.getByRole('checkbox', { name: 'Idle applications' }))
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(
@@ -627,5 +664,39 @@ describe('App', () => {
     expect(await screen.findByText('Keep the lights on')).toBeInTheDocument()
     act(() => scan?.())
     await waitFor(() => expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES))
+  })
+
+  it('drives the low disk alert from the development-only Debug tab', async () => {
+    const bridge = api()
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await user.click(screen.getByRole('button', { name: 'Debug' }))
+    expect(await screen.findByText('Low disk alert')).toBeInTheDocument()
+    await waitFor(() => expect(bridge.debug?.lowDiskStatus).toHaveBeenCalled())
+    expect(screen.getByText('never')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Simulate free space'), { target: { value: '5' } })
+    await waitFor(() => expect(bridge.debug?.simulateFreePercent).toHaveBeenCalledWith(5))
+
+    await user.click(screen.getByRole('button', { name: 'Run check now' }))
+    await waitFor(() => expect(bridge.debug?.runLowDiskCheck).toHaveBeenCalled())
+
+    await user.click(screen.getByRole('button', { name: 'Send test notification' }))
+    await waitFor(() => expect(bridge.debug?.sendLowDiskNotification).toHaveBeenCalled())
+
+    await user.click(screen.getByRole('button', { name: 'Reset cooldown' }))
+    await waitFor(() => expect(bridge.debug?.resetLowDiskCooldown).toHaveBeenCalled())
+  })
+
+  it('falls back to a notice when the preload exposes no debug bridge', async () => {
+    window.diskheadroom = api({ debug: null })
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Debug' }))
+    expect(await screen.findByText('Debug bridge unavailable.')).toBeInTheDocument()
   })
 })

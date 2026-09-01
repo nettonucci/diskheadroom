@@ -2,6 +2,8 @@ import { BrowserWindow, Menu, nativeImage, shell, app } from 'electron'
 import { join } from 'node:path'
 import { APP_NAME } from '../shared/constants'
 import { registerIpc } from './ipc'
+import { registerDebugIpc } from './debug'
+import { startLowDiskAlertWatcher } from './lowDiskAlert'
 import { loadSettings } from './settings'
 import { createTray, type TrayController } from './tray'
 
@@ -102,12 +104,20 @@ app.whenReady().then(async () => {
 
   applyDevDockIcon()
   applyAppMenu()
+  const lowDiskAlert = startLowDiskAlertWatcher({ showWindow })
   registerIpc({
     sendToRenderer,
-    getTrayController: () => trayController
+    getTrayController: () => trayController,
+    onSettingsChanged: (next) => lowDiskAlert.setSettings(next)
   })
+  // import.meta.env.DEV drops the handlers from the production bundle; the
+  // isPackaged guard covers a development bundle someone runs from a copy.
+  if (import.meta.env.DEV && !app.isPackaged) {
+    registerDebugIpc(lowDiskAlert)
+  }
   createWindow()
   const settings = await loadSettings()
+  lowDiskAlert.setSettings(settings)
   trayController = createTray(
     {
       showWindow,

@@ -123,6 +123,11 @@ module.exports = {
     unusedDays: 90,
     setupComplete: true,
     locale: 'en',
+    lowDiskAlert: {
+      enabled: true,
+      kind: 'percent',
+      value: 10
+    },
     scanCategories: {
       userCaches: true,
       userLogs: true,

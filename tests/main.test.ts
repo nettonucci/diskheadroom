@@ -147,7 +147,8 @@ describe('settings', () => {
       unusedDays: 90,
       setupComplete: false,
       locale: 'pt-BR',
-      scanCategories: DEFAULT_SCAN_CATEGORIES
+      scanCategories: DEFAULT_SCAN_CATEGORIES,
+      lowDiskAlert: { enabled: false, kind: 'percent', value: 10 }
     })
   })
 
@@ -166,6 +167,13 @@ describe('settings', () => {
     })
   })
 
+  it('fills in the default low-disk alert when the file omits it', async () => {
+    mocks.readFile.mockResolvedValue(JSON.stringify({ unusedDays: 90, locale: 'en' }))
+    await expect(loadSettings()).resolves.toMatchObject({
+      lowDiskAlert: { enabled: false, kind: 'percent', value: 10 }
+    })
+  })
+
   it('uses the default locale when omitted', async () => {
     mocks.readFile.mockResolvedValue(JSON.stringify({ setupComplete: true }))
     await expect(loadSettings()).resolves.toMatchObject({ setupComplete: true, locale: 'pt-BR' })
@@ -176,7 +184,8 @@ describe('settings', () => {
       unusedDays: 30 as const,
       setupComplete: true,
       locale: 'en' as const,
-      scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false }
+      scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
+      lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 }
     }
     await saveSettings(value)
     expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/diskheadroom', { recursive: true })

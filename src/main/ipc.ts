@@ -1,5 +1,5 @@
 import { clipboard, ipcMain, shell } from 'electron'
-import { mergeScanCategories, SPONSORS_URL } from '../shared/constants'
+import { mergeLowDiskAlert, mergeScanCategories, SPONSORS_URL } from '../shared/constants'
 import type { AppSettings, CleanRequest, ScanItem } from '../shared/types'
 import { trashPaths } from './cleaner'
 import { getDiskInfo } from './disk'
@@ -16,6 +16,7 @@ import type { TrayController } from './tray'
 interface IpcOptions {
   sendToRenderer: (channel: string, payload?: unknown) => void
   getTrayController: () => TrayController | null
+  onSettingsChanged?: (settings: AppSettings) => void
 }
 
 export function registerIpc(options: IpcOptions): void {
@@ -28,9 +29,15 @@ export function registerIpc(options: IpcOptions): void {
   ipcMain.handle('permissions:reveal-target', () => revealGrantTarget())
   ipcMain.handle('settings:get', () => loadSettings())
   ipcMain.handle('settings:set', async (_event, next: AppSettings) => {
-    await saveSettings(next)
-    options.getTrayController()?.setLocale(next.locale)
-    return next
+    const normalized: AppSettings = {
+      ...next,
+      scanCategories: mergeScanCategories(next.scanCategories),
+      lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert)
+    }
+    await saveSettings(normalized)
+    options.getTrayController()?.setLocale(normalized.locale)
+    options.onSettingsChanged?.(normalized)
+    return normalized
   })
   ipcMain.handle(
     'scan:run',

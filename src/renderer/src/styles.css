@@ -332,6 +332,37 @@ input {
   font-size: 14px;
 }
 
+.debug-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.debug-grid dt {
+  color: var(--muted);
+}
+
+.debug-grid dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.field-label {
+  display: block;
+  margin: 14px 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .status {
   display: inline-flex;
   align-items: center;

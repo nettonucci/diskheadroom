@@ -23,6 +23,7 @@ It is not a “one-click miracle cleaner.” You review every group, optional de
 - Shows sizes and paths before anything is touched
 - Moves selected items to **Trash** (recoverable) rather than deleting in place
 - Lives in the **menu bar** so you can open it, scan, or quit without hunting the Dock
+- Can show a **local** Notification Center alert when free space is low (off by default)
 - Speaks English, Brazilian Portuguese, and Spanish
 
 All work stays on your Mac. There is no account, no telemetry, and no cloud.
@@ -41,7 +42,7 @@ If you need forensic deletion, secure erase, or Windows/Linux, this is not that 
 
 | System access | Settings |
 | --- | --- |
-| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with scan category toggles, idle app window, and language pickers" width="440"> |
+| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with scan category toggles, optional low-disk alert, idle app window, and language pickers" width="440"> |
 
 <p align="center">
   <img src="docs/screenshots/developer.png" alt="Optional developer groups showing simulators on older runtimes and Android, Gradle and CocoaPods caches, all unchecked, with a warning that those simulators still work" width="560">
@@ -68,6 +69,7 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Documents & Desktop (opt-in) | First-level files and folders older than the idle window and at least 100 MB — **unchecked**; the Documents and Desktop folders themselves are never listed |
 | Idle apps | `/Applications` and `~/Applications`, skipping Apple system bundles |
 | Menu bar | Open, Scan now, Donate, Quit |
+| Low disk alert | Optional local Notification Center notice when free space drops below a percent or GB threshold (off by default, with a cooldown so it does not spam) |
 | Languages | English, Português (Brasil), Español |
 | Donate | In-app page plus this README, both pointing at GitHub Sponsors |
 
@@ -159,6 +161,14 @@ npm run build:mac -- --arm64
 Artifacts land in `dist/`. The builder is configured for **macOS only**. Published
 versions are also available from the repository's GitHub Releases page.
 
+### Debug tab (development only)
+
+`npm run dev` adds a **Debug** entry to the sidebar for exercising the low disk
+alert without filling the disk: pin the free space the watcher sees to a chosen
+percentage, run the real check, send a test notification, and clear the 12-hour
+cooldown. The tab, its IPC channels, and its preload bridge are compiled out of
+production bundles, so they appear in neither `npm run screenshots` nor the DMG.
+
 Useful scripts:
 
 | Command | Purpose |
@@ -173,6 +183,7 @@ Useful scripts:
 | `npm run build:mac` | Compile and package a DMG |
 | `npm run icons` | Rasterize `assets/brand` into `build/icon.icns` and the menu bar templates |
 | `npm run screenshots` | Rebuild and capture `docs/screenshots` from the UI using sample data |
+| `npm run screenshots:notification` | Render the low disk alert banner for release notes (`-- --locale=pt-BR --percent=5`) |
 | `npm run commitlint` | Check the latest commit message against Conventional Commits |
 | `npm run release:dry` | Preview the next SemVer bump without tagging |
 
@@ -202,7 +213,8 @@ There are exactly two GitHub Actions workflows:
 
 - **CI** runs commitlint, TypeScript, unit tests, and the coverage gate on every
   pull request targeting `main`. Configure `CI / Validate` as a required status
-  check in the `main` branch protection rule.
+  check in the `main` branch protection rule. The `.githooks/pre-push` hook runs
+  the same commitlint check locally.
 - **Release** repeats typecheck and coverage after a merge to `main`, lets
   semantic-release calculate the next version, builds the signed-ad-hoc arm64
   DMG, verifies its code signature, and attaches it to the GitHub Release.
@@ -264,6 +276,12 @@ feat: add idle-app threshold presets
 fix: detect Full Disk Access after granting Electron
 feat!: require macOS 14
 ```
+
+`npm install` points `core.hooksPath` at `.githooks`, whose `pre-push` hook runs
+the same commitlint check as CI over the commits you are about to push, and
+rejects branch names longer than 60 characters. Body lines are capped at 100
+characters, so wrap long explanations. Use `git push --no-verify` only to
+recover from a broken hook.
 
 Preview locally (does not tag or push):
 

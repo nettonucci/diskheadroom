@@ -4,6 +4,10 @@ import {
   SCAN_CATEGORY_IDS,
   SPONSORS_URL,
   REPO_URL,
+  LOW_DISK_ALERT_PRESETS,
+  lowDiskAlertPresetKey,
+  parseLowDiskAlertPreset,
+  type LowDiskAlertSettings,
   type ScanCategoryFlag,
   type UnusedDays
 } from '../../shared/constants'
@@ -19,6 +23,7 @@ import type {
   AppSettings,
   DiskInfo,
   GrantTarget,
+  LowDiskDebugStatus,
   PermissionStatus,
   ScanItem,
   ScanProgress,
@@ -255,6 +260,15 @@ function AppShell(): JSX.Element {
     setSettings(next)
   }
 
+  async function updateLowDiskAlert(patch: Partial<LowDiskAlertSettings>): Promise<void> {
+    if (!settings) return
+    const next = await window.diskheadroom.setSettings({
+      ...settings,
+      lowDiskAlert: { ...settings.lowDiskAlert, ...patch }
+    })
+    setSettings(next)
+  }
+
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
 
   function requestClean(): void {
@@ -322,6 +336,15 @@ function AppShell(): JSX.Element {
               {t(item.label)}
             </button>
           ))}
+          {import.meta.env.DEV && (
+            <button
+              className={view === 'debug' ? 'active' : ''}
+              onClick={() => setView('debug')}
+              type="button"
+            >
+              Debug
+            </button>
+          )}
         </nav>
       </aside>
       <main className="main">
@@ -395,10 +418,12 @@ function AppShell(): JSX.Element {
             onUnusedDays={(value) => void updateUnusedDays(value)}
             onLocale={(value) => void updateLocale(value)}
             onScanCategory={(id, enabled) => void updateScanCategory(id, enabled)}
+            onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
             onPermissions={() => setView('permissions')}
           />
         )}
         {view === 'donate' && <DonateView t={t} />}
+        {import.meta.env.DEV && view === 'debug' && <DebugView />}
       </main>
       {confirmCleanOpen && (
         <ConfirmDialog
@@ -907,8 +932,16 @@ function SettingsView(props: {
   onUnusedDays: (value: UnusedDays) => void
   onLocale: (value: Locale) => void
   onScanCategory: (id: ScanCategoryFlag, enabled: boolean) => void
+  onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
   onPermissions: () => void
 }): JSX.Element {
+  const alert = props.settings.lowDiskAlert
+  const presets = LOW_DISK_ALERT_PRESETS.some(
+    (preset) => preset.kind === alert.kind && preset.value === alert.value
+  )
+    ? LOW_DISK_ALERT_PRESETS
+    : [{ kind: alert.kind, value: alert.value }, ...LOW_DISK_ALERT_PRESETS]
+
   return (
     <section>
       <div className="hero">
@@ -948,6 +981,39 @@ function SettingsView(props: {
         </select>
       </div>
       <div className="card">
+        <h3>{props.t('settings.lowDiskTitle')}</h3>
+        <p className="muted">{props.t('settings.lowDiskHint')}</p>
+        <label className="scan-flag">
+          <input
+            type="checkbox"
+            checked={alert.enabled}
+            onChange={(event) => props.onLowDiskAlert({ enabled: event.target.checked })}
+          />
+          <span>{props.t('settings.lowDiskEnable')}</span>
+        </label>
+        <label className="field-label" htmlFor="low-disk-threshold">
+          {props.t('settings.lowDiskThreshold')}
+        </label>
+        <select
+          id="low-disk-threshold"
+          disabled={!alert.enabled}
+          value={lowDiskAlertPresetKey(alert.kind, alert.value)}
+          onChange={(event) => {
+            const parsed = parseLowDiskAlertPreset(event.target.value)
+            if (parsed) props.onLowDiskAlert(parsed)
+          }}
+        >
+          {presets.map((preset) => (
+            <option key={lowDiskAlertPresetKey(preset.kind, preset.value)} value={lowDiskAlertPresetKey(preset.kind, preset.value)}>
+              {props.t(
+                preset.kind === 'percent' ? 'settings.lowDisk.percent' : 'settings.lowDisk.gigabytes',
+                { value: preset.value }
+              )}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="card">
         <h3>{props.t('settings.languageTitle')}</h3>
         <p className="muted">{props.t('settings.languageHint')}</p>
         <select
@@ -967,6 +1033,156 @@ function SettingsView(props: {
         <button className="btn" type="button" onClick={props.onPermissions}>
           {props.t('settings.openPermissions')}
         </button>
+      </div>
+    </section>
+  )
+}
+
+const SIMULATION_OPTIONS = [0, 2, 5, 8, 12, 20, 40] as const
+
+// Development-only harness for the low disk alert: pin free space, run the real
+// check, and inspect the cooldown without waiting for the disk to fill up.
+// Copy stays in English and out of languages.json because it never ships.
+function DebugView(): JSX.Element {
+  const debug = window.diskheadroom.debug
+  const [status, setStatus] = useState<LowDiskDebugStatus | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const refresh = useCallback(async () => {
+    if (!debug) return
+    setStatus(await debug.lowDiskStatus())
+  }, [debug])
+
+  useEffect(() => {
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 2000)
+    return () => window.clearInterval(timer)
+  }, [refresh])
+
+  if (!debug) {
+    return (
+      <section>
+        <div className="card">
+          <p className="muted">Debug bridge unavailable.</p>
+        </div>
+      </section>
+    )
+  }
+
+  async function run(label: string, action: () => Promise<LowDiskDebugStatus>): Promise<void> {
+    setBusy(true)
+    try {
+      setStatus(await action())
+      setNote(`${label} at ${new Date().toLocaleTimeString()}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const cooldownLeft =
+    status?.lastFiredAt == null
+      ? 0
+      : Math.max(0, status.lastFiredAt + status.cooldownMs - Date.now())
+
+  return (
+    <section>
+      <div className="hero">
+        <div>
+          <h2>Debug</h2>
+          <p>Development build only. This tab is absent from packaged builds and screenshots.</p>
+        </div>
+      </div>
+      <div className="card">
+        <h3>Low disk alert</h3>
+        <dl className="debug-grid">
+          <dt>Real free space</dt>
+          <dd>
+            {status ? formatBytes(status.realFreeBytes) : '—'}
+            {status && status.disk.totalBytes > 0
+              ? ` (${Math.round((status.realFreeBytes / status.disk.totalBytes) * 100)}%)`
+              : ''}
+          </dd>
+          <dt>Free space the watcher sees</dt>
+          <dd>
+            {status ? formatBytes(status.disk.freeBytes) : '—'}
+            {status?.simulatedFreePercent == null
+              ? ''
+              : ` (simulated ${status.simulatedFreePercent}%)`}
+          </dd>
+          <dt>Setting</dt>
+          <dd>
+            {status
+              ? `${status.alert.enabled ? 'on' : 'off'} · below ${status.alert.value}${
+                  status.alert.kind === 'percent' ? '%' : ' GB'
+                } free`
+              : '—'}
+          </dd>
+          <dt>Below threshold</dt>
+          <dd>{status ? (status.belowThreshold ? 'yes' : 'no') : '—'}</dd>
+          <dt>Last notification</dt>
+          <dd>
+            {status?.lastFiredAt == null
+              ? 'never'
+              : new Date(status.lastFiredAt).toLocaleString()}
+          </dd>
+          <dt>Cooldown left</dt>
+          <dd>{cooldownLeft === 0 ? 'none' : `${Math.ceil(cooldownLeft / 60000)} min`}</dd>
+          <dt>Notification Center</dt>
+          <dd>{status ? (status.notificationsSupported ? 'supported' : 'unavailable') : '—'}</dd>
+        </dl>
+        <label className="field-label" htmlFor="debug-simulate">
+          Simulate free space
+        </label>
+        <select
+          id="debug-simulate"
+          value={status?.simulatedFreePercent ?? ''}
+          onChange={(event) => {
+            const raw = event.target.value
+            void run('Simulation changed', () =>
+              debug.simulateFreePercent(raw === '' ? null : Number(raw))
+            )
+          }}
+        >
+          <option value="">Off (real disk)</option>
+          {SIMULATION_OPTIONS.map((percent) => (
+            <option key={percent} value={percent}>
+              {percent}% free
+            </option>
+          ))}
+        </select>
+        <div className="debug-actions">
+          <button
+            className="btn primary"
+            type="button"
+            disabled={busy}
+            onClick={() => void run('Check finished', debug.runLowDiskCheck)}
+          >
+            Run check now
+          </button>
+          <button
+            className="btn"
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void run('Test notification sent', async () => {
+                const outcome = await debug.sendLowDiskNotification()
+                return outcome.status
+              })
+            }
+          >
+            Send test notification
+          </button>
+          <button
+            className="btn"
+            type="button"
+            disabled={busy}
+            onClick={() => void run('Cooldown reset', debug.resetLowDiskCooldown)}
+          >
+            Reset cooldown
+          </button>
+        </div>
+        {note && <p className="muted">{note}</p>}
       </div>
     </section>
   )

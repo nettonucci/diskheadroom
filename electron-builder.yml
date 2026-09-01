@@ -27,6 +27,8 @@ mac:
     NSDocumentsFolderUsageDescription: Disk Headroom needs access to your documents folder when you choose to scan user files for reclaimable space.
     NSDownloadsFolderUsageDescription: Disk Headroom may inspect Downloads only for size reporting if you include it in a scan.
     NSDesktopFolderUsageDescription: Disk Headroom does not scan the Desktop by default.
+    NSUserNotificationsUsageDescription: Disk Headroom can show a local alert when free space on the startup disk is low. Nothing is sent over the network.
+    NSUserNotificationAlertStyle: alert
     LSApplicationCategoryType: public.app-category.utilities
 dmg:
   artifactName: ${productName}-${version}-mac.${ext}

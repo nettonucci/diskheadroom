@@ -1,0 +1,51 @@
+#!/bin/sh
+# Runs the same commitlint check as the "Validate commit messages" step in
+# .github/workflows/ci.yml, so a bad subject or an over-long body line fails
+# here instead of after the push. Also keeps branch names short enough to read
+# in the PR list.
+#
+# Wired by the "prepare" script in package.json (git config core.hooksPath .githooks).
+# Bypass in an emergency with: git push --no-verify
+
+MAX_BRANCH_NAME=60
+status=0
+
+if [ ! -x node_modules/.bin/commitlint ]; then
+  echo "pre-push: commitlint not installed, skipping message check (run npm install)" >&2
+  exit 0
+fi
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # An all-zero local sha means the ref is being deleted.
+  case "$local_sha" in
+    *[!0]*) ;;
+    *) continue ;;
+  esac
+
+  branch=${local_ref#refs/heads/}
+  if [ ${#branch} -gt $MAX_BRANCH_NAME ]; then
+    echo "pre-push: branch name is ${#branch} characters, limit is $MAX_BRANCH_NAME" >&2
+    echo "  $branch" >&2
+    status=1
+  fi
+
+  # A new branch has no remote sha, so compare against where it left main.
+  case "$remote_sha" in
+    *[!0]*) base=$remote_sha ;;
+    *) base=$(git merge-base origin/main "$local_sha" 2>/dev/null) ;;
+  esac
+
+  [ -z "$base" ] && continue
+  [ "$base" = "$local_sha" ] && continue
+
+  if ! node_modules/.bin/commitlint --from "$base" --to "$local_sha" --verbose; then
+    status=1
+  fi
+done
+
+if [ $status -ne 0 ]; then
+  echo "" >&2
+  echo "pre-push: fix the commits above (git commit --amend or a rebase) and push again." >&2
+fi
+
+exit $status
