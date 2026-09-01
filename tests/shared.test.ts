@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DEFAULT_UNUSED_DAYS, UNUSED_DAY_OPTIONS } from '../src/shared/constants'
+import {
+  DEFAULT_UNUSED_DAYS,
+  UNUSED_DAY_OPTIONS,
+  mergeScanCategories
+} from '../src/shared/constants'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
 import { CATEGORY_META, NAV } from '../src/renderer/src/lib/copy'
 import { formatBytes, formatDate } from '../src/renderer/src/lib/format'
@@ -28,6 +32,17 @@ describe('shared helpers', () => {
     expect(NAV).toHaveLength(4)
     expect(Object.keys(CATEGORY_META)).toHaveLength(15)
     expect(UNUSED_DAY_OPTIONS).toContain(DEFAULT_UNUSED_DAYS)
+  })
+
+  it('keeps every scan category on when flags are missing or malformed', () => {
+    expect(mergeScanCategories(undefined).unusedApps).toBe(true)
+    expect(mergeScanCategories(null).unusedApps).toBe(true)
+    expect(mergeScanCategories('all' as never).unusedApps).toBe(true)
+    expect(mergeScanCategories({ unusedApps: 'no' } as never).unusedApps).toBe(true)
+    expect(mergeScanCategories({ unusedApps: false })).toMatchObject({
+      unusedApps: false,
+      userCaches: true
+    })
   })
 })
 

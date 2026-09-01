@@ -1,3 +1,4 @@
+import type { ScanCategoryFlag } from '../../../shared/constants'
 import type { ScanCategoryId } from '../../../shared/types'
 import type { TranslationKey } from '../../../shared/i18n'
 
@@ -65,6 +66,21 @@ export const CATEGORY_META: Record<
     title: 'category.unusedApps.title',
     hint: 'category.unusedApps.hint'
   }
+}
+
+// A scan phase can produce several result categories, so the Settings list
+// reuses the progress labels the user already sees while a scan runs.
+export const SCAN_CATEGORY_LABELS: Record<ScanCategoryFlag, TranslationKey> = {
+  userCaches: 'progress.userCaches',
+  userLogs: 'progress.logs',
+  homebrewCache: 'progress.homebrew',
+  packageManagers: 'progress.packageManagers',
+  trash: 'progress.trash',
+  xcode: 'progress.xcode',
+  androidDev: 'progress.androidDev',
+  docker: 'progress.docker',
+  idleUserFolders: 'progress.documentsDesktop',
+  unusedApps: 'progress.apps'
 }
 
 export const CATEGORY_WARNING: Partial<Record<ScanCategoryId, TranslationKey>> = {

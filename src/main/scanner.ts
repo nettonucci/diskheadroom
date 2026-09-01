@@ -4,7 +4,11 @@ import { lstat, readdir, readlink, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
 import { promisify } from 'node:util'
-import type { UnusedDays } from '../shared/constants'
+import {
+  DEFAULT_SCAN_CATEGORIES,
+  type ScanCategoryFlags,
+  type UnusedDays
+} from '../shared/constants'
 import type { TranslationKey } from '../shared/i18n'
 import type { ScanCategoryId, ScanItem, ScanProgress, ScanResult } from '../shared/types'
 import { getPermissionStatus } from './permissions'
@@ -33,52 +37,79 @@ const USER_CACHE_SKIP = new Set([
 
 type ProgressFn = (progress: ScanProgress) => void
 
-export async function runScan(unusedDays: UnusedDays, onProgress: ProgressFn): Promise<ScanResult> {
+export async function runScan(
+  unusedDays: UnusedDays,
+  onProgress: ProgressFn,
+  categories: ScanCategoryFlags = DEFAULT_SCAN_CATEGORIES
+): Promise<ScanResult> {
   const items: ScanItem[] = []
   const perms = await getPermissionStatus()
   const home = homedir()
 
+  // Progress still reports every phase, including the skipped ones: a bar that
+  // jumps from 8% to 80% reads as a scan that broke rather than one that obeyed
+  // the settings.
   onProgress({ phase: 'progress.userCaches', percent: 8 })
-  items.push(
-    ...(await scanChildren(join(home, 'Library', 'Caches'), 'userCaches', true, false, 24))
-  )
+  if (categories.userCaches) {
+    items.push(
+      ...(await scanChildren(join(home, 'Library', 'Caches'), 'userCaches', true, false, 24))
+    )
+  }
 
   onProgress({ phase: 'progress.logs', percent: 22 })
-  items.push(...(await scanChildren(join(home, 'Library', 'Logs'), 'userLogs', true, false, 36)))
+  if (categories.userLogs) {
+    items.push(...(await scanChildren(join(home, 'Library', 'Logs'), 'userLogs', true, false, 36)))
+  }
 
   onProgress({ phase: 'progress.homebrew', percent: 38 })
-  items.push(
-    ...(await scanIfExists(
-      join(home, 'Library', 'Caches', 'Homebrew'),
-      'homebrewCache',
-      'category.homebrewCache.title',
-      true,
-      false
-    ))
-  )
+  if (categories.homebrewCache) {
+    items.push(
+      ...(await scanIfExists(
+        join(home, 'Library', 'Caches', 'Homebrew'),
+        'homebrewCache',
+        'category.homebrewCache.title',
+        true,
+        false
+      ))
+    )
+  }
 
   onProgress({ phase: 'progress.packageManagers', percent: 44 })
-  items.push(...(await scanPackageManagerCaches(home)))
+  if (categories.packageManagers) {
+    items.push(...(await scanPackageManagerCaches(home)))
+  }
 
   onProgress({ phase: 'progress.trash', percent: 52 })
-  items.push(
-    ...(await scanIfExists(join(home, '.Trash'), 'trash', 'category.trash.title', true, false))
-  )
+  if (categories.trash) {
+    items.push(
+      ...(await scanIfExists(join(home, '.Trash'), 'trash', 'category.trash.title', true, false))
+    )
+  }
 
   onProgress({ phase: 'progress.xcode', percent: 64 })
-  items.push(...(await scanXcodeLeftovers(home)))
+  if (categories.xcode) {
+    items.push(...(await scanXcodeLeftovers(home)))
+  }
 
   onProgress({ phase: 'progress.androidDev', percent: 68 })
-  items.push(...(await scanAndroidDevCaches(home)))
+  if (categories.androidDev) {
+    items.push(...(await scanAndroidDevCaches(home)))
+  }
 
   onProgress({ phase: 'progress.docker', percent: 72 })
-  items.push(...(await scanDockerDesktop(home)))
+  if (categories.docker) {
+    items.push(...(await scanDockerDesktop(home)))
+  }
 
   onProgress({ phase: 'progress.documentsDesktop', percent: 76 })
-  items.push(...(await scanIdleUserFolders(home, unusedDays)))
+  if (categories.idleUserFolders) {
+    items.push(...(await scanIdleUserFolders(home, unusedDays)))
+  }
 
   onProgress({ phase: 'progress.apps', percent: 80 })
-  items.push(...(await scanUnusedApps(unusedDays)))
+  if (categories.unusedApps) {
+    items.push(...(await scanUnusedApps(unusedDays)))
+  }
 
   onProgress({ phase: 'progress.done', percent: 100 })
 

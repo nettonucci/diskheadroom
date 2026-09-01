@@ -122,7 +122,19 @@ module.exports = {
   settings: {
     unusedDays: 90,
     setupComplete: true,
-    locale: 'en'
+    locale: 'en',
+    scanCategories: {
+      userCaches: true,
+      userLogs: true,
+      homebrewCache: true,
+      packageManagers: true,
+      trash: true,
+      xcode: true,
+      androidDev: true,
+      docker: true,
+      idleUserFolders: true,
+      unusedApps: true
+    }
   },
   scanResult,
   compactScanResult

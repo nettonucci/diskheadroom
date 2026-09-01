@@ -1,7 +1,11 @@
 import { app } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { DEFAULT_UNUSED_DAYS } from '../shared/constants'
+import {
+  DEFAULT_SCAN_CATEGORIES,
+  DEFAULT_UNUSED_DAYS,
+  mergeScanCategories
+} from '../shared/constants'
 import { resolveLocale } from '../shared/i18n'
 import type { AppSettings } from '../shared/types'
 
@@ -10,7 +14,8 @@ const filePath = (): string => join(app.getPath('userData'), 'settings.json')
 const defaults = (): AppSettings => ({
   unusedDays: DEFAULT_UNUSED_DAYS,
   setupComplete: false,
-  locale: resolveLocale(app.getLocale())
+  locale: resolveLocale(app.getLocale()),
+  scanCategories: { ...DEFAULT_SCAN_CATEGORIES }
 })
 
 export async function loadSettings(): Promise<AppSettings> {
@@ -20,7 +25,8 @@ export async function loadSettings(): Promise<AppSettings> {
     return {
       ...defaults(),
       ...parsed,
-      locale: parsed.locale ? resolveLocale(parsed.locale) : defaults().locale
+      locale: parsed.locale ? resolveLocale(parsed.locale) : defaults().locale,
+      scanCategories: mergeScanCategories(parsed.scanCategories)
     }
   } catch {
     return defaults()

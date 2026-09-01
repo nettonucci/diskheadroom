@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/renderer/src/App'
+import { DEFAULT_SCAN_CATEGORIES } from '../src/shared/constants'
 
 const disk = {
   mount: '/',
@@ -17,7 +18,8 @@ const granted = {
 const settings = {
   unusedDays: 90 as const,
   setupComplete: true,
-  locale: 'en' as const
+  locale: 'en' as const,
+  scanCategories: { ...DEFAULT_SCAN_CATEGORIES }
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -581,6 +583,14 @@ describe('App', () => {
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ unusedDays: 180 }))
     )
+    await user.click(screen.getByRole('checkbox', { name: 'Idle applications' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true })
+        })
+      )
+    )
     await user.click(screen.getByRole('button', { name: 'Open permissions' }))
     expect(await screen.findByText('System access')).toBeInTheDocument()
 
@@ -616,6 +626,6 @@ describe('App', () => {
     act(() => donate?.())
     expect(await screen.findByText('Keep the lights on')).toBeInTheDocument()
     act(() => scan?.())
-    await waitFor(() => expect(bridge.runScan).toHaveBeenCalled())
+    await waitFor(() => expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES))
   })
 })

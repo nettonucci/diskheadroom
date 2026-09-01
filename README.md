@@ -41,7 +41,7 @@ If you need forensic deletion, secure erase, or Windows/Linux, this is not that 
 
 | System access | Settings |
 | --- | --- |
-| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with idle app window and language pickers" width="440"> |
+| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with scan category toggles, idle app window, and language pickers" width="440"> |
 
 <p align="center">
   <img src="docs/screenshots/developer.png" alt="Optional developer groups showing simulators on older runtimes and Android, Gradle and CocoaPods caches, all unchecked, with a warning that those simulators still work" width="560">

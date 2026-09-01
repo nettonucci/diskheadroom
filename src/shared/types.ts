@@ -1,4 +1,4 @@
-import type { UnusedDays } from './constants'
+import type { ScanCategoryFlags, UnusedDays } from './constants'
 import type { Locale, TranslationKey } from './i18n'
 
 export type ScanCategoryId =
@@ -68,6 +68,7 @@ export interface AppSettings {
   unusedDays: UnusedDays
   setupComplete: boolean
   locale: Locale
+  scanCategories: ScanCategoryFlags
 }
 
 export interface CleanRequest {

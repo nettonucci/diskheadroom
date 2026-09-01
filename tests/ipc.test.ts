@@ -82,7 +82,12 @@ describe('IPC registration', () => {
       sendToRenderer: vi.fn(),
       getTrayController: () => ({ setLocale } as never)
     })
-    const next = { unusedDays: 90, setupComplete: true, locale: 'pt-BR' }
+    const next = {
+      unusedDays: 90,
+      setupComplete: true,
+      locale: 'pt-BR',
+      scanCategories: { unusedApps: false }
+    }
     await expect(call('settings:set', next)).resolves.toEqual(next)
     expect(mocks.saveSettings).toHaveBeenCalledWith(next)
     expect(setLocale).toHaveBeenCalledWith('pt-BR')
@@ -101,11 +106,16 @@ describe('IPC registration', () => {
     mocks.trashPaths.mockResolvedValue({ trashed: [], failed: [], bytesRequested: 42 })
     registerIpc({ sendToRenderer, getTrayController: () => null })
 
-    await call('scan:run', 90)
+    await call('scan:run', 90, { unusedApps: false })
     expect(sendToRenderer).toHaveBeenCalledWith('scan:progress', {
       phase: 'progress.done',
       percent: 100
     })
+    expect(mocks.runScan).toHaveBeenCalledWith(
+      90,
+      expect.any(Function),
+      expect.objectContaining({ unusedApps: false, userCaches: true })
+    )
     const request = { paths: ['/Users/test/cache', '/Users/test/unknown'] }
     await call('clean:trash', request)
     expect(mocks.trashPaths).toHaveBeenCalledWith(

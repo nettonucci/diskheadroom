@@ -1,5 +1,5 @@
 import { clipboard, ipcMain, shell } from 'electron'
-import { SPONSORS_URL } from '../shared/constants'
+import { mergeScanCategories, SPONSORS_URL } from '../shared/constants'
 import type { AppSettings, CleanRequest, ScanItem } from '../shared/types'
 import { trashPaths } from './cleaner'
 import { getDiskInfo } from './disk'
@@ -32,13 +32,24 @@ export function registerIpc(options: IpcOptions): void {
     options.getTrayController()?.setLocale(next.locale)
     return next
   })
-  ipcMain.handle('scan:run', async (_event, unusedDays: AppSettings['unusedDays']) => {
-    const result = await runScan(unusedDays, (progress) => {
-      options.sendToRenderer('scan:progress', progress)
-    })
-    lastItems = new Map(result.items.map((item) => [item.path, item]))
-    return result
-  })
+  ipcMain.handle(
+    'scan:run',
+    async (
+      _event,
+      unusedDays: AppSettings['unusedDays'],
+      categories?: AppSettings['scanCategories']
+    ) => {
+      const result = await runScan(
+        unusedDays,
+        (progress) => {
+          options.sendToRenderer('scan:progress', progress)
+        },
+        mergeScanCategories(categories)
+      )
+      lastItems = new Map(result.items.map((item) => [item.path, item]))
+      return result
+    }
+  )
   ipcMain.handle('clean:trash', async (_event, request: CleanRequest) => {
     const sizes = new Map<string, number>()
     for (const path of request.paths) {
