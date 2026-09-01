@@ -1,7 +1,7 @@
 # Alerta local de disco cheio
 
 - **Data:** 2026-09-01
-- **Commit / PR:** (esta task)
+- **Commit / PR:** `0ba0e51` / [#39](https://github.com/nettonucci/diskheadroom/pull/39)
 - **Tipo:** feat
 - **Público:** quem deixa o Mac no limite e só percebe o disco cheio tarde demais
 - **Formato sugerido no Instagram:** carrossel (1. banner do aviso, 2. tela de Ajustes)
