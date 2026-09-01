@@ -1,4 +1,6 @@
 import type {
+  DownloadsMinBytes,
+  DownloadsMinDays,
   LowDiskAlertSettings,
   ScanCategoryFlags,
   ScanReminderSettings,
@@ -21,6 +23,7 @@ export type ScanCategoryId =
   | 'dockerDesktop'
   | 'androidDevCaches'
   | 'idleUserFolders'
+  | 'downloadsReview'
   | 'unusedApps'
 
 export interface ScanItem {
@@ -74,6 +77,8 @@ export interface AppSettings {
   setupComplete: boolean
   locale: Locale
   scanCategories: ScanCategoryFlags
+  downloadsMinDays: DownloadsMinDays
+  downloadsMinBytes: DownloadsMinBytes
   lowDiskAlert: LowDiskAlertSettings
   launchAtLogin: boolean
   scanReminder: ScanReminderSettings

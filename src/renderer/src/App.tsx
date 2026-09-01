@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import {
   UNUSED_DAY_OPTIONS,
+  DOWNLOADS_MIN_DAYS_OPTIONS,
+  DOWNLOADS_MIN_BYTES_OPTIONS,
   SCAN_CATEGORY_IDS,
   SPONSORS_URL,
   REPO_URL,
@@ -8,6 +10,8 @@ import {
   SCAN_REMINDER_INTERVAL_DAYS,
   lowDiskAlertPresetKey,
   parseLowDiskAlertPreset,
+  type DownloadsMinBytes,
+  type DownloadsMinDays,
   type LowDiskAlertSettings,
   type ScanCategoryFlag,
   type ScanReminderSettings,
@@ -198,7 +202,12 @@ function AppShell(): JSX.Element {
     // sign of work; the dashboard is where the progress bar lives.
     setView('dashboard')
     try {
-      const next = await window.diskheadroom.runScan(settings.unusedDays, settings.scanCategories)
+      const next = await window.diskheadroom.runScan(
+        settings.unusedDays,
+        settings.scanCategories,
+        settings.downloadsMinDays,
+        settings.downloadsMinBytes
+      )
       setResult(next)
       const initial: Record<string, boolean> = {}
       for (const item of next.items) {
@@ -250,6 +259,14 @@ function AppShell(): JSX.Element {
 
   async function updateUnusedDays(unusedDays: UnusedDays): Promise<void> {
     await updateSettings(() => ({ unusedDays }))
+  }
+
+  async function updateDownloadsMinDays(downloadsMinDays: DownloadsMinDays): Promise<void> {
+    await updateSettings(() => ({ downloadsMinDays }))
+  }
+
+  async function updateDownloadsMinBytes(downloadsMinBytes: DownloadsMinBytes): Promise<void> {
+    await updateSettings(() => ({ downloadsMinBytes }))
   }
 
   async function updateLocale(nextLocale: Locale): Promise<void> {
@@ -421,6 +438,8 @@ function AppShell(): JSX.Element {
             t={t}
             settings={settings}
             onUnusedDays={(value) => void updateUnusedDays(value)}
+            onDownloadsMinDays={(value) => void updateDownloadsMinDays(value)}
+            onDownloadsMinBytes={(value) => void updateDownloadsMinBytes(value)}
             onLocale={(value) => void updateLocale(value)}
             onScanCategory={(id, enabled) => void updateScanCategory(id, enabled)}
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
@@ -736,7 +755,7 @@ function ResultItemRow(props: {
         <span>
           <strong>{item.nameKey ? t(item.nameKey) : item.name}</strong>
           <div className="path">{item.path}</div>
-          {(item.categoryId === 'unusedApps' || item.categoryId === 'idleUserFolders') && (
+          {(item.categoryId === 'unusedApps' || item.categoryId === 'idleUserFolders' || item.categoryId === 'downloadsReview') && (
             <div className="muted">
               {t('results.lastUsed', {
                 date: item.lastUsedAt
@@ -937,6 +956,8 @@ function SettingsView(props: {
   t: Translator
   settings: AppSettings
   onUnusedDays: (value: UnusedDays) => void
+  onDownloadsMinDays: (value: DownloadsMinDays) => void
+  onDownloadsMinBytes: (value: DownloadsMinBytes) => void
   onLocale: (value: Locale) => void
   onScanCategory: (id: ScanCategoryFlag, enabled: boolean) => void
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
@@ -986,6 +1007,42 @@ function SettingsView(props: {
           {UNUSED_DAY_OPTIONS.map((days) => (
             <option key={days} value={days}>
               {props.t('settings.days', { days })}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.downloadsTitle')}</h3>
+        <p className="muted">{props.t('settings.downloadsHint')}</p>
+        <label className="field-label" htmlFor="downloads-min-age">
+          {props.t('settings.downloadsMinAge')}
+        </label>
+        <select
+          id="downloads-min-age"
+          value={props.settings.downloadsMinDays}
+          onChange={(event) =>
+            props.onDownloadsMinDays(Number(event.target.value) as DownloadsMinDays)
+          }
+        >
+          {DOWNLOADS_MIN_DAYS_OPTIONS.map((days) => (
+            <option key={days} value={days}>
+              {days === 0 ? props.t('settings.downloadsAgeAny') : props.t('settings.days', { days })}
+            </option>
+          ))}
+        </select>
+        <label className="field-label" htmlFor="downloads-min-size">
+          {props.t('settings.downloadsMinSize')}
+        </label>
+        <select
+          id="downloads-min-size"
+          value={props.settings.downloadsMinBytes}
+          onChange={(event) =>
+            props.onDownloadsMinBytes(Number(event.target.value) as DownloadsMinBytes)
+          }
+        >
+          {DOWNLOADS_MIN_BYTES_OPTIONS.map((bytes) => (
+            <option key={bytes} value={bytes}>
+              {bytes === 0 ? props.t('settings.downloadsSizeAny') : formatBytes(bytes)}
             </option>
           ))}
         </select>

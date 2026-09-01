@@ -88,6 +88,8 @@ describe('IPC registration', () => {
     })
     const next = {
       unusedDays: 90,
+      downloadsMinDays: 60,
+      downloadsMinBytes: 104857600,
       setupComplete: true,
       locale: 'pt-BR',
       scanCategories: { unusedApps: false }
@@ -96,6 +98,8 @@ describe('IPC registration', () => {
     expect(saved).toEqual(
       expect.objectContaining({
         locale: 'pt-BR',
+        downloadsMinDays: 60,
+        downloadsMinBytes: 104857600,
         scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true }),
         lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
         launchAtLogin: false,
@@ -141,7 +145,7 @@ describe('IPC registration', () => {
     mocks.trashPaths.mockResolvedValue({ trashed: [], failed: [], bytesRequested: 42 })
     registerIpc({ sendToRenderer, getTrayController: () => null, onScanCompleted })
 
-    await call('scan:run', 90, { unusedApps: false })
+    await call('scan:run', 90, { unusedApps: false }, 30, 52428800)
     expect(onScanCompleted).toHaveBeenCalledTimes(1)
     expect(sendToRenderer).toHaveBeenCalledWith('scan:progress', {
       phase: 'progress.done',
@@ -150,7 +154,9 @@ describe('IPC registration', () => {
     expect(mocks.runScan).toHaveBeenCalledWith(
       90,
       expect.any(Function),
-      expect.objectContaining({ unusedApps: false, userCaches: true })
+      expect.objectContaining({ unusedApps: false, userCaches: true }),
+      30,
+      52428800
     )
     const request = { paths: ['/Users/test/cache', '/Users/test/unknown'] }
     await call('clean:trash', request)

@@ -17,6 +17,8 @@ const granted = {
 }
 const settings = {
   unusedDays: 90 as const,
+  downloadsMinDays: 30 as const,
+  downloadsMinBytes: 52428800 as const,
   setupComplete: true,
   locale: 'en' as const,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
@@ -427,6 +429,35 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
   })
 
+  it('shows old Downloads items unchecked with a warning', async () => {
+    const downloadsResult = {
+      ...result,
+      items: [
+        {
+          id: 'dl-item',
+          categoryId: 'downloadsReview' as const,
+          name: 'OldInstaller.dmg',
+          path: '/Users/test/Downloads/OldInstaller.dmg',
+          bytes: 500 * 1024 * 1024,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: '2022-04-01T00:00:00.000Z',
+          daysIdle: 1400
+        }
+      ]
+    }
+    window.diskheadroom = api({ runScan: vi.fn().mockResolvedValue(downloadsResult) })
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+
+    expect(await screen.findByRole('heading', { name: 'Downloads' })).toBeInTheDocument()
+    expect(screen.getByText('OldInstaller.dmg')).toBeInTheDocument()
+    expect(screen.getByText(/Downloads often contains important files/)).toBeInTheDocument()
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
+  })
+
   it('keeps the disk panel on results and rereads free space when refocused', async () => {
     const bridge = api({
       getDiskInfo: vi
@@ -650,6 +681,22 @@ describe('App', () => {
         })
       )
     )
+    fireEvent.change(screen.getByLabelText('Minimum age'), {
+      target: { value: '60' }
+    })
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ downloadsMinDays: 60 })
+      )
+    )
+    fireEvent.change(screen.getByLabelText('Minimum size'), {
+      target: { value: String(100 * 1024 * 1024) }
+    })
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ downloadsMinBytes: 100 * 1024 * 1024 })
+      )
+    )
     await user.click(screen.getByRole('button', { name: 'Open permissions' }))
     expect(await screen.findByText('System access')).toBeInTheDocument()
 
@@ -685,7 +732,9 @@ describe('App', () => {
     act(() => donate?.())
     expect(await screen.findByText('Keep the lights on')).toBeInTheDocument()
     act(() => scan?.())
-    await waitFor(() => expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES))
+    await waitFor(() =>
+      expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES, 30, 52428800)
+    )
   })
 
   it('drives the low disk alert from the development-only Debug tab', async () => {

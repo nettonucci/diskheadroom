@@ -17,6 +17,7 @@ export const SCAN_CATEGORY_IDS = [
   'androidDev',
   'docker',
   'idleUserFolders',
+  'downloadsReview',
   'unusedApps'
 ] as const
 export type ScanCategoryFlag = (typeof SCAN_CATEGORY_IDS)[number]
@@ -32,6 +33,7 @@ export const DEFAULT_SCAN_CATEGORIES: ScanCategoryFlags = {
   androidDev: true,
   docker: true,
   idleUserFolders: true,
+  downloadsReview: false,
   unusedApps: true
 }
 
@@ -135,4 +137,39 @@ export function mergeScanReminder(input: unknown): ScanReminderSettings {
 
 export function mergeLaunchAtLogin(input: unknown): boolean {
   return input === true
+}
+
+export const DOWNLOADS_MIN_DAYS_OPTIONS = [0, 7, 14, 30, 60, 90, 180, 365] as const
+export type DownloadsMinDays = (typeof DOWNLOADS_MIN_DAYS_OPTIONS)[number]
+export const DEFAULT_DOWNLOADS_MIN_DAYS: DownloadsMinDays = 30
+
+export const DOWNLOADS_MIN_BYTES_OPTIONS = [
+  0,
+  10 * 1024 * 1024,
+  50 * 1024 * 1024,
+  100 * 1024 * 1024,
+  500 * 1024 * 1024,
+  1024 * 1024 * 1024
+] as const
+export type DownloadsMinBytes = (typeof DOWNLOADS_MIN_BYTES_OPTIONS)[number]
+export const DEFAULT_DOWNLOADS_MIN_BYTES: DownloadsMinBytes = 50 * 1024 * 1024
+
+export function mergeDownloadsMinDays(input: unknown): DownloadsMinDays {
+  if (
+    typeof input === 'number' &&
+    (DOWNLOADS_MIN_DAYS_OPTIONS as readonly number[]).includes(input)
+  ) {
+    return input as DownloadsMinDays
+  }
+  return DEFAULT_DOWNLOADS_MIN_DAYS
+}
+
+export function mergeDownloadsMinBytes(input: unknown): DownloadsMinBytes {
+  if (
+    typeof input === 'number' &&
+    (DOWNLOADS_MIN_BYTES_OPTIONS as readonly number[]).includes(input)
+  ) {
+    return input as DownloadsMinBytes
+  }
+  return DEFAULT_DOWNLOADS_MIN_BYTES
 }

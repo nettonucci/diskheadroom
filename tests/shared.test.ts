@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_UNUSED_DAYS,
   UNUSED_DAY_OPTIONS,
+  DEFAULT_DOWNLOADS_MIN_DAYS,
+  DOWNLOADS_MIN_DAYS_OPTIONS,
+  DEFAULT_DOWNLOADS_MIN_BYTES,
+  DOWNLOADS_MIN_BYTES_OPTIONS,
+  mergeDownloadsMinBytes,
+  mergeDownloadsMinDays,
   mergeScanCategories
 } from '../src/shared/constants'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
@@ -30,17 +36,31 @@ describe('shared helpers', () => {
     expect(LOCALES).toEqual(['en', 'pt-BR', 'es'])
     expect(LOCALE_NAMES['pt-BR']).toContain('Português')
     expect(NAV).toHaveLength(4)
-    expect(Object.keys(CATEGORY_META)).toHaveLength(15)
+    expect(Object.keys(CATEGORY_META)).toHaveLength(16)
     expect(UNUSED_DAY_OPTIONS).toContain(DEFAULT_UNUSED_DAYS)
+    expect(DOWNLOADS_MIN_DAYS_OPTIONS).toContain(DEFAULT_DOWNLOADS_MIN_DAYS)
+    expect(DOWNLOADS_MIN_BYTES_OPTIONS).toContain(DEFAULT_DOWNLOADS_MIN_BYTES)
   })
 
-  it('keeps every scan category on when flags are missing or malformed', () => {
+  it('merges downloads min days and bytes with fallback to defaults', () => {
+    expect(mergeDownloadsMinDays(60)).toBe(60)
+    expect(mergeDownloadsMinDays('invalid' as never)).toBe(DEFAULT_DOWNLOADS_MIN_DAYS)
+    expect(mergeDownloadsMinDays(999 as never)).toBe(DEFAULT_DOWNLOADS_MIN_DAYS)
+
+    expect(mergeDownloadsMinBytes(10 * 1024 * 1024)).toBe(10 * 1024 * 1024)
+    expect(mergeDownloadsMinBytes('invalid' as never)).toBe(DEFAULT_DOWNLOADS_MIN_BYTES)
+    expect(mergeDownloadsMinBytes(999 as never)).toBe(DEFAULT_DOWNLOADS_MIN_BYTES)
+  })
+
+  it('keeps default scan categories when flags are missing or malformed', () => {
     expect(mergeScanCategories(undefined).unusedApps).toBe(true)
+    expect(mergeScanCategories(undefined).downloadsReview).toBe(false)
     expect(mergeScanCategories(null).unusedApps).toBe(true)
     expect(mergeScanCategories('all' as never).unusedApps).toBe(true)
     expect(mergeScanCategories({ unusedApps: 'no' } as never).unusedApps).toBe(true)
-    expect(mergeScanCategories({ unusedApps: false })).toMatchObject({
+    expect(mergeScanCategories({ unusedApps: false, downloadsReview: true })).toMatchObject({
       unusedApps: false,
+      downloadsReview: true,
       userCaches: true
     })
   })

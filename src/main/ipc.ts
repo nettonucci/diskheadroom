@@ -1,5 +1,7 @@
 import { clipboard, ipcMain, shell } from 'electron'
 import {
+  mergeDownloadsMinBytes,
+  mergeDownloadsMinDays,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeScanCategories,
@@ -40,6 +42,8 @@ export function registerIpc(options: IpcOptions): void {
     const normalized: AppSettings = {
       ...next,
       scanCategories: mergeScanCategories(next.scanCategories),
+      downloadsMinDays: mergeDownloadsMinDays(next.downloadsMinDays),
+      downloadsMinBytes: mergeDownloadsMinBytes(next.downloadsMinBytes),
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
       scanReminder: mergeScanReminder(next.scanReminder)
@@ -55,14 +59,18 @@ export function registerIpc(options: IpcOptions): void {
     async (
       _event,
       unusedDays: AppSettings['unusedDays'],
-      categories?: AppSettings['scanCategories']
+      categories?: AppSettings['scanCategories'],
+      downloadsMinDays?: number,
+      downloadsMinBytes?: number
     ) => {
       const result = await runScan(
         unusedDays,
         (progress) => {
           options.sendToRenderer('scan:progress', progress)
         },
-        mergeScanCategories(categories)
+        mergeScanCategories(categories),
+        downloadsMinDays,
+        downloadsMinBytes
       )
       lastItems = new Map(result.items.map((item) => [item.path, item]))
       options.onScanCompleted?.()

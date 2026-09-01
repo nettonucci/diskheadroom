@@ -155,6 +155,8 @@ describe('settings', () => {
     mocks.readFile.mockRejectedValue(new Error('ENOENT'))
     await expect(loadSettings()).resolves.toEqual({
       unusedDays: 90,
+      downloadsMinDays: 30,
+      downloadsMinBytes: 52428800,
       setupComplete: false,
       locale: 'pt-BR',
       scanCategories: DEFAULT_SCAN_CATEGORIES,
@@ -165,8 +167,15 @@ describe('settings', () => {
   })
 
   it('merges persisted settings and normalizes locale', async () => {
-    mocks.readFile.mockResolvedValue(JSON.stringify({ unusedDays: 180, locale: 'es-MX' }))
-    await expect(loadSettings()).resolves.toMatchObject({ unusedDays: 180, locale: 'es' })
+    mocks.readFile.mockResolvedValue(
+      JSON.stringify({ unusedDays: 180, downloadsMinDays: 60, downloadsMinBytes: 104857600, locale: 'es-MX' })
+    )
+    await expect(loadSettings()).resolves.toMatchObject({
+      unusedDays: 180,
+      downloadsMinDays: 60,
+      downloadsMinBytes: 104857600,
+      locale: 'es'
+    })
   })
 
   it('keeps disabled scan categories and defaults the ones the file omits', async () => {
@@ -182,6 +191,8 @@ describe('settings', () => {
   it('fills in launch-at-login and scan-reminder defaults when the file omits them', async () => {
     mocks.readFile.mockResolvedValue(JSON.stringify({ unusedDays: 90, locale: 'en' }))
     await expect(loadSettings()).resolves.toMatchObject({
+      downloadsMinDays: 30,
+      downloadsMinBytes: 52428800,
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
       scanReminder: { enabled: false, intervalDays: 7 }
@@ -206,6 +217,8 @@ describe('settings', () => {
   it('creates the directory and writes formatted JSON', async () => {
     const value = {
       unusedDays: 30 as const,
+      downloadsMinDays: 30 as const,
+      downloadsMinBytes: 52428800 as const,
       setupComplete: true,
       locale: 'en' as const,
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
