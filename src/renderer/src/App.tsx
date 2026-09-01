@@ -234,56 +234,44 @@ function AppShell(): JSX.Element {
   const selectedBytes = selectedItems.reduce((sum, item) => sum + item.bytes, 0)
   const foundBytes = (result?.items ?? []).reduce((sum, item) => sum + item.bytes, 0)
 
+  async function updateSettings(
+    patch: (current: AppSettings) => Partial<AppSettings>
+  ): Promise<void> {
+    if (!settings) return
+    const next = await window.diskheadroom.setSettings({ ...settings, ...patch(settings) })
+    setSettings(next)
+  }
+
   async function markSetupDone(): Promise<void> {
     if (!settings) return
-    const next = await window.diskheadroom.setSettings({ ...settings, setupComplete: true })
-    setSettings(next)
+    await updateSettings(() => ({ setupComplete: true }))
     setView('dashboard')
   }
 
   async function updateUnusedDays(unusedDays: UnusedDays): Promise<void> {
-    if (!settings) return
-    const next = await window.diskheadroom.setSettings({ ...settings, unusedDays })
-    setSettings(next)
+    await updateSettings(() => ({ unusedDays }))
   }
 
   async function updateLocale(nextLocale: Locale): Promise<void> {
-    if (!settings) return
-    const next = await window.diskheadroom.setSettings({ ...settings, locale: nextLocale })
-    setSettings(next)
+    await updateSettings(() => ({ locale: nextLocale }))
   }
 
   async function updateScanCategory(id: ScanCategoryFlag, enabled: boolean): Promise<void> {
-    if (!settings) return
-    const next = await window.diskheadroom.setSettings({
-      ...settings,
-      scanCategories: { ...settings.scanCategories, [id]: enabled }
-    })
-    setSettings(next)
+    await updateSettings((current) => ({
+      scanCategories: { ...current.scanCategories, [id]: enabled }
+    }))
   }
 
   async function updateLowDiskAlert(patch: Partial<LowDiskAlertSettings>): Promise<void> {
-    if (!settings) return
-    const next = await window.diskheadroom.setSettings({
-      ...settings,
-      lowDiskAlert: { ...settings.lowDiskAlert, ...patch }
-    })
-    setSettings(next)
+    await updateSettings((current) => ({ lowDiskAlert: { ...current.lowDiskAlert, ...patch } }))
   }
 
   async function updateLaunchAtLogin(enabled: boolean): Promise<void> {
-    if (!settings) return
-    const next = await window.diskheadroom.setSettings({ ...settings, launchAtLogin: enabled })
-    setSettings(next)
+    await updateSettings(() => ({ launchAtLogin: enabled }))
   }
 
   async function updateScanReminder(patch: Partial<ScanReminderSettings>): Promise<void> {
-    if (!settings) return
-    const next = await window.diskheadroom.setSettings({
-      ...settings,
-      scanReminder: { ...settings.scanReminder, ...patch }
-    })
-    setSettings(next)
+    await updateSettings((current) => ({ scanReminder: { ...current.scanReminder, ...patch } }))
   }
 
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
