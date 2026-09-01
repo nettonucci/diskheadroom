@@ -47,7 +47,9 @@ const enabled: AppSettings = {
   setupComplete: true,
   locale: 'en',
   scanCategories: DEFAULT_SCAN_CATEGORIES,
-  lowDiskAlert: { enabled: true, kind: 'percent', value: 10 }
+  lowDiskAlert: { enabled: true, kind: 'percent', value: 10 },
+  launchAtLogin: false,
+  scanReminder: { enabled: false, intervalDays: 7 }
 }
 
 const disabled: AppSettings = {

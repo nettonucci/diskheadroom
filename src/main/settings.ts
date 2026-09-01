@@ -4,9 +4,12 @@ import { join } from 'node:path'
 import {
   DEFAULT_LOW_DISK_ALERT,
   DEFAULT_SCAN_CATEGORIES,
+  DEFAULT_SCAN_REMINDER,
   DEFAULT_UNUSED_DAYS,
+  mergeLaunchAtLogin,
   mergeLowDiskAlert,
-  mergeScanCategories
+  mergeScanCategories,
+  mergeScanReminder
 } from '../shared/constants'
 import { resolveLocale } from '../shared/i18n'
 import type { AppSettings } from '../shared/types'
@@ -18,7 +21,9 @@ const defaults = (): AppSettings => ({
   setupComplete: false,
   locale: resolveLocale(app.getLocale()),
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
-    lowDiskAlert: { ...DEFAULT_LOW_DISK_ALERT }
+  lowDiskAlert: { ...DEFAULT_LOW_DISK_ALERT },
+  launchAtLogin: false,
+  scanReminder: { ...DEFAULT_SCAN_REMINDER }
 })
 
 export async function loadSettings(): Promise<AppSettings> {
@@ -30,7 +35,9 @@ export async function loadSettings(): Promise<AppSettings> {
       ...parsed,
       locale: parsed.locale ? resolveLocale(parsed.locale) : defaults().locale,
       scanCategories: mergeScanCategories(parsed.scanCategories),
-      lowDiskAlert: mergeLowDiskAlert(parsed.lowDiskAlert)
+      lowDiskAlert: mergeLowDiskAlert(parsed.lowDiskAlert),
+      launchAtLogin: mergeLaunchAtLogin(parsed.launchAtLogin),
+      scanReminder: mergeScanReminder(parsed.scanReminder)
     }
   } catch {
     return defaults()

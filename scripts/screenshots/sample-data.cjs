@@ -128,6 +128,11 @@ module.exports = {
       kind: 'percent',
       value: 10
     },
+    launchAtLogin: true,
+    scanReminder: {
+      enabled: true,
+      intervalDays: 7
+    },
     scanCategories: {
       userCaches: true,
       userLogs: true,

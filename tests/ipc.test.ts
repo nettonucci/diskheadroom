@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => ({
   loadSettings: vi.fn(),
   saveSettings: vi.fn(),
   runScan: vi.fn(),
-  trashPaths: vi.fn()
+  trashPaths: vi.fn(),
+  applyLaunchAtLogin: vi.fn()
 }))
 
 vi.mock('electron', () => {
@@ -44,6 +45,7 @@ vi.mock('../src/main/scanner', async () => {
   return { ...actual, runScan: mocks.runScan }
 })
 vi.mock('../src/main/cleaner', () => ({ trashPaths: mocks.trashPaths }))
+vi.mock('../src/main/loginItem', () => ({ applyLaunchAtLogin: mocks.applyLaunchAtLogin }))
 
 import { registerIpc } from '../src/main/ipc'
 
@@ -95,16 +97,39 @@ describe('IPC registration', () => {
       expect.objectContaining({
         locale: 'pt-BR',
         scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true }),
-        lowDiskAlert: { enabled: false, kind: 'percent', value: 10 }
+        lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
+        launchAtLogin: false,
+        scanReminder: { enabled: false, intervalDays: 7 }
       })
     )
     expect(mocks.saveSettings).toHaveBeenCalledWith(saved)
+    expect(mocks.applyLaunchAtLogin).toHaveBeenCalledWith(false)
     expect(setLocale).toHaveBeenCalledWith('pt-BR')
     expect(onSettingsChanged).toHaveBeenCalledWith(saved)
   })
 
+  it('persists launch-at-login and scan-reminder flags and applies the login API', async () => {
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    const saved = await call('settings:set', {
+      unusedDays: 90,
+      setupComplete: true,
+      locale: 'en',
+      scanCategories: {},
+      launchAtLogin: true,
+      scanReminder: { enabled: true, intervalDays: 14 }
+    })
+    expect(saved).toEqual(
+      expect.objectContaining({
+        launchAtLogin: true,
+        scanReminder: { enabled: true, intervalDays: 14 }
+      })
+    )
+    expect(mocks.applyLaunchAtLogin).toHaveBeenCalledWith(true)
+  })
+
   it('stores scan sizes, forwards progress and cleans known paths', async () => {
     const sendToRenderer = vi.fn()
+    const onScanCompleted = vi.fn()
     mocks.runScan.mockImplementation(async (_days, onProgress) => {
       onProgress({ phase: 'progress.done', percent: 100 })
       return {
@@ -114,9 +139,10 @@ describe('IPC registration', () => {
       }
     })
     mocks.trashPaths.mockResolvedValue({ trashed: [], failed: [], bytesRequested: 42 })
-    registerIpc({ sendToRenderer, getTrayController: () => null })
+    registerIpc({ sendToRenderer, getTrayController: () => null, onScanCompleted })
 
     await call('scan:run', 90, { unusedApps: false })
+    expect(onScanCompleted).toHaveBeenCalledTimes(1)
     expect(sendToRenderer).toHaveBeenCalledWith('scan:progress', {
       phase: 'progress.done',
       percent: 100

@@ -3,7 +3,9 @@ import { join } from 'node:path'
 import { APP_NAME } from '../shared/constants'
 import { registerIpc } from './ipc'
 import { registerDebugIpc } from './debug'
+import { applyLaunchAtLogin, shouldShowWindowOnLaunch } from './loginItem'
 import { startLowDiskAlertWatcher } from './lowDiskAlert'
+import { startScanReminderWatcher } from './scanReminder'
 import { loadSettings } from './settings'
 import { createTray, type TrayController } from './tray'
 
@@ -15,7 +17,7 @@ let trayController: TrayController | null = null
 // menu bar, the About panel and the user-data folder. Must run before ready.
 app.setName(APP_NAME)
 
-function createWindow(): void {
+function createWindow(showOnReady: boolean): void {
   mainWindow = new BrowserWindow({
     width: 980,
     height: 680,
@@ -36,7 +38,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow?.show()
+    if (showOnReady) mainWindow?.show()
   })
 
   mainWindow.on('close', (event) => {
@@ -84,7 +86,7 @@ function applyAppMenu(): void {
 
 function showWindow(): void {
   if (!mainWindow) {
-    createWindow()
+    createWindow(true)
     return
   }
   if (mainWindow.isMinimized()) mainWindow.restore()
@@ -104,20 +106,29 @@ app.whenReady().then(async () => {
 
   applyDevDockIcon()
   applyAppMenu()
+  const settings = await loadSettings()
+  applyLaunchAtLogin(settings.launchAtLogin)
   const lowDiskAlert = startLowDiskAlertWatcher({ showWindow })
+  const scanReminder = startScanReminderWatcher({ showWindow })
   registerIpc({
     sendToRenderer,
     getTrayController: () => trayController,
-    onSettingsChanged: (next) => lowDiskAlert.setSettings(next)
+    onSettingsChanged: (next) => {
+      lowDiskAlert.setSettings(next)
+      scanReminder.setSettings(next)
+    },
+    onScanCompleted: () => {
+      void scanReminder.markScanComplete()
+    }
   })
   // import.meta.env.DEV drops the handlers from the production bundle; the
   // isPackaged guard covers a development bundle someone runs from a copy.
   if (import.meta.env.DEV && !app.isPackaged) {
     registerDebugIpc(lowDiskAlert)
   }
-  createWindow()
-  const settings = await loadSettings()
+  createWindow(shouldShowWindowOnLaunch())
   lowDiskAlert.setSettings(settings)
+  scanReminder.setSettings(settings)
   trayController = createTray(
     {
       showWindow,
