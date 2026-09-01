@@ -2,10 +2,12 @@ import { app } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
+  DEFAULT_DUPLICATE_FOLDERS,
   DEFAULT_LOW_DISK_ALERT,
   DEFAULT_SCAN_CATEGORIES,
   DEFAULT_SCAN_REMINDER,
   DEFAULT_UNUSED_DAYS,
+  mergeDuplicateFolders,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeScanCategories,
@@ -21,6 +23,7 @@ const defaults = (): AppSettings => ({
   setupComplete: false,
   locale: resolveLocale(app.getLocale()),
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
+  duplicateFolders: [...DEFAULT_DUPLICATE_FOLDERS],
   lowDiskAlert: { ...DEFAULT_LOW_DISK_ALERT },
   launchAtLogin: false,
   scanReminder: { ...DEFAULT_SCAN_REMINDER }
@@ -35,6 +38,7 @@ export async function loadSettings(): Promise<AppSettings> {
       ...parsed,
       locale: parsed.locale ? resolveLocale(parsed.locale) : defaults().locale,
       scanCategories: mergeScanCategories(parsed.scanCategories),
+      duplicateFolders: mergeDuplicateFolders(parsed.duplicateFolders),
       lowDiskAlert: mergeLowDiskAlert(parsed.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(parsed.launchAtLogin),
       scanReminder: mergeScanReminder(parsed.scanReminder)

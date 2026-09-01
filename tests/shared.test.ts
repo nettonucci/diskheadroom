@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  DEFAULT_DUPLICATE_FOLDERS,
   DEFAULT_UNUSED_DAYS,
   UNUSED_DAY_OPTIONS,
+  mergeDuplicateFolders,
   mergeScanCategories
 } from '../src/shared/constants'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
@@ -30,19 +32,32 @@ describe('shared helpers', () => {
     expect(LOCALES).toEqual(['en', 'pt-BR', 'es'])
     expect(LOCALE_NAMES['pt-BR']).toContain('Português')
     expect(NAV).toHaveLength(4)
-    expect(Object.keys(CATEGORY_META)).toHaveLength(15)
+    expect(Object.keys(CATEGORY_META)).toHaveLength(16)
+    expect(CATEGORY_META.duplicateFiles).toBeDefined()
     expect(UNUSED_DAY_OPTIONS).toContain(DEFAULT_UNUSED_DAYS)
   })
 
-  it('keeps every scan category on when flags are missing or malformed', () => {
+  it('merges scan categories with default flags', () => {
     expect(mergeScanCategories(undefined).unusedApps).toBe(true)
+    expect(mergeScanCategories(undefined).duplicateFiles).toBe(false)
     expect(mergeScanCategories(null).unusedApps).toBe(true)
     expect(mergeScanCategories('all' as never).unusedApps).toBe(true)
     expect(mergeScanCategories({ unusedApps: 'no' } as never).unusedApps).toBe(true)
-    expect(mergeScanCategories({ unusedApps: false })).toMatchObject({
+    expect(mergeScanCategories({ unusedApps: false, duplicateFiles: true })).toMatchObject({
       unusedApps: false,
-      userCaches: true
+      userCaches: true,
+      duplicateFiles: true
     })
+  })
+
+  it('merges and sanitizes duplicate folders list', () => {
+    expect(mergeDuplicateFolders(undefined)).toEqual(DEFAULT_DUPLICATE_FOLDERS)
+    expect(mergeDuplicateFolders(null)).toEqual(DEFAULT_DUPLICATE_FOLDERS)
+    expect(mergeDuplicateFolders('not-array' as never)).toEqual(DEFAULT_DUPLICATE_FOLDERS)
+    expect(mergeDuplicateFolders(['/Users/test/Downloads', 123, '', '/Users/test/Downloads', '/Users/test/Desktop'])).toEqual([
+      '/Users/test/Downloads',
+      '/Users/test/Desktop'
+    ])
   })
 })
 

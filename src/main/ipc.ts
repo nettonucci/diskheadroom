@@ -1,5 +1,6 @@
-import { clipboard, ipcMain, shell } from 'electron'
+import { clipboard, dialog, ipcMain, shell } from 'electron'
 import {
+  mergeDuplicateFolders,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeScanCategories,
@@ -35,11 +36,19 @@ export function registerIpc(options: IpcOptions): void {
   ipcMain.handle('permissions:open-fda', () => openFullDiskAccessSettings())
   ipcMain.handle('permissions:grant-target', () => getGrantTarget())
   ipcMain.handle('permissions:reveal-target', () => revealGrantTarget())
+  ipcMain.handle('dialog:pick-folders', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'multiSelections', 'createDirectory']
+    })
+    if (result.canceled) return []
+    return result.filePaths
+  })
   ipcMain.handle('settings:get', () => loadSettings())
   ipcMain.handle('settings:set', async (_event, next: AppSettings) => {
     const normalized: AppSettings = {
       ...next,
       scanCategories: mergeScanCategories(next.scanCategories),
+      duplicateFolders: mergeDuplicateFolders(next.duplicateFolders),
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
       scanReminder: mergeScanReminder(next.scanReminder)
@@ -55,14 +64,16 @@ export function registerIpc(options: IpcOptions): void {
     async (
       _event,
       unusedDays: AppSettings['unusedDays'],
-      categories?: AppSettings['scanCategories']
+      categories?: AppSettings['scanCategories'],
+      duplicateFolders?: AppSettings['duplicateFolders']
     ) => {
       const result = await runScan(
         unusedDays,
         (progress) => {
           options.sendToRenderer('scan:progress', progress)
         },
-        mergeScanCategories(categories)
+        mergeScanCategories(categories),
+        mergeDuplicateFolders(duplicateFolders)
       )
       lastItems = new Map(result.items.map((item) => [item.path, item]))
       options.onScanCompleted?.()

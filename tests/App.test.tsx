@@ -20,6 +20,7 @@ const settings = {
   setupComplete: true,
   locale: 'en' as const,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
+  duplicateFolders: [] as string[],
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
   scanReminder: { enabled: false, intervalDays: 7 as const }
@@ -80,6 +81,7 @@ function api(overrides: Partial<Api> = {}): Api {
     revealGrantTarget: vi.fn().mockResolvedValue(undefined),
     getSettings: vi.fn().mockResolvedValue(settings),
     setSettings: vi.fn().mockImplementation(async (next) => next),
+    pickFolders: vi.fn().mockResolvedValue([]),
     runScan: vi.fn().mockResolvedValue(result),
     trashItems: vi.fn().mockResolvedValue({
       trashed: ['/Users/test/Library/Caches/a'],
@@ -685,7 +687,62 @@ describe('App', () => {
     act(() => donate?.())
     expect(await screen.findByText('Keep the lights on')).toBeInTheDocument()
     act(() => scan?.())
-    await waitFor(() => expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES))
+    await waitFor(() =>
+      expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES, [])
+    )
+  })
+
+  it('allows managing duplicate folders in Settings', async () => {
+    const bridge = api({
+      pickFolders: vi.fn().mockResolvedValue(['/Users/test/Downloads'])
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByText(/Duplicate folders/i)).toBeInTheDocument()
+    expect(screen.getByText(/No folders selected/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add folder…' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ duplicateFolders: ['/Users/test/Downloads'] })
+      )
+    )
+  })
+
+  it('shows duplicate files unchecked by default with warning banner', async () => {
+    const duplicateResult = {
+      ...result,
+      items: [
+        {
+          id: 'dup-1',
+          categoryId: 'duplicateFiles' as const,
+          name: 'photo-copy.jpg',
+          path: '/Users/test/Downloads/photo-copy.jpg',
+          bytes: 8 * 1024 * 1024,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: null,
+          daysIdle: null
+        }
+      ]
+    }
+    const bridge = api({ runScan: vi.fn().mockResolvedValue(duplicateResult) })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+
+    expect(await screen.findByRole('heading', { name: /Duplicate files/i })).toBeInTheDocument()
+    expect(screen.getByText('photo-copy.jpg')).toBeInTheDocument()
+    expect(
+      screen.getByText(/Identical files discovered in your selected folders/i)
+    ).toBeInTheDocument()
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
   })
 
   it('drives the low disk alert from the development-only Debug tab', async () => {

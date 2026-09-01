@@ -158,6 +158,7 @@ describe('settings', () => {
       setupComplete: false,
       locale: 'pt-BR',
       scanCategories: DEFAULT_SCAN_CATEGORIES,
+      duplicateFolders: [],
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
       scanReminder: { enabled: false, intervalDays: 7 }
@@ -179,12 +180,22 @@ describe('settings', () => {
     })
   })
 
-  it('fills in launch-at-login and scan-reminder defaults when the file omits them', async () => {
+  it('fills in launch-at-login, duplicate-folders and scan-reminder defaults when the file omits them', async () => {
     mocks.readFile.mockResolvedValue(JSON.stringify({ unusedDays: 90, locale: 'en' }))
     await expect(loadSettings()).resolves.toMatchObject({
+      duplicateFolders: [],
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
       scanReminder: { enabled: false, intervalDays: 7 }
+    })
+  })
+
+  it('keeps duplicate folders when present in settings file', async () => {
+    mocks.readFile.mockResolvedValue(
+      JSON.stringify({ duplicateFolders: ['/Users/test/Downloads', '/Users/test/Documents'] })
+    )
+    await expect(loadSettings()).resolves.toMatchObject({
+      duplicateFolders: ['/Users/test/Downloads', '/Users/test/Documents']
     })
   })
 
@@ -209,6 +220,7 @@ describe('settings', () => {
       setupComplete: true,
       locale: 'en' as const,
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
+      duplicateFolders: ['/Users/test/Downloads'],
       lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
       launchAtLogin: false,
       scanReminder: { enabled: false, intervalDays: 7 as const }
