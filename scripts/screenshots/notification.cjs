@@ -1,5 +1,6 @@
-// Renders the low disk alert banner for release-notes posts.
-// Run with: npm run screenshots:notification -- --locale=pt-BR --percent=5
+// Renders a Notification Center-style banner for release-notes posts.
+// Run with: npm run screenshots:notification -- --locale=pt-BR --kind=lowDisk
+//           npm run screenshots:notification -- --locale=pt-BR --kind=scanReminder
 //
 // macOS posts notifications from the app bundle and gives no way to capture a
 // banner from a script, so this reproduces the system banner instead. The icon
@@ -19,6 +20,7 @@ const arg = (name, fallback) => {
 
 const locale = arg('locale', 'pt-BR')
 const percent = Number(arg('percent', '5'))
+const kind = arg('kind', 'lowDisk')
 const outName = arg('out', `notification-${locale}`)
 
 const escape = (value) =>
@@ -98,8 +100,14 @@ app.whenReady().then(async () => {
   const catalog = JSON.parse(await readFile(join(root, 'src', 'shared', 'languages.json'), 'utf8'))
   const iconData = await readFile(join(root, 'build', 'icon.png'))
   const icon = `data:image/png;base64,${iconData.toString('base64')}`
-  const title = translate(catalog, 'alert.lowDisk.title', {})
-  const body = translate(catalog, 'alert.lowDisk.body', { percent })
+  const title =
+    kind === 'scanReminder'
+      ? translate(catalog, 'alert.scanReminder.title', {})
+      : translate(catalog, 'alert.lowDisk.title', {})
+  const body =
+    kind === 'scanReminder'
+      ? translate(catalog, 'alert.scanReminder.body', {})
+      : translate(catalog, 'alert.lowDisk.body', { percent })
 
   const win = new BrowserWindow({
     width: BANNER_WIDTH + MARGIN * 2,

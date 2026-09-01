@@ -5,10 +5,12 @@ import {
   SPONSORS_URL,
   REPO_URL,
   LOW_DISK_ALERT_PRESETS,
+  SCAN_REMINDER_INTERVAL_DAYS,
   lowDiskAlertPresetKey,
   parseLowDiskAlertPreset,
   type LowDiskAlertSettings,
   type ScanCategoryFlag,
+  type ScanReminderSettings,
   type UnusedDays
 } from '../../shared/constants'
 import {
@@ -232,41 +234,44 @@ function AppShell(): JSX.Element {
   const selectedBytes = selectedItems.reduce((sum, item) => sum + item.bytes, 0)
   const foundBytes = (result?.items ?? []).reduce((sum, item) => sum + item.bytes, 0)
 
+  async function updateSettings(
+    patch: (current: AppSettings) => Partial<AppSettings>
+  ): Promise<void> {
+    if (!settings) return
+    const next = await window.diskheadroom.setSettings({ ...settings, ...patch(settings) })
+    setSettings(next)
+  }
+
   async function markSetupDone(): Promise<void> {
     if (!settings) return
-    const next = await window.diskheadroom.setSettings({ ...settings, setupComplete: true })
-    setSettings(next)
+    await updateSettings(() => ({ setupComplete: true }))
     setView('dashboard')
   }
 
   async function updateUnusedDays(unusedDays: UnusedDays): Promise<void> {
-    if (!settings) return
-    const next = await window.diskheadroom.setSettings({ ...settings, unusedDays })
-    setSettings(next)
+    await updateSettings(() => ({ unusedDays }))
   }
 
   async function updateLocale(nextLocale: Locale): Promise<void> {
-    if (!settings) return
-    const next = await window.diskheadroom.setSettings({ ...settings, locale: nextLocale })
-    setSettings(next)
+    await updateSettings(() => ({ locale: nextLocale }))
   }
 
   async function updateScanCategory(id: ScanCategoryFlag, enabled: boolean): Promise<void> {
-    if (!settings) return
-    const next = await window.diskheadroom.setSettings({
-      ...settings,
-      scanCategories: { ...settings.scanCategories, [id]: enabled }
-    })
-    setSettings(next)
+    await updateSettings((current) => ({
+      scanCategories: { ...current.scanCategories, [id]: enabled }
+    }))
   }
 
   async function updateLowDiskAlert(patch: Partial<LowDiskAlertSettings>): Promise<void> {
-    if (!settings) return
-    const next = await window.diskheadroom.setSettings({
-      ...settings,
-      lowDiskAlert: { ...settings.lowDiskAlert, ...patch }
-    })
-    setSettings(next)
+    await updateSettings((current) => ({ lowDiskAlert: { ...current.lowDiskAlert, ...patch } }))
+  }
+
+  async function updateLaunchAtLogin(enabled: boolean): Promise<void> {
+    await updateSettings(() => ({ launchAtLogin: enabled }))
+  }
+
+  async function updateScanReminder(patch: Partial<ScanReminderSettings>): Promise<void> {
+    await updateSettings((current) => ({ scanReminder: { ...current.scanReminder, ...patch } }))
   }
 
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
@@ -419,6 +424,8 @@ function AppShell(): JSX.Element {
             onLocale={(value) => void updateLocale(value)}
             onScanCategory={(id, enabled) => void updateScanCategory(id, enabled)}
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
+            onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
+            onScanReminder={(patch) => void updateScanReminder(patch)}
             onPermissions={() => setView('permissions')}
           />
         )}
@@ -933,9 +940,12 @@ function SettingsView(props: {
   onLocale: (value: Locale) => void
   onScanCategory: (id: ScanCategoryFlag, enabled: boolean) => void
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
+  onLaunchAtLogin: (enabled: boolean) => void
+  onScanReminder: (patch: Partial<ScanReminderSettings>) => void
   onPermissions: () => void
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
+  const reminder = props.settings.scanReminder
   const presets = LOW_DISK_ALERT_PRESETS.some(
     (preset) => preset.kind === alert.kind && preset.value === alert.value
   )
@@ -976,6 +986,49 @@ function SettingsView(props: {
           {UNUSED_DAY_OPTIONS.map((days) => (
             <option key={days} value={days}>
               {props.t('settings.days', { days })}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.launchAtLoginTitle')}</h3>
+        <p className="muted">{props.t('settings.launchAtLoginHint')}</p>
+        <label className="scan-flag">
+          <input
+            type="checkbox"
+            checked={props.settings.launchAtLogin}
+            onChange={(event) => props.onLaunchAtLogin(event.target.checked)}
+          />
+          <span>{props.t('settings.launchAtLoginEnable')}</span>
+        </label>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.scanReminderTitle')}</h3>
+        <p className="muted">{props.t('settings.scanReminderHint')}</p>
+        <label className="scan-flag">
+          <input
+            type="checkbox"
+            checked={reminder.enabled}
+            onChange={(event) => props.onScanReminder({ enabled: event.target.checked })}
+          />
+          <span>{props.t('settings.scanReminderEnable')}</span>
+        </label>
+        <label className="field-label" htmlFor="scan-reminder-interval">
+          {props.t('settings.scanReminderInterval')}
+        </label>
+        <select
+          id="scan-reminder-interval"
+          disabled={!reminder.enabled}
+          value={reminder.intervalDays}
+          onChange={(event) =>
+            props.onScanReminder({
+              intervalDays: Number(event.target.value) as ScanReminderSettings['intervalDays']
+            })
+          }
+        >
+          {SCAN_REMINDER_INTERVAL_DAYS.map((days) => (
+            <option key={days} value={days}>
+              {props.t('settings.scanReminder.days', { days })}
             </option>
           ))}
         </select>

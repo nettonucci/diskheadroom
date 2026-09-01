@@ -1,8 +1,15 @@
 import { clipboard, ipcMain, shell } from 'electron'
-import { mergeLowDiskAlert, mergeScanCategories, SPONSORS_URL } from '../shared/constants'
+import {
+  mergeLaunchAtLogin,
+  mergeLowDiskAlert,
+  mergeScanCategories,
+  mergeScanReminder,
+  SPONSORS_URL
+} from '../shared/constants'
 import type { AppSettings, CleanRequest, ScanItem } from '../shared/types'
 import { trashPaths } from './cleaner'
 import { getDiskInfo } from './disk'
+import { applyLaunchAtLogin } from './loginItem'
 import {
   getGrantTarget,
   getPermissionStatus,
@@ -17,6 +24,7 @@ interface IpcOptions {
   sendToRenderer: (channel: string, payload?: unknown) => void
   getTrayController: () => TrayController | null
   onSettingsChanged?: (settings: AppSettings) => void
+  onScanCompleted?: () => void
 }
 
 export function registerIpc(options: IpcOptions): void {
@@ -32,9 +40,12 @@ export function registerIpc(options: IpcOptions): void {
     const normalized: AppSettings = {
       ...next,
       scanCategories: mergeScanCategories(next.scanCategories),
-      lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert)
+      lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
+      launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
+      scanReminder: mergeScanReminder(next.scanReminder)
     }
     await saveSettings(normalized)
+    applyLaunchAtLogin(normalized.launchAtLogin)
     options.getTrayController()?.setLocale(normalized.locale)
     options.onSettingsChanged?.(normalized)
     return normalized
@@ -54,6 +65,7 @@ export function registerIpc(options: IpcOptions): void {
         mergeScanCategories(categories)
       )
       lastItems = new Map(result.items.map((item) => [item.path, item]))
+      options.onScanCompleted?.()
       return result
     }
   )

@@ -11,6 +11,13 @@ const mocks = vi.hoisted(() => ({
   openExternal: vi.fn(),
   showItemInFolder: vi.fn(),
   quit: vi.fn(),
+  setLoginItemSettings: vi.fn(),
+  getLoginItemSettings: vi.fn(() => ({
+    openAtLogin: false,
+    openAsHidden: false,
+    wasOpenedAtLogin: false,
+    wasOpenedAsHidden: false
+  })),
   getPath: vi.fn((key: string) => key === 'exe'
     ? '/Applications/Disk Headroom.app/Contents/MacOS/Disk Headroom'
     : '/tmp/diskheadroom'),
@@ -58,6 +65,8 @@ vi.mock('electron', () => {
       getLocale: mocks.getLocale,
       get isPackaged() { return mocks.isPackaged },
       quit: mocks.quit,
+      setLoginItemSettings: mocks.setLoginItemSettings,
+      getLoginItemSettings: mocks.getLoginItemSettings,
       getAppPath: () => '/project'
     },
     shell: {
@@ -79,6 +88,7 @@ import {
   openFullDiskAccessSettings,
   revealGrantTarget
 } from '../src/main/permissions'
+import { applyLaunchAtLogin, shouldShowWindowOnLaunch } from '../src/main/loginItem'
 import { loadSettings, saveSettings } from '../src/main/settings'
 import { createTray } from '../src/main/tray'
 import { DEFAULT_SCAN_CATEGORIES } from '../src/shared/constants'
@@ -148,7 +158,9 @@ describe('settings', () => {
       setupComplete: false,
       locale: 'pt-BR',
       scanCategories: DEFAULT_SCAN_CATEGORIES,
-      lowDiskAlert: { enabled: false, kind: 'percent', value: 10 }
+      lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
+      launchAtLogin: false,
+      scanReminder: { enabled: false, intervalDays: 7 }
     })
   })
 
@@ -167,10 +179,22 @@ describe('settings', () => {
     })
   })
 
-  it('fills in the default low-disk alert when the file omits it', async () => {
+  it('fills in launch-at-login and scan-reminder defaults when the file omits them', async () => {
     mocks.readFile.mockResolvedValue(JSON.stringify({ unusedDays: 90, locale: 'en' }))
     await expect(loadSettings()).resolves.toMatchObject({
-      lowDiskAlert: { enabled: false, kind: 'percent', value: 10 }
+      lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
+      launchAtLogin: false,
+      scanReminder: { enabled: false, intervalDays: 7 }
+    })
+  })
+
+  it('keeps launch-at-login and a custom reminder interval when present', async () => {
+    mocks.readFile.mockResolvedValue(
+      JSON.stringify({ launchAtLogin: true, scanReminder: { enabled: true, intervalDays: 30 } })
+    )
+    await expect(loadSettings()).resolves.toMatchObject({
+      launchAtLogin: true,
+      scanReminder: { enabled: true, intervalDays: 30 }
     })
   })
 
@@ -185,7 +209,9 @@ describe('settings', () => {
       setupComplete: true,
       locale: 'en' as const,
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
-      lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 }
+      lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
+      launchAtLogin: false,
+      scanReminder: { enabled: false, intervalDays: 7 as const }
     }
     await saveSettings(value)
     expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/diskheadroom', { recursive: true })
@@ -296,5 +322,31 @@ describe('tray', () => {
     createTray({ showWindow: vi.fn(), scanNow: vi.fn(), openDonate: vi.fn() }, 'es')
     expect(mocks.setTemplateImage).not.toHaveBeenCalled()
     expect(mocks.createFromPath).toHaveBeenCalledWith('/project/resources/trayTemplate.png')
+  })
+})
+
+describe('login item', () => {
+  it('enables and disables the macOS login item through Electron', () => {
+    applyLaunchAtLogin(true)
+    expect(mocks.setLoginItemSettings).toHaveBeenCalledWith({
+      openAtLogin: true,
+      openAsHidden: true
+    })
+    applyLaunchAtLogin(false)
+    expect(mocks.setLoginItemSettings).toHaveBeenCalledWith({
+      openAtLogin: false,
+      openAsHidden: true
+    })
+  })
+
+  it('hides the window when the app was opened at login', () => {
+    mocks.getLoginItemSettings.mockReturnValueOnce({
+      openAtLogin: true,
+      openAsHidden: true,
+      wasOpenedAtLogin: true,
+      wasOpenedAsHidden: true
+    })
+    expect(shouldShowWindowOnLaunch()).toBe(false)
+    expect(shouldShowWindowOnLaunch()).toBe(true)
   })
 })

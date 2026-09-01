@@ -1,4 +1,9 @@
-import type { LowDiskAlertSettings, ScanCategoryFlags, UnusedDays } from './constants'
+import type {
+  LowDiskAlertSettings,
+  ScanCategoryFlags,
+  ScanReminderSettings,
+  UnusedDays
+} from './constants'
 import type { Locale, TranslationKey } from './i18n'
 
 export type ScanCategoryId =
@@ -70,6 +75,8 @@ export interface AppSettings {
   locale: Locale
   scanCategories: ScanCategoryFlags
   lowDiskAlert: LowDiskAlertSettings
+  launchAtLogin: boolean
+  scanReminder: ScanReminderSettings
 }
 
 /** Development-only snapshot behind the Debug tab. Never registered in a packaged build. */

@@ -102,3 +102,37 @@ export function parseLowDiskAlertPreset(value: string): Omit<LowDiskAlertSetting
   }
   return { kind, value: amount }
 }
+
+export const SCAN_REMINDER_INTERVAL_DAYS = [7, 14, 30] as const
+export type ScanReminderIntervalDays = (typeof SCAN_REMINDER_INTERVAL_DAYS)[number]
+
+export interface ScanReminderSettings {
+  enabled: boolean
+  intervalDays: ScanReminderIntervalDays
+}
+
+export const DEFAULT_SCAN_REMINDER: ScanReminderSettings = {
+  enabled: false,
+  intervalDays: 7
+}
+
+export const DAY_MS = 24 * 60 * 60 * 1000
+export const SCAN_REMINDER_CHECK_INTERVAL_MS = 15 * 60 * 1000
+
+export function mergeScanReminder(input: unknown): ScanReminderSettings {
+  const next = { ...DEFAULT_SCAN_REMINDER }
+  if (!input || typeof input !== 'object') return next
+  const raw = input as Partial<ScanReminderSettings>
+  if (typeof raw.enabled === 'boolean') next.enabled = raw.enabled
+  if (
+    typeof raw.intervalDays === 'number' &&
+    (SCAN_REMINDER_INTERVAL_DAYS as readonly number[]).includes(raw.intervalDays)
+  ) {
+    next.intervalDays = raw.intervalDays as ScanReminderIntervalDays
+  }
+  return next
+}
+
+export function mergeLaunchAtLogin(input: unknown): boolean {
+  return input === true
+}

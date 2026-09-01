@@ -20,7 +20,9 @@ const settings = {
   setupComplete: true,
   locale: 'en' as const,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
-  lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 }
+  lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
+  launchAtLogin: false,
+  scanReminder: { enabled: false, intervalDays: 7 as const }
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -601,6 +603,26 @@ describe('App', () => {
     fireEvent.change(screen.getByDisplayValue('90 days'), { target: { value: '180' } })
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ unusedDays: 180 }))
+    )
+    await user.click(screen.getByRole('checkbox', { name: 'Start Disk Headroom at login' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ launchAtLogin: true }))
+    )
+    await user.click(screen.getByRole('checkbox', { name: 'Remind me to scan' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scanReminder: expect.objectContaining({ enabled: true, intervalDays: 7 })
+        })
+      )
+    )
+    fireEvent.change(screen.getByLabelText('Remind me every'), { target: { value: '14' } })
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scanReminder: expect.objectContaining({ intervalDays: 14 })
+        })
+      )
     )
     await user.click(screen.getByRole('checkbox', { name: 'Notify me when free space is low' }))
     await waitFor(() =>
