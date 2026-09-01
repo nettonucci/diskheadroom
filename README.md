@@ -213,7 +213,8 @@ There are exactly two GitHub Actions workflows:
 
 - **CI** runs commitlint, TypeScript, unit tests, and the coverage gate on every
   pull request targeting `main`. Configure `CI / Validate` as a required status
-  check in the `main` branch protection rule.
+  check in the `main` branch protection rule. The `.githooks/pre-push` hook runs
+  the same commitlint check locally.
 - **Release** repeats typecheck and coverage after a merge to `main`, lets
   semantic-release calculate the next version, builds the signed-ad-hoc arm64
   DMG, verifies its code signature, and attaches it to the GitHub Release.
@@ -275,6 +276,12 @@ feat: add idle-app threshold presets
 fix: detect Full Disk Access after granting Electron
 feat!: require macOS 14
 ```
+
+`npm install` points `core.hooksPath` at `.githooks`, whose `pre-push` hook runs
+the same commitlint check as CI over the commits you are about to push, and
+rejects branch names longer than 60 characters. Body lines are capped at 100
+characters, so wrap long explanations. Use `git push --no-verify` only to
+recover from a broken hook.
 
 Preview locally (does not tag or push):
 

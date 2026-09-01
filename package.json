@@ -24,6 +24,7 @@
     "build": "npm run typecheck && electron-vite build",
     "build:mac": "npm run build && electron-builder --mac",
     "build:unpack": "npm run build && electron-builder --dir",
+    "prepare": "git config core.hooksPath .githooks || true",
     "postinstall": "electron-builder install-app-deps",
     "icons": "node scripts/generate-icons.mjs",
     "screenshots": "electron-vite build && electron scripts/screenshots/main.cjs",
