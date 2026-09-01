@@ -317,6 +317,21 @@ input {
   line-height: 1.5;
 }
 
+.scan-flags {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+
+.scan-flag {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+}
+
 .status {
   display: inline-flex;
   align-items: center;

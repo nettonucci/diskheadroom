@@ -81,6 +81,7 @@ import {
 } from '../src/main/permissions'
 import { loadSettings, saveSettings } from '../src/main/settings'
 import { createTray } from '../src/main/tray'
+import { DEFAULT_SCAN_CATEGORIES } from '../src/shared/constants'
 
 function callbackResult(stdout: string, error: Error | null = null): void {
   mocks.execFile.mockImplementationOnce((_cmd, _args, callback) => callback(error, { stdout, stderr: '' }))
@@ -145,7 +146,8 @@ describe('settings', () => {
     await expect(loadSettings()).resolves.toEqual({
       unusedDays: 90,
       setupComplete: false,
-      locale: 'pt-BR'
+      locale: 'pt-BR',
+      scanCategories: DEFAULT_SCAN_CATEGORIES
     })
   })
 
@@ -154,13 +156,28 @@ describe('settings', () => {
     await expect(loadSettings()).resolves.toMatchObject({ unusedDays: 180, locale: 'es' })
   })
 
+  it('keeps disabled scan categories and defaults the ones the file omits', async () => {
+    mocks.readFile.mockResolvedValue(
+      JSON.stringify({ unusedDays: 180, scanCategories: { unusedApps: false } })
+    )
+    await expect(loadSettings()).resolves.toMatchObject({
+      unusedDays: 180,
+      scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false }
+    })
+  })
+
   it('uses the default locale when omitted', async () => {
     mocks.readFile.mockResolvedValue(JSON.stringify({ setupComplete: true }))
     await expect(loadSettings()).resolves.toMatchObject({ setupComplete: true, locale: 'pt-BR' })
   })
 
   it('creates the directory and writes formatted JSON', async () => {
-    const value = { unusedDays: 30 as const, setupComplete: true, locale: 'en' as const }
+    const value = {
+      unusedDays: 30 as const,
+      setupComplete: true,
+      locale: 'en' as const,
+      scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false }
+    }
     await saveSettings(value)
     expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/diskheadroom', { recursive: true })
     expect(mocks.writeFile).toHaveBeenCalledWith(

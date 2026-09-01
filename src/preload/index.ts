@@ -19,8 +19,10 @@ const api = {
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
   setSettings: (settings: AppSettings): Promise<AppSettings> =>
     ipcRenderer.invoke('settings:set', settings),
-  runScan: (unusedDays: AppSettings['unusedDays']): Promise<ScanResult> =>
-    ipcRenderer.invoke('scan:run', unusedDays),
+  runScan: (
+    unusedDays: AppSettings['unusedDays'],
+    categories: AppSettings['scanCategories']
+  ): Promise<ScanResult> => ipcRenderer.invoke('scan:run', unusedDays, categories),
   trashItems: (request: CleanRequest): Promise<CleanResult> =>
     ipcRenderer.invoke('clean:trash', request),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),

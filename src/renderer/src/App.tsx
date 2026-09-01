@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
-import { UNUSED_DAY_OPTIONS, SPONSORS_URL, REPO_URL, type UnusedDays } from '../../shared/constants'
+import {
+  UNUSED_DAY_OPTIONS,
+  SCAN_CATEGORY_IDS,
+  SPONSORS_URL,
+  REPO_URL,
+  type ScanCategoryFlag,
+  type UnusedDays
+} from '../../shared/constants'
 import {
   LOCALES,
   LOCALE_NAMES,
@@ -17,7 +24,7 @@ import type {
   ScanProgress,
   ScanResult
 } from '../../shared/types'
-import { CATEGORY_META, CATEGORY_WARNING, NAV, type ViewId } from './lib/copy'
+import { CATEGORY_META, CATEGORY_WARNING, NAV, SCAN_CATEGORY_LABELS, type ViewId } from './lib/copy'
 import { formatBytes, formatDate } from './lib/format'
 import markUrl from '@brand/mark-color.svg'
 
@@ -184,7 +191,7 @@ function AppShell(): JSX.Element {
     // sign of work; the dashboard is where the progress bar lives.
     setView('dashboard')
     try {
-      const next = await window.diskheadroom.runScan(settings.unusedDays)
+      const next = await window.diskheadroom.runScan(settings.unusedDays, settings.scanCategories)
       setResult(next)
       const initial: Record<string, boolean> = {}
       for (const item of next.items) {
@@ -236,6 +243,15 @@ function AppShell(): JSX.Element {
   async function updateLocale(nextLocale: Locale): Promise<void> {
     if (!settings) return
     const next = await window.diskheadroom.setSettings({ ...settings, locale: nextLocale })
+    setSettings(next)
+  }
+
+  async function updateScanCategory(id: ScanCategoryFlag, enabled: boolean): Promise<void> {
+    if (!settings) return
+    const next = await window.diskheadroom.setSettings({
+      ...settings,
+      scanCategories: { ...settings.scanCategories, [id]: enabled }
+    })
     setSettings(next)
   }
 
@@ -378,6 +394,7 @@ function AppShell(): JSX.Element {
             settings={settings}
             onUnusedDays={(value) => void updateUnusedDays(value)}
             onLocale={(value) => void updateLocale(value)}
+            onScanCategory={(id, enabled) => void updateScanCategory(id, enabled)}
             onPermissions={() => setView('permissions')}
           />
         )}
@@ -889,6 +906,7 @@ function SettingsView(props: {
   settings: AppSettings
   onUnusedDays: (value: UnusedDays) => void
   onLocale: (value: Locale) => void
+  onScanCategory: (id: ScanCategoryFlag, enabled: boolean) => void
   onPermissions: () => void
 }): JSX.Element {
   return (
@@ -897,6 +915,22 @@ function SettingsView(props: {
         <div>
           <h2>{props.t('settings.title')}</h2>
           <p>{props.t('settings.description')}</p>
+        </div>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.scanTitle')}</h3>
+        <p className="muted">{props.t('settings.scanHint')}</p>
+        <div className="scan-flags">
+          {SCAN_CATEGORY_IDS.map((id) => (
+            <label key={id} className="scan-flag">
+              <input
+                type="checkbox"
+                checked={props.settings.scanCategories[id]}
+                onChange={(event) => props.onScanCategory(id, event.target.checked)}
+              />
+              <span>{props.t(SCAN_CATEGORY_LABELS[id])}</span>
+            </label>
+          ))}
         </div>
       </div>
       <div className="card">
