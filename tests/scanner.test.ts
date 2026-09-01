@@ -198,6 +198,22 @@ describe('runScan', () => {
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.apps', percent: 80 })
   })
 
+  it('touches no scan root when every category is disabled', async () => {
+    const disabled = Object.fromEntries(
+      Object.keys(DEFAULT_SCAN_CATEGORIES).map((id) => [id, false])
+    ) as typeof DEFAULT_SCAN_CATEGORIES
+
+    const progress = vi.fn()
+    const result = await runScan(90, progress, disabled)
+    expect(result.items).toEqual([])
+    expect(result.limited).toBe(false)
+    expect(mocks.readdir).not.toHaveBeenCalled()
+    expect(mocks.lstat).not.toHaveBeenCalled()
+    expect(mocks.execFile).not.toHaveBeenCalled()
+    // Every phase is still announced so the progress bar does not look stuck.
+    expect(progress).toHaveBeenCalledTimes(11)
+  })
+
   it('scans Xcode Archives, CoreSimulator caches and unavailable simulators as opt-in', async () => {
     const home = '/Users/test'
     const caches = `${home}/Library/Caches`

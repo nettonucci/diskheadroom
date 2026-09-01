@@ -36,6 +36,8 @@ describe('shared helpers', () => {
 
   it('keeps every scan category on when flags are missing or malformed', () => {
     expect(mergeScanCategories(undefined).unusedApps).toBe(true)
+    expect(mergeScanCategories(null).unusedApps).toBe(true)
+    expect(mergeScanCategories('all' as never).unusedApps).toBe(true)
     expect(mergeScanCategories({ unusedApps: 'no' } as never).unusedApps).toBe(true)
     expect(mergeScanCategories({ unusedApps: false })).toMatchObject({
       unusedApps: false,
