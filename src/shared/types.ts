@@ -77,6 +77,39 @@ export interface AppSettings {
   lowDiskAlert: LowDiskAlertSettings
   launchAtLogin: boolean
   scanReminder: ScanReminderSettings
+  isPro: boolean
+}
+
+export interface ApfsSnapshot {
+  uuid: string
+  name: string
+  xid?: number
+  purgeable: boolean
+  isSystem: boolean
+  date?: string | null
+}
+
+export interface ApfsVolumeUsage {
+  name: string
+  role: string
+  mountPoint: string | null
+  usedBytes: number
+}
+
+export interface ApfsStorageExplanation {
+  isApfs: boolean
+  containerSize: number
+  containerFree: number
+  purgeableBytes: number
+  snapshots: ApfsSnapshot[]
+  snapshotCount: number
+  purgeableSnapshotCount: number
+  breakdown: {
+    systemBytes: number
+    dataBytes: number
+    otherVolumesBytes: number
+  }
+  explanation?: string
 }
 
 /** Development-only snapshot behind the Debug tab. Never registered in a packaged build. */

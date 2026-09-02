@@ -601,3 +601,132 @@ select {
 .donate-panel .btn.primary {
   margin-top: 8px;
 }
+
+.badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+}
+
+.badge-pro {
+  background: rgba(125, 154, 122, 0.16);
+  border-color: rgba(125, 154, 122, 0.4);
+  color: var(--accent-strong);
+}
+
+.badge-experimental {
+  background: rgba(230, 192, 123, 0.16);
+  border-color: rgba(230, 192, 123, 0.4);
+  color: var(--warn);
+}
+
+.badge-sys {
+  background: rgba(161, 161, 166, 0.15);
+  border-color: rgba(161, 161, 166, 0.3);
+  color: var(--muted);
+}
+
+.badge-user {
+  background: rgba(125, 206, 160, 0.15);
+  border-color: rgba(125, 206, 160, 0.3);
+  color: var(--ok);
+}
+
+.badge-purgeable {
+  background: rgba(230, 192, 123, 0.15);
+  border-color: rgba(230, 192, 123, 0.3);
+  color: var(--warn);
+}
+
+.badge-protected {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.apfs-card {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.apfs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.apfs-notice {
+  margin: 0;
+}
+
+.apfs-breakdown h4,
+.apfs-snapshots h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.apfs-snapshots-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.apfs-untouched-badge {
+  font-size: 12px;
+}
+
+.apfs-snapshot-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.apfs-snapshot-item {
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.apfs-snapshot-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.apfs-snapshot-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.apfs-uuid {
+  font-size: 11px;
+  color: var(--muted);
+}
