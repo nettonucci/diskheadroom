@@ -1,7 +1,7 @@
 # Lista never-touch e lixeira só do último scan
 
 - **Data:** 2026-09-02
-- **Commit / PR:** #16 #17
+- **Commit / PR:** #59
 - **Tipo:** feat
 - **Público:** quem já usa o Disk Headroom e quer proteger pastas (caches de projeto, apps idle) sem mudar o fluxo de revisão
 - **Formato sugerido no Instagram:** carrossel
