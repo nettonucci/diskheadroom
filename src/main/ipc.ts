@@ -1,7 +1,9 @@
-import { clipboard, ipcMain, shell } from 'electron'
+import { clipboard, dialog, ipcMain, shell } from 'electron'
+import { resolve as resolvePath } from 'node:path'
 import {
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
+  mergeNeverTouchPaths,
   mergeScanCategories,
   mergeScanReminder,
   SPONSORS_URL
@@ -35,6 +37,13 @@ export function registerIpc(options: IpcOptions): void {
   ipcMain.handle('permissions:open-fda', () => openFullDiskAccessSettings())
   ipcMain.handle('permissions:grant-target', () => getGrantTarget())
   ipcMain.handle('permissions:reveal-target', () => revealGrantTarget())
+  ipcMain.handle('dialog:pick-folder', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory']
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
   ipcMain.handle('settings:get', () => loadSettings())
   ipcMain.handle('settings:set', async (_event, next: AppSettings) => {
     const normalized: AppSettings = {
@@ -42,7 +51,8 @@ export function registerIpc(options: IpcOptions): void {
       scanCategories: mergeScanCategories(next.scanCategories),
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
-      scanReminder: mergeScanReminder(next.scanReminder)
+      scanReminder: mergeScanReminder(next.scanReminder),
+      neverTouchPaths: mergeNeverTouchPaths(next.neverTouchPaths)
     }
     await saveSettings(normalized)
     applyLaunchAtLogin(normalized.launchAtLogin)
@@ -57,12 +67,14 @@ export function registerIpc(options: IpcOptions): void {
       unusedDays: AppSettings['unusedDays'],
       categories?: AppSettings['scanCategories']
     ) => {
+      const settings = await loadSettings()
       const result = await runScan(
         unusedDays,
         (progress) => {
           options.sendToRenderer('scan:progress', progress)
         },
-        mergeScanCategories(categories)
+        mergeScanCategories(categories),
+        mergeNeverTouchPaths(settings.neverTouchPaths)
       )
       lastItems = new Map(result.items.map((item) => [item.path, item]))
       options.onScanCompleted?.()
@@ -70,17 +82,28 @@ export function registerIpc(options: IpcOptions): void {
     }
   )
   ipcMain.handle('clean:trash', async (_event, request: CleanRequest) => {
+    const settings = await loadSettings()
     const sizes = new Map<string, number>()
     for (const path of request.paths) {
       sizes.set(path, lastItems.get(path)?.bytes ?? 0)
     }
-    return trashPaths(request, sizes)
+    return trashPaths(request, sizes, {
+      lastScanPaths: new Set(lastItems.keys()),
+      neverTouchPaths: mergeNeverTouchPaths(settings.neverTouchPaths)
+    })
   })
   ipcMain.handle('shell:copy-text', (_event, text: string) => {
     clipboard.writeText(text)
   })
-  ipcMain.handle('shell:reveal-item', (_event, itemPath: unknown) => {
-    if (typeof itemPath !== 'string' || !lastItems.has(itemPath) || !isSafePath(itemPath)) {
+  ipcMain.handle('shell:reveal-item', async (_event, itemPath: unknown) => {
+    if (typeof itemPath !== 'string' || !isSafePath(itemPath)) {
+      return false
+    }
+    const settings = await loadSettings()
+    const neverTouch = mergeNeverTouchPaths(settings.neverTouchPaths)
+    const resolved = resolvePath(itemPath)
+    const listed = neverTouch.some((prefix) => resolved === resolvePath(prefix))
+    if (!lastItems.has(itemPath) && !listed) {
       return false
     }
     shell.showItemInFolder(itemPath)

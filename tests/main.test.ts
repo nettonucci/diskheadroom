@@ -160,7 +160,8 @@ describe('settings', () => {
       scanCategories: DEFAULT_SCAN_CATEGORIES,
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
-      scanReminder: { enabled: false, intervalDays: 7 }
+      scanReminder: { enabled: false, intervalDays: 7 },
+      neverTouchPaths: []
     })
   })
 
@@ -188,13 +189,14 @@ describe('settings', () => {
     })
   })
 
-  it('keeps launch-at-login and a custom reminder interval when present', async () => {
+  it('keeps never-touch prefixes and drops junk entries', async () => {
     mocks.readFile.mockResolvedValue(
-      JSON.stringify({ launchAtLogin: true, scanReminder: { enabled: true, intervalDays: 30 } })
+      JSON.stringify({
+        neverTouchPaths: ['/Users/test/Library/Caches/keep', '/', 'relative', '/Users/test/Library/Caches/keep']
+      })
     )
     await expect(loadSettings()).resolves.toMatchObject({
-      launchAtLogin: true,
-      scanReminder: { enabled: true, intervalDays: 30 }
+      neverTouchPaths: ['/Users/test/Library/Caches/keep']
     })
   })
 
@@ -211,7 +213,8 @@ describe('settings', () => {
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
       lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
       launchAtLogin: false,
-      scanReminder: { enabled: false, intervalDays: 7 as const }
+      scanReminder: { enabled: false, intervalDays: 7 as const },
+      neverTouchPaths: []
     }
     await saveSettings(value)
     expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/diskheadroom', { recursive: true })
@@ -229,12 +232,19 @@ describe('cleaner', () => {
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('locked'))
       .mockRejectedValueOnce('unknown')
+    const lastScanPaths = new Set([
+      '/',
+      '/Users/test/cache-a',
+      '/Users/test/cache-b',
+      '/Users/test/cache-c'
+    ])
     const result = await trashPaths(
       { paths: ['/', '/Users/test/cache-a', '/Users/test/cache-b', '/Users/test/cache-c'] },
       new Map([
         ['/Users/test/cache-a', 10],
         ['/Users/test/cache-b', 20]
-      ])
+      ]),
+      { lastScanPaths, neverTouchPaths: [] }
     )
     expect(result).toEqual({
       trashed: ['/Users/test/cache-a'],
@@ -244,6 +254,38 @@ describe('cleaner', () => {
         { path: '/Users/test/cache-c', error: 'Could not move to Trash' }
       ],
       bytesRequested: 30
+    })
+  })
+
+  it('does not trash paths that were not in the last scan', async () => {
+    const result = await trashPaths(
+      { paths: ['/Users/test/cache-a', '/Users/test/unknown'] },
+      new Map([['/Users/test/cache-a', 10]]),
+      { lastScanPaths: new Set(['/Users/test/cache-a']), neverTouchPaths: [] }
+    )
+    expect(mocks.trashItem).toHaveBeenCalledTimes(1)
+    expect(mocks.trashItem).toHaveBeenCalledWith('/Users/test/cache-a')
+    expect(result).toEqual({
+      trashed: ['/Users/test/cache-a'],
+      failed: [{ path: '/Users/test/unknown', error: 'Path was not in the last scan' }],
+      bytesRequested: 10
+    })
+  })
+
+  it('refuses never-touch paths even when they were in the last scan', async () => {
+    const result = await trashPaths(
+      { paths: ['/Users/test/Library/Caches/keep'] },
+      new Map([['/Users/test/Library/Caches/keep', 99]]),
+      {
+        lastScanPaths: new Set(['/Users/test/Library/Caches/keep']),
+        neverTouchPaths: ['/Users/test/Library/Caches/keep']
+      }
+    )
+    expect(mocks.trashItem).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      trashed: [],
+      failed: [{ path: '/Users/test/Library/Caches/keep', error: 'Path is on the never-touch list' }],
+      bytesRequested: 0
     })
   })
 })

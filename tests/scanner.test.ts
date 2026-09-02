@@ -30,7 +30,7 @@ vi.mock('../src/main/permissions', () => ({
   getPermissionStatus: mocks.getPermissionStatus
 }))
 
-import { isSafePath, runScan } from '../src/main/scanner'
+import { isNeverTouchPath, isSafePath, runScan } from '../src/main/scanner'
 import { DEFAULT_SCAN_CATEGORIES } from '../src/shared/constants'
 
 const directory = {
@@ -98,6 +98,15 @@ describe('path safety', () => {
     ['/Users/test/Desktop/OldBackup.iso', true]
   ])('classifies %s', (path, safe) => {
     expect(isSafePath(path)).toBe(safe)
+  })
+
+  it.each([
+    ['/Users/test/Library/Caches/keep', ['/Users/test/Library/Caches/keep'], true],
+    ['/Users/test/Library/Caches/keep/child', ['/Users/test/Library/Caches/keep'], true],
+    ['/Users/test/Library/Caches/other', ['/Users/test/Library/Caches/keep'], false],
+    ['/Users/test/Library/Caches', ['/Users/test/Library/Caches/keep'], false]
+  ])('never-touch classifies %s', (path, prefixes, excluded) => {
+    expect(isNeverTouchPath(path, prefixes)).toBe(excluded)
   })
 })
 
@@ -175,6 +184,29 @@ describe('runScan', () => {
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.docker', percent: 72 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.documentsDesktop', percent: 76 })
     expect(progress).toHaveBeenLastCalledWith({ phase: 'progress.done', percent: 100 })
+  })
+
+  it('omits items under never-touch prefixes', async () => {
+    const home = '/Users/test'
+    const caches = `${home}/Library/Caches`
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === caches) return ['Homebrew', 'good']
+      if (path === `${caches}/Homebrew` || path === `${home}/.Trash`) return ['payload']
+      if (path === '/Applications' || path === `${home}/Applications`) return []
+      return []
+    })
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path.endsWith('/good')) return file(200)
+      if (path.endsWith('/payload')) return file(100)
+      return directory
+    })
+    execResult(() => new Error('spotlight unavailable'))
+
+    const result = await runScan(90, vi.fn(), DEFAULT_SCAN_CATEGORIES, [
+      `${home}/Library/Caches/Homebrew`
+    ])
+    expect(result.items.some((item) => item.categoryId === 'homebrewCache')).toBe(false)
+    expect(result.items.some((item) => item.name === 'good')).toBe(true)
   })
 
   it('skips a disabled category without touching Spotlight', async () => {

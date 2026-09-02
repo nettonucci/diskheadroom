@@ -274,6 +274,10 @@ function AppShell(): JSX.Element {
     await updateSettings((current) => ({ scanReminder: { ...current.scanReminder, ...patch } }))
   }
 
+  async function updateNeverTouchPaths(neverTouchPaths: string[]): Promise<void> {
+    await updateSettings(() => ({ neverTouchPaths }))
+  }
+
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
 
   function requestClean(): void {
@@ -426,6 +430,7 @@ function AppShell(): JSX.Element {
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
             onScanReminder={(patch) => void updateScanReminder(patch)}
+            onNeverTouchPaths={(paths) => void updateNeverTouchPaths(paths)}
             onPermissions={() => setView('permissions')}
           />
         )}
@@ -942,15 +947,25 @@ function SettingsView(props: {
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
   onLaunchAtLogin: (enabled: boolean) => void
   onScanReminder: (patch: Partial<ScanReminderSettings>) => void
+  onNeverTouchPaths: (paths: string[]) => void
   onPermissions: () => void
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
   const reminder = props.settings.scanReminder
+  const [neverTouchDraft, setNeverTouchDraft] = useState('')
   const presets = LOW_DISK_ALERT_PRESETS.some(
     (preset) => preset.kind === alert.kind && preset.value === alert.value
   )
     ? LOW_DISK_ALERT_PRESETS
     : [{ kind: alert.kind, value: alert.value }, ...LOW_DISK_ALERT_PRESETS]
+
+  function addNeverTouchPath(raw: string): void {
+    const trimmed = raw.trim()
+    if (!trimmed) return
+    const merged = Array.from(new Set([...props.settings.neverTouchPaths, trimmed]))
+    props.onNeverTouchPaths(merged)
+    setNeverTouchDraft('')
+  }
 
   return (
     <section>
@@ -975,6 +990,77 @@ function SettingsView(props: {
             </label>
           ))}
         </div>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.neverTouchTitle')}</h3>
+        <p className="muted">{props.t('settings.neverTouchHint')}</p>
+        <form
+          className="never-touch-add"
+          onSubmit={(event) => {
+            event.preventDefault()
+            addNeverTouchPath(neverTouchDraft)
+          }}
+        >
+          <label className="field-label" htmlFor="never-touch-path">
+            {props.t('settings.neverTouchPaste')}
+          </label>
+          <input
+            id="never-touch-path"
+            type="text"
+            value={neverTouchDraft}
+            onChange={(event) => setNeverTouchDraft(event.target.value)}
+            placeholder={props.t('settings.neverTouchPlaceholder')}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <div className="row">
+            <button className="btn" type="submit">
+              {props.t('settings.neverTouchAdd')}
+            </button>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => {
+                void window.diskheadroom.pickFolder().then((picked) => {
+                  if (picked) addNeverTouchPath(picked)
+                })
+              }}
+            >
+              {props.t('settings.neverTouchChoose')}
+            </button>
+          </div>
+        </form>
+        {props.settings.neverTouchPaths.length === 0 ? (
+          <p className="muted">{props.t('settings.neverTouchEmpty')}</p>
+        ) : (
+          <ul className="never-touch-list">
+            {props.settings.neverTouchPaths.map((path) => (
+              <li key={path}>
+                <code className="path">{path}</code>
+                <div className="row">
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => void window.diskheadroom.revealItem(path)}
+                  >
+                    {props.t('settings.neverTouchReveal')}
+                  </button>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() =>
+                      props.onNeverTouchPaths(
+                        props.settings.neverTouchPaths.filter((item) => item !== path)
+                      )
+                    }
+                  >
+                    {props.t('settings.neverTouchRemove')}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div className="card">
         <h3>{props.t('settings.idleTitle')}</h3>
