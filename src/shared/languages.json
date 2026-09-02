@@ -181,7 +181,21 @@
     "tray.open": "Open Disk Headroom",
     "tray.scan": "Scan now",
     "tray.donate": "Donate",
-    "tray.quit": "Quit Disk Headroom"
+    "tray.quit": "Quit Disk Headroom",
+    "forecast.title": "Headroom forecast",
+    "forecast.description": "Estimates when disk space will reach your low-disk alert threshold based on local history.",
+    "forecast.proCardTitle": "Headroom forecast (Pro)",
+    "forecast.proCardBody": "Track your disk usage rate over time and predict when you will run out of space. 100% offline and private.",
+    "forecast.proCardCta": "Unlock Pro",
+    "forecast.insufficient": "Collecting local samples. The forecast will appear after additional disk readings over time.",
+    "forecast.steady": "Free space is steady. No rate of decline detected.",
+    "forecast.daysRemainingOne": "Estimated 1 day until low-disk threshold ({rate}/day decline)",
+    "forecast.daysRemainingOther": "Estimated {days} days until low-disk threshold ({rate}/day decline)",
+    "forecast.predictedDate": "Predicted threshold date: {date}",
+    "forecast.critical": "Disk free space is currently below your alert threshold.",
+    "settings.proTitle": "Disk Headroom Pro",
+    "settings.proHint": "Local-only advanced features, insights and forecasting. No accounts, no telemetry.",
+    "settings.proEnable": "Enable Pro entitlement"
   },
   "pt-BR": {
     "app.tagline": "Um Mac mais leve, com um pouco mais de espaço.",
@@ -365,7 +379,21 @@
     "tray.open": "Abrir Disk Headroom",
     "tray.scan": "Verificar agora",
     "tray.donate": "Doar",
-    "tray.quit": "Sair do Disk Headroom"
+    "tray.quit": "Sair do Disk Headroom",
+    "forecast.title": "Previsão de espaço livre",
+    "forecast.description": "Estima quando o espaço em disco atingirá o limite de alerta com base no histórico local.",
+    "forecast.proCardTitle": "Previsão de espaço (Pro)",
+    "forecast.proCardBody": "Acompanhe o ritmo de uso do disco ao longo do tempo e preveja quando o espaço vai acabar. 100% offline e privado.",
+    "forecast.proCardCta": "Desbloquear Pro",
+    "forecast.insufficient": "Coletando amostras locais. A previsão aparecerá após mais leituras de disco ao longo do tempo.",
+    "forecast.steady": "O espaço livre está estável. Nenhuma taxa de declínio detectada.",
+    "forecast.daysRemainingOne": "Estimativa de 1 dia até o limite de disco baixo (declínio de {rate}/dia)",
+    "forecast.daysRemainingOther": "Estimativa de {days} dias até o limite de disco baixo (declínio de {rate}/dia)",
+    "forecast.predictedDate": "Data estimada do limite: {date}",
+    "forecast.critical": "O espaço livre em disco está atualmente abaixo do limite de alerta.",
+    "settings.proTitle": "Disk Headroom Pro",
+    "settings.proHint": "Recursos avançados, previsões e insights locais. Sem contas e sem telemetria.",
+    "settings.proEnable": "Ativar recursos Pro"
   },
   "es": {
     "app.tagline": "Un Mac más ligero, con un poco más de espacio.",
@@ -549,6 +577,20 @@
     "tray.open": "Abrir Disk Headroom",
     "tray.scan": "Analizar ahora",
     "tray.donate": "Donar",
-    "tray.quit": "Salir de Disk Headroom"
+    "tray.quit": "Salir de Disk Headroom",
+    "forecast.title": "Pronóstico de espacio libre",
+    "forecast.description": "Estima cuándo el espacio en disco alcanzará el umbral de alerta según el historial local.",
+    "forecast.proCardTitle": "Pronóstico de espacio (Pro)",
+    "forecast.proCardBody": "Siga el ritmo de uso del disco a lo largo del tiempo y prediga cuándo se quedará sin espacio. 100% local y privado.",
+    "forecast.proCardCta": "Desbloquear Pro",
+    "forecast.insufficient": "Recolectando muestras locales. El pronóstico aparecerá tras más lecturas de disco a lo largo del tiempo.",
+    "forecast.steady": "El espacio libre está estable. No se detecta ritmo de disminución.",
+    "forecast.daysRemainingOne": "Estimado 1 día hasta el umbral de poco espacio (disminución de {rate}/día)",
+    "forecast.daysRemainingOther": "Estimado {days} días hasta el umbral de poco espacio (disminución de {rate}/día)",
+    "forecast.predictedDate": "Fecha prevista del umbral: {date}",
+    "forecast.critical": "El espacio libre en disco está actualmente por debajo del umbral de alerta.",
+    "settings.proTitle": "Disk Headroom Pro",
+    "settings.proHint": "Funciones avanzadas, predicciones e información local. Sin cuentas ni telemetría.",
+    "settings.proEnable": "Activar funciones Pro"
   }
 }

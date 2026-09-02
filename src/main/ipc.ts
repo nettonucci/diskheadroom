@@ -1,5 +1,6 @@
 import { clipboard, ipcMain, shell } from 'electron'
 import {
+  mergeIsPro,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeScanCategories,
@@ -9,6 +10,7 @@ import {
 import type { AppSettings, CleanRequest, ScanItem } from '../shared/types'
 import { trashPaths } from './cleaner'
 import { getDiskInfo } from './disk'
+import { getHeadroomForecast, loadHeadroomSamples, recordHeadroomSample } from './forecast'
 import { applyLaunchAtLogin } from './loginItem'
 import {
   getGrantTarget,
@@ -30,7 +32,18 @@ interface IpcOptions {
 export function registerIpc(options: IpcOptions): void {
   let lastItems = new Map<string, ScanItem>()
 
-  ipcMain.handle('disk:info', () => getDiskInfo())
+  ipcMain.handle('disk:info', async () => {
+    const disk = await getDiskInfo()
+    if (disk.totalBytes > 0) {
+      void Promise.resolve(
+        recordHeadroomSample({
+          freeBytes: disk.freeBytes,
+          totalBytes: disk.totalBytes
+        })
+      ).catch(() => {})
+    }
+    return disk
+  })
   ipcMain.handle('permissions:status', () => getPermissionStatus())
   ipcMain.handle('permissions:open-fda', () => openFullDiskAccessSettings())
   ipcMain.handle('permissions:grant-target', () => getGrantTarget())
@@ -42,7 +55,8 @@ export function registerIpc(options: IpcOptions): void {
       scanCategories: mergeScanCategories(next.scanCategories),
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
-      scanReminder: mergeScanReminder(next.scanReminder)
+      scanReminder: mergeScanReminder(next.scanReminder),
+      isPro: mergeIsPro(next.isPro)
     }
     await saveSettings(normalized)
     applyLaunchAtLogin(normalized.launchAtLogin)
@@ -50,6 +64,12 @@ export function registerIpc(options: IpcOptions): void {
     options.onSettingsChanged?.(normalized)
     return normalized
   })
+  ipcMain.handle('forecast:get', async () => {
+    const [disk, settings] = await Promise.all([getDiskInfo(), loadSettings()])
+    return getHeadroomForecast(disk, settings)
+  })
+  ipcMain.handle('forecast:samples', () => loadHeadroomSamples())
+  ipcMain.handle('forecast:record', (_event, sample) => recordHeadroomSample(sample))
   ipcMain.handle(
     'scan:run',
     async (
@@ -65,6 +85,24 @@ export function registerIpc(options: IpcOptions): void {
         mergeScanCategories(categories)
       )
       lastItems = new Map(result.items.map((item) => [item.path, item]))
+
+      try {
+        const disk = await getDiskInfo()
+        const junkBytes = result.items.reduce((sum, item) => sum + item.bytes, 0)
+        const categoryTotals: Record<string, number> = {}
+        for (const item of result.items) {
+          categoryTotals[item.categoryId] = (categoryTotals[item.categoryId] ?? 0) + item.bytes
+        }
+        await recordHeadroomSample({
+          freeBytes: disk.freeBytes,
+          totalBytes: disk.totalBytes,
+          junkBytes,
+          categoryTotals
+        })
+      } catch {
+        // Sample recording failure is non-fatal
+      }
+
       options.onScanCompleted?.()
       return result
     }

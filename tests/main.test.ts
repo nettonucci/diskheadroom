@@ -160,7 +160,8 @@ describe('settings', () => {
       scanCategories: DEFAULT_SCAN_CATEGORIES,
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
-      scanReminder: { enabled: false, intervalDays: 7 }
+      scanReminder: { enabled: false, intervalDays: 7 },
+      isPro: false
     })
   })
 

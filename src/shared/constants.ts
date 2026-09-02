@@ -136,3 +136,11 @@ export function mergeScanReminder(input: unknown): ScanReminderSettings {
 export function mergeLaunchAtLogin(input: unknown): boolean {
   return input === true
 }
+
+export const MAX_HEADROOM_SAMPLES = 100
+export const MAX_HEADROOM_SAMPLE_AGE_MS = 60 * DAY_MS
+export const MIN_HEADROOM_SAMPLE_INTERVAL_MS = 5 * 60 * 1000
+
+export function mergeIsPro(input: unknown): boolean {
+  return input === true
+}

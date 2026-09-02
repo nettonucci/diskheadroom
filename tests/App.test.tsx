@@ -22,7 +22,8 @@ const settings = {
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
-  scanReminder: { enabled: false, intervalDays: 7 as const }
+  scanReminder: { enabled: false, intervalDays: 7 as const },
+  isPro: false
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -80,6 +81,8 @@ function api(overrides: Partial<Api> = {}): Api {
     revealGrantTarget: vi.fn().mockResolvedValue(undefined),
     getSettings: vi.fn().mockResolvedValue(settings),
     setSettings: vi.fn().mockImplementation(async (next) => next),
+    getForecast: vi.fn().mockResolvedValue(null),
+    getHeadroomSamples: vi.fn().mockResolvedValue([]),
     runScan: vi.fn().mockResolvedValue(result),
     trashItems: vi.fn().mockResolvedValue({
       trashed: ['/Users/test/Library/Caches/a'],
@@ -720,5 +723,55 @@ describe('App', () => {
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Debug' }))
     expect(await screen.findByText('Debug bridge unavailable.')).toBeInTheDocument()
+  })
+
+  it('renders Pro CTA card when isPro is false and navigates to settings on CTA click', async () => {
+    const bridge = api()
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByText('Headroom forecast (Pro)')).toBeInTheDocument()
+    expect(screen.getByText(/Track your disk usage rate over time/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Unlock Pro' }))
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+  })
+
+  it('renders headroom forecast when isPro is true', async () => {
+    const bridge = api({
+      getSettings: vi.fn().mockResolvedValue({ ...settings, isPro: true }),
+      getForecast: vi.fn().mockResolvedValue({
+        status: 'declining',
+        dailyDeclineBytes: 2 * 1024 * 1024 * 1024,
+        daysRemaining: 15,
+        thresholdBytes: 10 * 1024 * 1024 * 1024,
+        estimatedDate: '2025-06-01T00:00:00.000Z',
+        sampleCount: 5
+      })
+    })
+    window.diskheadroom = bridge
+    render(<App />)
+
+    expect(await screen.findByText('Headroom forecast')).toBeInTheDocument()
+    expect(screen.getByText(/Estimated 15 days until low-disk threshold/)).toBeInTheDocument()
+    expect(screen.getByText(/Predicted threshold date:/)).toBeInTheDocument()
+  })
+
+  it('toggles Pro features in settings', async () => {
+    const bridge = api()
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    const proCheckbox = screen.getByRole('checkbox', { name: 'Enable Pro entitlement' })
+    expect(proCheckbox).not.toBeChecked()
+
+    await user.click(proCheckbox)
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ isPro: true }))
+    )
   })
 })

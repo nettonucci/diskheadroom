@@ -25,6 +25,7 @@ import type {
   AppSettings,
   DiskInfo,
   GrantTarget,
+  HeadroomForecast,
   LowDiskDebugStatus,
   PermissionStatus,
   ScanItem,
@@ -122,6 +123,7 @@ function AppShell(): JSX.Element {
   const [view, setView] = useState<ViewId>('permissions')
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [disk, setDisk] = useState<DiskInfo | null>(null)
+  const [forecast, setForecast] = useState<HeadroomForecast | null>(null)
   const [perms, setPerms] = useState<PermissionStatus | null>(null)
   const [grantTarget, setGrantTarget] = useState<GrantTarget | null>(null)
   const [scanning, setScanning] = useState(false)
@@ -138,18 +140,20 @@ function AppShell(): JSX.Element {
   const t = translator(locale)
 
   const refresh = useCallback(async () => {
-    const [nextSettings, nextDisk, nextPerms, nextTarget] = await Promise.all([
+    const [nextSettings, nextDisk, nextPerms, nextTarget, nextForecast] = await Promise.all([
       window.diskheadroom.getSettings(),
       // A failed capacity reading must not take the rest of the UI down with it:
       // the panel can be missing, the app still scans and cleans.
       window.diskheadroom.getDiskInfo().catch(() => null),
       window.diskheadroom.getPermissions(),
-      window.diskheadroom.getGrantTarget()
+      window.diskheadroom.getGrantTarget(),
+      window.diskheadroom.getForecast().catch(() => null)
     ])
     setSettings(nextSettings)
     setDisk(nextDisk)
     setPerms(nextPerms)
     setGrantTarget(nextTarget)
+    setForecast(nextForecast)
     // Only the first load decides the landing view. Later refreshes come from
     // Recheck or a finished cleanup, and pulling the user out of the screen they
     // opened makes those buttons feel broken.
@@ -160,9 +164,13 @@ function AppShell(): JSX.Element {
   }, [])
 
   const refreshDisk = useCallback(async () => {
-    const next = await window.diskheadroom.getDiskInfo().catch(() => null)
+    const [nextDisk, nextForecast] = await Promise.all([
+      window.diskheadroom.getDiskInfo().catch(() => null),
+      window.diskheadroom.getForecast().catch(() => null)
+    ])
     // Keep the previous reading on a transient failure rather than blanking the panel.
-    if (next) setDisk(next)
+    if (nextDisk) setDisk(nextDisk)
+    if (nextForecast) setForecast(nextForecast)
   }, [])
 
   useEffect(() => {
@@ -274,6 +282,12 @@ function AppShell(): JSX.Element {
     await updateSettings((current) => ({ scanReminder: { ...current.scanReminder, ...patch } }))
   }
 
+  async function updatePro(enabled: boolean): Promise<void> {
+    await updateSettings(() => ({ isPro: enabled }))
+    const nextForecast = await window.diskheadroom.getForecast().catch(() => null)
+    setForecast(nextForecast)
+  }
+
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
 
   function requestClean(): void {
@@ -367,7 +381,10 @@ function AppShell(): JSX.Element {
         {view === 'dashboard' && (
           <DashboardView
             t={t}
+            locale={locale}
             disk={disk}
+            forecast={forecast}
+            isPro={Boolean(settings?.isPro)}
             usedPct={usedPct}
             scanning={scanning}
             progress={progress}
@@ -375,6 +392,7 @@ function AppShell(): JSX.Element {
             limited={Boolean(perms && !perms.fullDiskAccess)}
             scanFailed={scanFailed}
             onScan={() => void startScan()}
+            onUnlockPro={() => setView('settings')}
           />
         )}
         {view === 'results' && result && (
@@ -406,7 +424,10 @@ function AppShell(): JSX.Element {
         {view === 'results' && !result && (
           <DashboardView
             t={t}
+            locale={locale}
             disk={disk}
+            forecast={forecast}
+            isPro={Boolean(settings?.isPro)}
             usedPct={usedPct}
             scanning={scanning}
             progress={progress}
@@ -414,6 +435,7 @@ function AppShell(): JSX.Element {
             limited={Boolean(perms && !perms.fullDiskAccess)}
             scanFailed={scanFailed}
             onScan={() => void startScan()}
+            onUnlockPro={() => setView('settings')}
           />
         )}
         {view === 'settings' && settings && (
@@ -426,6 +448,7 @@ function AppShell(): JSX.Element {
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
             onScanReminder={(patch) => void updateScanReminder(patch)}
+            onPro={(enabled) => void updatePro(enabled)}
             onPermissions={() => setView('permissions')}
           />
         )}
@@ -653,9 +676,76 @@ function DiskStat(props: {
   )
 }
 
+function ForecastCard(props: {
+  t: Translator
+  locale: Locale
+  forecast: HeadroomForecast | null
+  isPro: boolean
+  onUnlockPro: () => void
+}): JSX.Element {
+  if (!props.isPro) {
+    return (
+      <div className="card forecast-card pro-cta">
+        <div className="forecast-header">
+          <h3>{props.t('forecast.proCardTitle')}</h3>
+          <p className="muted">{props.t('forecast.proCardBody')}</p>
+        </div>
+        <div className="row">
+          <button className="btn" type="button" onClick={props.onUnlockPro}>
+            {props.t('forecast.proCardCta')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const forecast = props.forecast
+
+  return (
+    <div className="card forecast-card">
+      <div className="forecast-header">
+        <h3>{props.t('forecast.title')}</h3>
+        <p className="muted">{props.t('forecast.description')}</p>
+      </div>
+
+      {!forecast || forecast.status === 'insufficient_data' ? (
+        <p className="notice">{props.t('forecast.insufficient')}</p>
+      ) : forecast.status === 'steady' ? (
+        <p className="notice ok">{props.t('forecast.steady')}</p>
+      ) : forecast.status === 'critical' ? (
+        <p className="notice" role="alert">{props.t('forecast.critical')}</p>
+      ) : (
+        <div className="forecast-details">
+          <strong className="forecast-headline">
+            {props.t(
+              forecast.daysRemaining === 1
+                ? 'forecast.daysRemainingOne'
+                : 'forecast.daysRemainingOther',
+              {
+                days: forecast.daysRemaining ?? 0,
+                rate: formatBytes(forecast.dailyDeclineBytes)
+              }
+            )}
+          </strong>
+          {forecast.estimatedDate && (
+            <p className="muted">
+              {props.t('forecast.predictedDate', {
+                date: formatDate(forecast.estimatedDate, props.locale)
+              })}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function DashboardView(props: {
   t: Translator
+  locale: Locale
   disk: DiskInfo | null
+  forecast: HeadroomForecast | null
+  isPro: boolean
   usedPct: number
   scanning: boolean
   progress: ScanProgress | null
@@ -663,6 +753,7 @@ function DashboardView(props: {
   limited: boolean
   scanFailed: boolean
   onScan: () => void
+  onUnlockPro: () => void
 }): JSX.Element {
   return (
     <section>
@@ -673,6 +764,13 @@ function DashboardView(props: {
         </div>
       </div>
       <DiskPanel t={props.t} disk={props.disk} usedPct={props.usedPct} />
+      <ForecastCard
+        t={props.t}
+        locale={props.locale}
+        forecast={props.forecast}
+        isPro={props.isPro}
+        onUnlockPro={props.onUnlockPro}
+      />
       {props.limited && (
         <div className="notice">{props.t('dashboard.limited')}</div>
       )}
@@ -942,6 +1040,7 @@ function SettingsView(props: {
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
   onLaunchAtLogin: (enabled: boolean) => void
   onScanReminder: (patch: Partial<ScanReminderSettings>) => void
+  onPro: (enabled: boolean) => void
   onPermissions: () => void
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
@@ -959,6 +1058,18 @@ function SettingsView(props: {
           <h2>{props.t('settings.title')}</h2>
           <p>{props.t('settings.description')}</p>
         </div>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.proTitle')}</h3>
+        <p className="muted">{props.t('settings.proHint')}</p>
+        <label className="scan-flag">
+          <input
+            type="checkbox"
+            checked={props.settings.isPro}
+            onChange={(event) => props.onPro(event.target.checked)}
+          />
+          <span>{props.t('settings.proEnable')}</span>
+        </label>
       </div>
       <div className="card">
         <h3>{props.t('settings.scanTitle')}</h3>
