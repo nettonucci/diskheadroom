@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_UNUSED_DAYS,
   UNUSED_DAY_OPTIONS,
-  mergeScanCategories
+  mergeScanCategories,
+  mergeIsPro,
+  mergeExternalVolumePaths
 } from '../src/shared/constants'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
 import { CATEGORY_META, NAV } from '../src/renderer/src/lib/copy'
@@ -30,7 +32,7 @@ describe('shared helpers', () => {
     expect(LOCALES).toEqual(['en', 'pt-BR', 'es'])
     expect(LOCALE_NAMES['pt-BR']).toContain('Português')
     expect(NAV).toHaveLength(4)
-    expect(Object.keys(CATEGORY_META)).toHaveLength(15)
+    expect(Object.keys(CATEGORY_META)).toHaveLength(16)
     expect(UNUSED_DAY_OPTIONS).toContain(DEFAULT_UNUSED_DAYS)
   })
 
@@ -43,6 +45,24 @@ describe('shared helpers', () => {
       unusedApps: false,
       userCaches: true
     })
+  })
+
+  it('normalizes isPro and externalVolumePaths flags', () => {
+    expect(mergeIsPro(true)).toBe(true)
+    expect(mergeIsPro(false)).toBe(false)
+    expect(mergeIsPro(undefined)).toBe(false)
+    expect(mergeIsPro('true' as never)).toBe(false)
+
+    expect(mergeExternalVolumePaths(['/Volumes/USB', '/Volumes/Ext', '/Volumes/USB'])).toEqual([
+      '/Volumes/USB',
+      '/Volumes/Ext'
+    ])
+    expect(mergeExternalVolumePaths(undefined)).toEqual([])
+    expect(mergeExternalVolumePaths(null as never)).toEqual([])
+    expect(mergeExternalVolumePaths('invalid' as never)).toEqual([])
+    expect(mergeExternalVolumePaths(['', '   ', 123 as never, '/Volumes/Valid'])).toEqual([
+      '/Volumes/Valid'
+    ])
   })
 })
 

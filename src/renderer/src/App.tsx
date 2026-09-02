@@ -198,7 +198,14 @@ function AppShell(): JSX.Element {
     // sign of work; the dashboard is where the progress bar lives.
     setView('dashboard')
     try {
-      const next = await window.diskheadroom.runScan(settings.unusedDays, settings.scanCategories)
+      const next = await window.diskheadroom.runScan(
+        settings.unusedDays,
+        settings.scanCategories,
+        {
+          isPro: settings.isPro,
+          externalVolumePaths: settings.externalVolumePaths
+        }
+      )
       setResult(next)
       const initial: Record<string, boolean> = {}
       for (const item of next.items) {
@@ -272,6 +279,22 @@ function AppShell(): JSX.Element {
 
   async function updateScanReminder(patch: Partial<ScanReminderSettings>): Promise<void> {
     await updateSettings((current) => ({ scanReminder: { ...current.scanReminder, ...patch } }))
+  }
+
+  async function addExternalVolume(): Promise<void> {
+    const picked = await window.diskheadroom.pickExternalVolume()
+    if (!picked) return
+    if (settings && !settings.externalVolumePaths.includes(picked)) {
+      await updateSettings((current) => ({
+        externalVolumePaths: [...current.externalVolumePaths, picked]
+      }))
+    }
+  }
+
+  async function removeExternalVolume(pathToRemove: string): Promise<void> {
+    await updateSettings((current) => ({
+      externalVolumePaths: current.externalVolumePaths.filter((p) => p !== pathToRemove)
+    }))
   }
 
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
@@ -426,6 +449,8 @@ function AppShell(): JSX.Element {
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
             onScanReminder={(patch) => void updateScanReminder(patch)}
+            onAddExternalVolume={() => void addExternalVolume()}
+            onRemoveExternalVolume={(volPath) => void removeExternalVolume(volPath)}
             onPermissions={() => setView('permissions')}
           />
         )}
@@ -942,6 +967,8 @@ function SettingsView(props: {
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
   onLaunchAtLogin: (enabled: boolean) => void
   onScanReminder: (patch: Partial<ScanReminderSettings>) => void
+  onAddExternalVolume: () => void
+  onRemoveExternalVolume: (path: string) => void
   onPermissions: () => void
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
@@ -975,6 +1002,50 @@ function SettingsView(props: {
             </label>
           ))}
         </div>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.externalVolumesTitle')}</h3>
+        <p className="muted">{props.t('settings.externalVolumesHint')}</p>
+        {!props.settings.isPro ? (
+          <div className="notice">{props.t('settings.externalVolumesProLock')}</div>
+        ) : (
+          <div>
+            {props.settings.externalVolumePaths.length === 0 ? (
+              <p className="muted" style={{ marginBottom: '12px' }}>
+                {props.t('settings.externalVolumesNone')}
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                {props.settings.externalVolumePaths.map((volPath) => (
+                  <div
+                    key={volPath}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      padding: '8px 12px',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <span style={{ wordBreak: 'break-all', fontSize: '13px' }}>{volPath}</span>
+                    <button
+                      className="btn"
+                      type="button"
+                      style={{ padding: '4px 8px', fontSize: '12px' }}
+                      onClick={() => props.onRemoveExternalVolume(volPath)}
+                    >
+                      {props.t('settings.externalVolumesRemove')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="btn" type="button" onClick={props.onAddExternalVolume}>
+              {props.t('settings.externalVolumesAdd')}
+            </button>
+          </div>
+        )}
       </div>
       <div className="card">
         <h3>{props.t('settings.idleTitle')}</h3>

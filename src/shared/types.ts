@@ -22,6 +22,7 @@ export type ScanCategoryId =
   | 'androidDevCaches'
   | 'idleUserFolders'
   | 'unusedApps'
+  | 'externalVolumes'
 
 export interface ScanItem {
   id: string
@@ -54,6 +55,11 @@ export interface DiskInfo {
   usedBytes: number
 }
 
+export interface MountedVolume {
+  name: string
+  path: string
+}
+
 export interface PermissionStatus {
   fullDiskAccess: boolean
   libraryCachesReadable: boolean
@@ -77,6 +83,8 @@ export interface AppSettings {
   lowDiskAlert: LowDiskAlertSettings
   launchAtLogin: boolean
   scanReminder: ScanReminderSettings
+  isPro: boolean
+  externalVolumePaths: string[]
 }
 
 /** Development-only snapshot behind the Debug tab. Never registered in a packaged build. */

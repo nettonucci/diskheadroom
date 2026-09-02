@@ -14,7 +14,9 @@ const mocks = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   runScan: vi.fn(),
   trashPaths: vi.fn(),
-  applyLaunchAtLogin: vi.fn()
+  applyLaunchAtLogin: vi.fn(),
+  listMountedVolumes: vi.fn(),
+  pickExternalVolumeDialog: vi.fn()
 }))
 
 vi.mock('electron', () => {
@@ -39,6 +41,10 @@ vi.mock('../src/main/permissions', () => ({
 vi.mock('../src/main/settings', () => ({
   loadSettings: mocks.loadSettings,
   saveSettings: mocks.saveSettings
+}))
+vi.mock('../src/main/volumes', () => ({
+  listMountedVolumes: mocks.listMountedVolumes,
+  pickExternalVolumeDialog: mocks.pickExternalVolumeDialog
 }))
 vi.mock('../src/main/scanner', async () => {
   const actual = await vi.importActual<typeof import('../src/main/scanner')>('../src/main/scanner')
@@ -66,9 +72,11 @@ describe('IPC registration', () => {
     mocks.getPermissionStatus.mockResolvedValue({ fullDiskAccess: true })
     mocks.getGrantTarget.mockReturnValue({ displayName: 'Disk Headroom' })
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
+    mocks.listMountedVolumes.mockResolvedValue([{ name: 'USB', path: '/Volumes/USB' }])
+    mocks.pickExternalVolumeDialog.mockResolvedValue('/Volumes/USB')
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(12)
+    expect(mocks.handlers.size).toBe(14)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
@@ -76,6 +84,8 @@ describe('IPC registration', () => {
     call('permissions:reveal-target')
     expect(mocks.revealGrantTarget).toHaveBeenCalled()
     await expect(call('settings:get')).resolves.toEqual({ locale: 'en' })
+    await expect(call('volumes:list')).resolves.toEqual([{ name: 'USB', path: '/Volumes/USB' }])
+    await expect(call('volumes:pick')).resolves.toBe('/Volumes/USB')
   })
 
   it('saves settings and updates the tray locale when available', async () => {
@@ -141,7 +151,7 @@ describe('IPC registration', () => {
     mocks.trashPaths.mockResolvedValue({ trashed: [], failed: [], bytesRequested: 42 })
     registerIpc({ sendToRenderer, getTrayController: () => null, onScanCompleted })
 
-    await call('scan:run', 90, { unusedApps: false })
+    await call('scan:run', 90, { unusedApps: false }, { isPro: true, externalVolumePaths: ['/Volumes/Disk'] })
     expect(onScanCompleted).toHaveBeenCalledTimes(1)
     expect(sendToRenderer).toHaveBeenCalledWith('scan:progress', {
       phase: 'progress.done',
@@ -150,7 +160,8 @@ describe('IPC registration', () => {
     expect(mocks.runScan).toHaveBeenCalledWith(
       90,
       expect.any(Function),
-      expect.objectContaining({ unusedApps: false, userCaches: true })
+      expect.objectContaining({ unusedApps: false, userCaches: true }),
+      { isPro: true, externalVolumePaths: ['/Volumes/Disk'] }
     )
     const request = { paths: ['/Users/test/cache', '/Users/test/unknown'] }
     await call('clean:trash', request)

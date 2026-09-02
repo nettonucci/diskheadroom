@@ -160,7 +160,9 @@ describe('settings', () => {
       scanCategories: DEFAULT_SCAN_CATEGORIES,
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
-      scanReminder: { enabled: false, intervalDays: 7 }
+      scanReminder: { enabled: false, intervalDays: 7 },
+      isPro: false,
+      externalVolumePaths: []
     })
   })
 
@@ -184,7 +186,19 @@ describe('settings', () => {
     await expect(loadSettings()).resolves.toMatchObject({
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
-      scanReminder: { enabled: false, intervalDays: 7 }
+      scanReminder: { enabled: false, intervalDays: 7 },
+      isPro: false,
+      externalVolumePaths: []
+    })
+  })
+
+  it('keeps isPro and externalVolumePaths when present', async () => {
+    mocks.readFile.mockResolvedValue(
+      JSON.stringify({ isPro: true, externalVolumePaths: ['/Volumes/Disk1', '/Volumes/Disk2'] })
+    )
+    await expect(loadSettings()).resolves.toMatchObject({
+      isPro: true,
+      externalVolumePaths: ['/Volumes/Disk1', '/Volumes/Disk2']
     })
   })
 
@@ -211,7 +225,9 @@ describe('settings', () => {
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
       lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
       launchAtLogin: false,
-      scanReminder: { enabled: false, intervalDays: 7 as const }
+      scanReminder: { enabled: false, intervalDays: 7 as const },
+      isPro: false,
+      externalVolumePaths: []
     }
     await saveSettings(value)
     expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/diskheadroom', { recursive: true })

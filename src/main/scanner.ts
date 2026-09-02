@@ -17,6 +17,18 @@ const execFileAsync = promisify(execFile)
 
 const BLOCKED_PREFIXES = ['/System', '/usr/sbin', '/bin', '/sbin', '/private/var/db']
 
+const IGNORED_EXTERNAL_ENTRIES = new Set([
+  'System Volume Information',
+  '$RECYCLE.BIN',
+  '.Trashes',
+  '.Spotlight-V100',
+  '.fseventsd',
+  '.DocumentRevisions-V100',
+  '.TemporaryItems',
+  '.VolumeIcon.icns',
+  '.com.apple.timemachine.donotpresent'
+])
+
 /** First-level Documents/Desktop children below this size stay off the list. */
 const IDLE_USER_MIN_BYTES = 100 * 1024 * 1024
 const IDLE_USER_LIMIT = 24
@@ -37,14 +49,22 @@ const USER_CACHE_SKIP = new Set([
 
 type ProgressFn = (progress: ScanProgress) => void
 
+export interface ScanOptions {
+  isPro?: boolean
+  externalVolumePaths?: string[]
+}
+
 export async function runScan(
   unusedDays: UnusedDays,
   onProgress: ProgressFn,
-  categories: ScanCategoryFlags = DEFAULT_SCAN_CATEGORIES
+  categories: ScanCategoryFlags = DEFAULT_SCAN_CATEGORIES,
+  options?: ScanOptions
 ): Promise<ScanResult> {
   const items: ScanItem[] = []
   const perms = await getPermissionStatus()
   const home = homedir()
+  const isPro = options?.isPro === true
+  const externalVolumePaths = options?.externalVolumePaths ?? []
 
   // Progress still reports every phase, including the skipped ones: a bar that
   // jumps from 8% to 80% reads as a scan that broke rather than one that obeyed
@@ -111,10 +131,15 @@ export async function runScan(
     items.push(...(await scanUnusedApps(unusedDays)))
   }
 
+  onProgress({ phase: 'progress.externalVolumes', percent: 88 })
+  if (categories.externalVolumes && isPro && externalVolumePaths.length > 0) {
+    items.push(...(await scanExternalVolumes(externalVolumePaths, isPro)))
+  }
+
   onProgress({ phase: 'progress.done', percent: 100 })
 
   return {
-    items: items.filter((item) => item.bytes > 0 && isSafePath(item.path)),
+    items: items.filter((item) => item.bytes > 0 && isSafePath(item.path, externalVolumePaths)),
     scannedAt: new Date().toISOString(),
     limited: !perms.fullDiskAccess
   }
@@ -558,12 +583,125 @@ async function readPlistValue(appPath: string, key: string): Promise<string> {
   }
 }
 
-export function isSafePath(target: string): boolean {
+const BLOCKED_VOLUME_ENTRIES = [
+  '.Trashes',
+  '.Spotlight-V100',
+  '.fseventsd',
+  '.DocumentRevisions-V100',
+  '.TemporaryItems',
+  '.VolumeIcon.icns',
+  'System Volume Information',
+  '$RECYCLE.BIN'
+]
+
+export function isSafePath(target: string, volumeRoots: string[] = []): boolean {
   const resolved = resolvePath(target)
   const home = homedir()
   if (resolved === '/' || resolved === home) return false
   if (resolved === join(home, 'Documents') || resolved === join(home, 'Desktop')) return false
+  if (resolved === '/Volumes') return false
+  for (const root of volumeRoots) {
+    if (resolved === resolvePath(root)) return false
+  }
+  if (resolved.startsWith('/Volumes/')) {
+    const rel = resolved.slice('/Volumes/'.length)
+    if (!rel.includes('/')) {
+      return false
+    }
+  }
+  for (const entry of BLOCKED_VOLUME_ENTRIES) {
+    if (resolved.endsWith(`/${entry}`) || resolved.includes(`/${entry}/`)) {
+      return false
+    }
+  }
   return !BLOCKED_PREFIXES.some((prefix) => resolved === prefix || resolved.startsWith(`${prefix}/`))
+}
+
+export async function scanExternalVolumes(
+  volumePaths: string[],
+  isPro: boolean
+): Promise<ScanItem[]> {
+  if (!isPro || !Array.isArray(volumePaths) || volumePaths.length === 0) {
+    return []
+  }
+
+  const items: ScanItem[] = []
+  const home = homedir()
+  const now = Date.now()
+
+  for (const rawVolumePath of volumePaths) {
+    if (typeof rawVolumePath !== 'string' || !rawVolumePath.trim()) continue
+    const volumePath = resolvePath(rawVolumePath)
+
+    if (
+      volumePath === '/' ||
+      volumePath === home ||
+      volumePath === '/Volumes' ||
+      BLOCKED_PREFIXES.some((prefix) => volumePath === prefix || volumePath.startsWith(`${prefix}/`))
+    ) {
+      continue
+    }
+
+    try {
+      const lst = await lstat(volumePath)
+      if (lst.isSymbolicLink()) {
+        const link = await readlink(volumePath).catch(() => '')
+        const target = isAbsolute(link) ? link : resolvePath(dirname(volumePath), link)
+        if (target === '/' || target === home) continue
+      }
+      if (!lst.isDirectory()) continue
+    } catch {
+      continue
+    }
+
+    try {
+      const entries = await readdir(volumePath)
+      const volumeCandidates: ScanItem[] = []
+
+      for (const entry of entries) {
+        if (entry.startsWith('.') || IGNORED_EXTERNAL_ENTRIES.has(entry)) {
+          continue
+        }
+
+        const entryPath = join(volumePath, entry)
+        if (!isSafePath(entryPath, [volumePath])) continue
+
+        let info
+        try {
+          info = await lstat(entryPath)
+        } catch {
+          continue
+        }
+
+        const bytes = await directorySize(entryPath)
+        if (bytes <= 0) continue
+
+        const daysIdle =
+          info.mtimeMs && Number.isFinite(info.mtimeMs)
+            ? Math.floor((now - info.mtimeMs) / (24 * 60 * 60 * 1000))
+            : null
+
+        volumeCandidates.push({
+          id: idFor(entryPath),
+          categoryId: 'externalVolumes',
+          name: entry,
+          path: entryPath,
+          bytes,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: info.mtimeMs ? new Date(info.mtimeMs).toISOString() : null,
+          daysIdle
+        })
+      }
+
+      volumeCandidates.sort((a, b) => b.bytes - a.bytes)
+      items.push(...volumeCandidates.slice(0, 24))
+    } catch {
+      continue
+    }
+  }
+
+  return items
 }
 
 async function directorySize(path: string): Promise<number> {

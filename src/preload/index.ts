@@ -6,6 +6,7 @@ import type {
   DiskInfo,
   GrantTarget,
   LowDiskDebugStatus,
+  MountedVolume,
   PermissionStatus,
   ScanProgress,
   ScanResult
@@ -40,10 +41,13 @@ const api = {
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
   setSettings: (settings: AppSettings): Promise<AppSettings> =>
     ipcRenderer.invoke('settings:set', settings),
+  listMountedVolumes: (): Promise<MountedVolume[]> => ipcRenderer.invoke('volumes:list'),
+  pickExternalVolume: (): Promise<string | null> => ipcRenderer.invoke('volumes:pick'),
   runScan: (
     unusedDays: AppSettings['unusedDays'],
-    categories: AppSettings['scanCategories']
-  ): Promise<ScanResult> => ipcRenderer.invoke('scan:run', unusedDays, categories),
+    categories?: AppSettings['scanCategories'],
+    options?: { isPro?: boolean; externalVolumePaths?: string[] }
+  ): Promise<ScanResult> => ipcRenderer.invoke('scan:run', unusedDays, categories, options),
   trashItems: (request: CleanRequest): Promise<CleanResult> =>
     ipcRenderer.invoke('clean:trash', request),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
