@@ -22,7 +22,9 @@ const settings = {
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
-  scanReminder: { enabled: false, intervalDays: 7 as const }
+  scanReminder: { enabled: false, intervalDays: 7 as const },
+  isPro: false,
+  externalVolumePaths: []
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -86,6 +88,8 @@ function api(overrides: Partial<Api> = {}): Api {
       failed: [],
       bytesRequested: 2048
     }),
+    listMountedVolumes: vi.fn().mockResolvedValue([]),
+    pickExternalVolume: vi.fn().mockResolvedValue(null),
     openExternal: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
     revealItem: vi.fn().mockResolvedValue(true),
@@ -685,7 +689,49 @@ describe('App', () => {
     act(() => donate?.())
     expect(await screen.findByText('Keep the lights on')).toBeInTheDocument()
     act(() => scan?.())
-    await waitFor(() => expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES))
+    await waitFor(() =>
+      expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES, {
+        isPro: false,
+        externalVolumePaths: []
+      })
+    )
+  })
+
+  it('handles external volume management in settings', async () => {
+    const bridge = api({
+      getSettings: vi.fn().mockResolvedValue({
+        ...settings,
+        isPro: true,
+        externalVolumePaths: ['/Volumes/Existing']
+      }),
+      pickExternalVolume: vi.fn().mockResolvedValue('/Volumes/NewDisk')
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByText('/Volumes/Existing')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add volume…' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          externalVolumePaths: ['/Volumes/Existing', '/Volumes/NewDisk']
+        })
+      )
+    )
+
+    const removeButtons = screen.getAllByRole('button', { name: 'Remove' })
+    await user.click(removeButtons[0])
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          externalVolumePaths: ['/Volumes/NewDisk']
+        })
+      )
+    )
   })
 
   it('drives the low disk alert from the development-only Debug tab', async () => {

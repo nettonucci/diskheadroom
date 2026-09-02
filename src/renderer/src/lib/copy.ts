@@ -65,6 +65,10 @@ export const CATEGORY_META: Record<
   unusedApps: {
     title: 'category.unusedApps.title',
     hint: 'category.unusedApps.hint'
+  },
+  externalVolumes: {
+    title: 'category.externalVolumes.title',
+    hint: 'category.externalVolumes.hint'
   }
 }
 
@@ -80,13 +84,15 @@ export const SCAN_CATEGORY_LABELS: Record<ScanCategoryFlag, TranslationKey> = {
   androidDev: 'progress.androidDev',
   docker: 'progress.docker',
   idleUserFolders: 'progress.documentsDesktop',
-  unusedApps: 'progress.apps'
+  unusedApps: 'progress.apps',
+  externalVolumes: 'progress.externalVolumes'
 }
 
 export const CATEGORY_WARNING: Partial<Record<ScanCategoryId, TranslationKey>> = {
   dockerDesktop: 'category.dockerDesktop.warning',
   outdatedSimulators: 'category.outdatedSimulators.warning',
-  idleUserFolders: 'category.idleUserFolders.warning'
+  idleUserFolders: 'category.idleUserFolders.warning',
+  externalVolumes: 'category.externalVolumes.warning'
 }
 
 export const NAV: { id: ViewId; label: TranslationKey }[] = [

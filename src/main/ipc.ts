@@ -1,5 +1,7 @@
 import { clipboard, ipcMain, shell } from 'electron'
 import {
+  mergeExternalVolumePaths,
+  mergeIsPro,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeScanCategories,
@@ -16,9 +18,10 @@ import {
   openFullDiskAccessSettings,
   revealGrantTarget
 } from './permissions'
-import { isSafePath, runScan } from './scanner'
+import { isSafePath, runScan, type ScanOptions } from './scanner'
 import { loadSettings, saveSettings } from './settings'
 import type { TrayController } from './tray'
+import { listMountedVolumes, pickExternalVolumeDialog } from './volumes'
 
 interface IpcOptions {
   sendToRenderer: (channel: string, payload?: unknown) => void
@@ -35,6 +38,8 @@ export function registerIpc(options: IpcOptions): void {
   ipcMain.handle('permissions:open-fda', () => openFullDiskAccessSettings())
   ipcMain.handle('permissions:grant-target', () => getGrantTarget())
   ipcMain.handle('permissions:reveal-target', () => revealGrantTarget())
+  ipcMain.handle('volumes:list', () => listMountedVolumes())
+  ipcMain.handle('volumes:pick', () => pickExternalVolumeDialog())
   ipcMain.handle('settings:get', () => loadSettings())
   ipcMain.handle('settings:set', async (_event, next: AppSettings) => {
     const normalized: AppSettings = {
@@ -42,7 +47,9 @@ export function registerIpc(options: IpcOptions): void {
       scanCategories: mergeScanCategories(next.scanCategories),
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
-      scanReminder: mergeScanReminder(next.scanReminder)
+      scanReminder: mergeScanReminder(next.scanReminder),
+      isPro: mergeIsPro(next.isPro),
+      externalVolumePaths: mergeExternalVolumePaths(next.externalVolumePaths)
     }
     await saveSettings(normalized)
     applyLaunchAtLogin(normalized.launchAtLogin)
@@ -55,14 +62,19 @@ export function registerIpc(options: IpcOptions): void {
     async (
       _event,
       unusedDays: AppSettings['unusedDays'],
-      categories?: AppSettings['scanCategories']
+      categories?: AppSettings['scanCategories'],
+      scanOptions?: ScanOptions
     ) => {
+      const currentSettings = await loadSettings()
+      const isPro = scanOptions?.isPro ?? currentSettings.isPro
+      const externalVolumePaths = scanOptions?.externalVolumePaths ?? currentSettings.externalVolumePaths
       const result = await runScan(
         unusedDays,
         (progress) => {
           options.sendToRenderer('scan:progress', progress)
         },
-        mergeScanCategories(categories)
+        mergeScanCategories(categories),
+        { isPro, externalVolumePaths }
       )
       lastItems = new Map(result.items.map((item) => [item.path, item]))
       options.onScanCompleted?.()

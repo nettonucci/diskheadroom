@@ -17,7 +17,8 @@ export const SCAN_CATEGORY_IDS = [
   'androidDev',
   'docker',
   'idleUserFolders',
-  'unusedApps'
+  'unusedApps',
+  'externalVolumes'
 ] as const
 export type ScanCategoryFlag = (typeof SCAN_CATEGORY_IDS)[number]
 export type ScanCategoryFlags = Record<ScanCategoryFlag, boolean>
@@ -32,7 +33,8 @@ export const DEFAULT_SCAN_CATEGORIES: ScanCategoryFlags = {
   androidDev: true,
   docker: true,
   idleUserFolders: true,
-  unusedApps: true
+  unusedApps: true,
+  externalVolumes: false
 }
 
 // Settings saved before a phase existed omit its flag, and the renderer can send
@@ -135,4 +137,16 @@ export function mergeScanReminder(input: unknown): ScanReminderSettings {
 
 export function mergeLaunchAtLogin(input: unknown): boolean {
   return input === true
+}
+
+export function mergeIsPro(input: unknown): boolean {
+  return input === true
+}
+
+export function mergeExternalVolumePaths(input: unknown): string[] {
+  if (!Array.isArray(input)) return []
+  const valid = input
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map((item) => item.trim())
+  return Array.from(new Set(valid))
 }
