@@ -238,6 +238,10 @@ input {
   align-items: center;
 }
 
+.row.spread {
+  justify-content: space-between;
+}
+
 .btn {
   appearance: none;
   border: 0;
@@ -600,4 +604,44 @@ select {
 
 .donate-panel .btn.primary {
   margin-top: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0;
+}
+
+.delta-grew {
+  background: rgba(255, 107, 107, 0.16);
+  color: #ff8585;
+  border: 1px solid rgba(255, 107, 107, 0.28);
+}
+
+.delta-shrank {
+  background: rgba(125, 206, 160, 0.16);
+  color: #7dcea0;
+  border: 1px solid rgba(125, 206, 160, 0.28);
+}
+
+.delta-same {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.delta-new {
+  background: rgba(125, 154, 122, 0.16);
+  color: var(--accent-strong);
+  border: 1px solid rgba(125, 154, 122, 0.28);
+}
+
+.delta-disabled {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  border: 1px solid var(--line);
 }

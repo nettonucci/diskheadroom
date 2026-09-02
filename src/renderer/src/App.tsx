@@ -274,6 +274,10 @@ function AppShell(): JSX.Element {
     await updateSettings((current) => ({ scanReminder: { ...current.scanReminder, ...patch } }))
   }
 
+  async function updatePro(isPro: boolean): Promise<void> {
+    await updateSettings(() => ({ isPro }))
+  }
+
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
 
   function requestClean(): void {
@@ -391,6 +395,8 @@ function AppShell(): JSX.Element {
             busyClean={busyClean}
             cleanMessage={cleanMessage}
             cleanFailed={cleanFailed}
+            isPro={Boolean(settings?.isPro)}
+            onOpenSettings={() => setView('settings')}
             onToggle={(item, value) => setSelected((current) => ({ ...current, [item.id]: value }))}
             onToggleCategory={(ids, value) => {
               setSelected((current) => {
@@ -426,6 +432,7 @@ function AppShell(): JSX.Element {
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
             onScanReminder={(patch) => void updateScanReminder(patch)}
+            onPro={(value) => void updatePro(value)}
             onPermissions={() => setView('permissions')}
           />
         )}
@@ -787,6 +794,8 @@ function ResultsView(props: {
   busyClean: boolean
   cleanMessage: string | null
   cleanFailed: { path: string; error: string }[]
+  isPro: boolean
+  onOpenSettings: () => void
   onToggle: (item: ScanItem, value: boolean) => void
   onToggleCategory: (ids: string[], value: boolean) => void
   onClean: () => void
@@ -826,6 +835,62 @@ function ResultsView(props: {
       {props.result.limited && (
         <div className="notice">{props.t('results.limited')}</div>
       )}
+      {!props.isPro && (
+        <div className="card">
+          <div className="row spread">
+            <div>
+              <h3>{props.t('deltas.panelTitle')}</h3>
+              <p className="muted">{props.t('deltas.proTeaser')}</p>
+            </div>
+            <button className="btn" type="button" onClick={props.onOpenSettings}>
+              {props.t('settings.proEnable')}
+            </button>
+          </div>
+        </div>
+      )}
+      {props.isPro && props.result.deltas && !props.result.deltas.hasPreviousScan && (
+        <div className="card">
+          <h3>{props.t('deltas.panelTitle')}</h3>
+          <p className="muted">{props.t('deltas.firstScan')}</p>
+        </div>
+      )}
+      {props.isPro && props.result.deltas && props.result.deltas.hasPreviousScan && (
+        <div className="card">
+          <div className="row spread">
+            <div>
+              <h3>{props.t('deltas.panelTitle')}</h3>
+              {props.result.deltas.previousScannedAt && (
+                <p className="muted">
+                  {props.t('deltas.lastScanned', {
+                    date: formatDate(props.result.deltas.previousScannedAt, props.locale, true)
+                  })}
+                </p>
+              )}
+            </div>
+            {props.result.deltas.totalDeltaBytes !== null && (
+              <span
+                className={`badge delta-${
+                  props.result.deltas.totalDeltaBytes > 0
+                    ? 'grew'
+                    : props.result.deltas.totalDeltaBytes < 0
+                      ? 'shrank'
+                      : 'same'
+                }`}
+              >
+                {props.result.deltas.totalDeltaBytes > 0
+                  ? props.t('deltas.totalGrew', {
+                      size: formatBytes(props.result.deltas.totalDeltaBytes)
+                    })
+                  : props.result.deltas.totalDeltaBytes < 0
+                    ? props.t('deltas.totalShrank', {
+                        size: formatBytes(Math.abs(props.result.deltas.totalDeltaBytes))
+                      })
+                    : props.t('deltas.totalSame')}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       {props.cleanMessage && (
         <div className="card">
           <p className="muted">{props.cleanMessage}</p>
@@ -856,12 +921,14 @@ function ResultsView(props: {
         </div>
       )}
       {Array.from(grouped.entries()).map(([categoryId, items]) => {
-        // Select/clear group only toggles the rows currently on screen, so a
-        // filter cannot silently change hidden items in the same category.
         const ids = items.map((item) => item.id)
         const allOn = ids.every((id) => props.selected[id])
         const bytes = items.reduce((sum, item) => sum + item.bytes, 0)
         const meta = CATEGORY_META[categoryId]
+        const delta =
+          props.isPro && props.result.deltas?.hasPreviousScan
+            ? props.result.deltas.categories[categoryId]
+            : undefined
         return (
           <div className="list-card category" key={categoryId}>
             <div className="category-head">
@@ -871,6 +938,19 @@ function ResultsView(props: {
               </div>
               <div className="row">
                 <span className="muted">{formatBytes(bytes)}</span>
+                {delta && (
+                  <span className={`badge delta-${delta.status}`}>
+                    {delta.status === 'grew' && delta.deltaBytes !== null
+                      ? props.t('deltas.grew', { size: formatBytes(delta.deltaBytes) })
+                      : delta.status === 'shrank' && delta.deltaBytes !== null
+                        ? props.t('deltas.shrank', { size: formatBytes(Math.abs(delta.deltaBytes)) })
+                        : delta.status === 'same'
+                          ? props.t('deltas.same')
+                          : delta.status === 'new'
+                            ? props.t('deltas.newCategory')
+                            : props.t('deltas.disabledCategory')}
+                  </span>
+                )}
                 <button className="btn" type="button" onClick={() => props.onToggleCategory(ids, !allOn)}>
                   {allOn ? props.t('results.groupClear') : props.t('results.groupSelect')}
                 </button>
@@ -942,6 +1022,7 @@ function SettingsView(props: {
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
   onLaunchAtLogin: (enabled: boolean) => void
   onScanReminder: (patch: Partial<ScanReminderSettings>) => void
+  onPro: (enabled: boolean) => void
   onPermissions: () => void
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
@@ -959,6 +1040,18 @@ function SettingsView(props: {
           <h2>{props.t('settings.title')}</h2>
           <p>{props.t('settings.description')}</p>
         </div>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.proTitle')}</h3>
+        <p className="muted">{props.t('settings.proHint')}</p>
+        <label className="scan-flag">
+          <input
+            type="checkbox"
+            checked={props.settings.isPro}
+            onChange={(event) => props.onPro(event.target.checked)}
+          />
+          <span>{props.t('settings.proEnable')}</span>
+        </label>
       </div>
       <div className="card">
         <h3>{props.t('settings.scanTitle')}</h3>

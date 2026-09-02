@@ -41,10 +41,38 @@ export interface ScanProgress {
   percent: number
 }
 
+export interface CategorySnapshot {
+  scannedAt: string
+  categories: Partial<Record<ScanCategoryId, number>>
+  totalBytes: number
+}
+
+export type CategoryDeltaStatus = 'grew' | 'shrank' | 'same' | 'new' | 'disabled'
+
+export interface CategoryDelta {
+  categoryId: ScanCategoryId
+  currentBytes: number
+  previousBytes: number | null
+  deltaBytes: number | null
+  status: CategoryDeltaStatus
+}
+
+export interface ScanDeltaSummary {
+  isPro: boolean
+  hasPreviousScan: boolean
+  previousScannedAt: string | null
+  currentScannedAt: string
+  totalCurrentBytes: number
+  totalPreviousBytes: number | null
+  totalDeltaBytes: number | null
+  categories: Partial<Record<ScanCategoryId, CategoryDelta>>
+}
+
 export interface ScanResult {
   items: ScanItem[]
   scannedAt: string
   limited: boolean
+  deltas?: ScanDeltaSummary
 }
 
 export interface DiskInfo {
@@ -64,8 +92,6 @@ export interface GrantTarget {
   displayName: string
   bundlePath: string
   packaged: boolean
-  // macOS attributes permissions to the app that launched this process, so a
-  // terminal or IDE can override whatever the running bundle was granted.
   launchedBy: string | null
 }
 
@@ -77,6 +103,7 @@ export interface AppSettings {
   lowDiskAlert: LowDiskAlertSettings
   launchAtLogin: boolean
   scanReminder: ScanReminderSettings
+  isPro: boolean
 }
 
 /** Development-only snapshot behind the Debug tab. Never registered in a packaged build. */

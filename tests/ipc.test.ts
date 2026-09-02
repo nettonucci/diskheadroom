@@ -14,16 +14,24 @@ const mocks = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   runScan: vi.fn(),
   trashPaths: vi.fn(),
-  applyLaunchAtLogin: vi.fn()
+  applyLaunchAtLogin: vi.fn(),
+  loadLastSnapshot: vi.fn(),
+  saveSnapshot: vi.fn(),
+  clearSnapshots: vi.fn(),
+  recordScanSnapshot: vi.fn().mockResolvedValue({
+    current: { scannedAt: '2025-01-01T00:00:00Z', totalBytes: 0, categories: {} },
+    previous: null
+  })
 }))
 
 vi.mock('electron', () => {
   const module = {
+    app: { getPath: () => '/mock/userData' },
     clipboard: { writeText: mocks.writeText },
     ipcMain: {
-    handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
-      mocks.handlers.set(channel, handler)
-    }
+      handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+        mocks.handlers.set(channel, handler)
+      }
     },
     shell: { openExternal: mocks.openExternal, showItemInFolder: mocks.showItemInFolder }
   }
@@ -46,6 +54,12 @@ vi.mock('../src/main/scanner', async () => {
 })
 vi.mock('../src/main/cleaner', () => ({ trashPaths: mocks.trashPaths }))
 vi.mock('../src/main/loginItem', () => ({ applyLaunchAtLogin: mocks.applyLaunchAtLogin }))
+vi.mock('../src/main/snapshots', () => ({
+  loadLastSnapshot: mocks.loadLastSnapshot,
+  saveSnapshot: mocks.saveSnapshot,
+  clearSnapshots: mocks.clearSnapshots,
+  recordScanSnapshot: mocks.recordScanSnapshot
+}))
 
 import { registerIpc } from '../src/main/ipc'
 
@@ -68,7 +82,7 @@ describe('IPC registration', () => {
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(12)
+    expect(mocks.handlers.size).toBe(14)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
@@ -197,4 +211,61 @@ describe('IPC registration', () => {
     expect(call('shell:reveal-item', 42)).toBe(false)
     expect(mocks.showItemInFolder).toHaveBeenCalledTimes(1)
   })
+
+  it('computes and returns deltas only when isPro is enabled', async () => {
+    mocks.runScan.mockResolvedValue({
+      items: [{ path: '/Users/test/Library/Caches/a', bytes: 100, categoryId: 'userCaches' }],
+      scannedAt: '2025-01-01',
+      limited: false
+    })
+    mocks.recordScanSnapshot.mockResolvedValue({
+      current: {
+        scannedAt: '2025-01-01T00:00:00.000Z',
+        totalBytes: 100,
+        categories: { userCaches: 100 }
+      },
+      previous: {
+        scannedAt: '2024-12-01T00:00:00.000Z',
+        totalBytes: 80,
+        categories: { userCaches: 80 }
+      }
+    })
+
+    mocks.loadSettings.mockResolvedValue({
+      unusedDays: 90,
+      setupComplete: true,
+      locale: 'en',
+      scanCategories: { userCaches: true },
+      isPro: false
+    })
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+
+    const nonProResult = (await call('scan:run', 90)) as { deltas?: unknown }
+    expect(nonProResult.deltas).toBeUndefined()
+
+    mocks.loadSettings.mockResolvedValue({
+      unusedDays: 90,
+      setupComplete: true,
+      locale: 'en',
+      scanCategories: { userCaches: true },
+      isPro: true
+    })
+    const proResult = (await call('scan:run', 90)) as {
+      deltas?: { isPro: boolean; hasPreviousScan: boolean; totalDeltaBytes: number | null }
+    }
+    expect(proResult.deltas?.isPro).toBe(true)
+    expect(proResult.deltas?.hasPreviousScan).toBe(true)
+    expect(proResult.deltas?.totalDeltaBytes).toBe(20)
+  })
+
+  it('handles snapshot:last and snapshot:clear channels', async () => {
+    mocks.loadLastSnapshot.mockResolvedValue({ totalBytes: 50 })
+    mocks.clearSnapshots.mockResolvedValue(undefined)
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+
+    await expect(call('snapshot:last')).resolves.toEqual({ totalBytes: 50 })
+    await expect(call('snapshot:clear')).resolves.toBeUndefined()
+    expect(mocks.clearSnapshots).toHaveBeenCalledTimes(1)
+  })
 })
+

@@ -22,7 +22,8 @@ const settings = {
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
-  scanReminder: { enabled: false, intervalDays: 7 as const }
+  scanReminder: { enabled: false, intervalDays: 7 as const },
+  isPro: false
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -721,4 +722,87 @@ describe('App', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Debug' }))
     expect(await screen.findByText('Debug bridge unavailable.')).toBeInTheDocument()
   })
+
+  it('toggles the Pro feature in Settings', async () => {
+    const bridge = api()
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByText('Disk Headroom Pro')).toBeInTheDocument()
+
+    const proCheckbox = screen.getByLabelText('Enable Pro features')
+    expect(proCheckbox).not.toBeChecked()
+
+    await user.click(proCheckbox)
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ isPro: true })
+      )
+    )
+  })
+
+  it('shows Pro teaser on results screen when Pro is disabled', async () => {
+    const bridge = api()
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await user.click(screen.getByRole('button', { name: 'Scan this Mac' }))
+    expect(await screen.findByText('What grew since last scan')).toBeInTheDocument()
+    expect(
+      screen.getByText('Disk Headroom Pro compares scan category sizes over time to show what grew.')
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Enable Pro features' }))
+    expect(await screen.findByText('Disk Headroom Pro')).toBeInTheDocument()
+  })
+
+  it('displays category growth badges and total delta when Pro is enabled on second scan', async () => {
+    const proResult = {
+      ...result,
+      deltas: {
+        isPro: true,
+        hasPreviousScan: true,
+        previousScannedAt: '2024-12-31T00:00:00Z',
+        currentScannedAt: '2025-01-01T00:00:00Z',
+        totalDeltaBytes: 1024,
+        categories: {
+          userCaches: {
+            categoryId: 'userCaches' as const,
+            status: 'grew' as const,
+            previousBytes: 1024,
+            currentBytes: 2048,
+            deltaBytes: 1024
+          },
+          unusedApps: {
+            categoryId: 'unusedApps' as const,
+            status: 'shrank' as const,
+            previousBytes: 5120,
+            currentBytes: 4096,
+            deltaBytes: -1024
+          }
+        }
+      }
+    }
+
+    const bridge = api({
+      getSettings: vi.fn().mockResolvedValue({ ...settings, isPro: true }),
+      runScan: vi.fn().mockResolvedValue(proResult)
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await user.click(screen.getByRole('button', { name: 'Scan this Mac' }))
+    expect(await screen.findByText('What grew since last scan')).toBeInTheDocument()
+    expect(screen.getByText('Grew by 1 KB since last scan')).toBeInTheDocument()
+    expect(screen.getByText('+1 KB since last scan')).toBeInTheDocument()
+    expect(screen.getByText('-1 KB since last scan')).toBeInTheDocument()
+  })
 })
+

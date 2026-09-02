@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_UNUSED_DAYS,
   UNUSED_DAY_OPTIONS,
+  mergeIsPro,
   mergeScanCategories
 } from '../src/shared/constants'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
@@ -24,6 +25,9 @@ describe('shared helpers', () => {
     expect(translate('pt-BR', 'settings.days', { days: 30 })).toBe('30 dias')
     expect(translate('en', 'settings.days')).toContain('{days}')
     expect(translator('es')('nav.settings')).toBe('Ajustes')
+    expect(translate('en', 'deltas.panelTitle')).toBe('What grew since last scan')
+    expect(translate('pt-BR', 'deltas.panelTitle')).toBe('O que cresceu desde a última verificação')
+    expect(translate('es', 'deltas.panelTitle')).toBe('Qué ha crecido desde el último análisis')
   })
 
   it('exposes complete locale and navigation metadata', () => {
@@ -43,6 +47,14 @@ describe('shared helpers', () => {
       unusedApps: false,
       userCaches: true
     })
+  })
+
+  it('handles mergeIsPro for various inputs', () => {
+    expect(mergeIsPro(true)).toBe(true)
+    expect(mergeIsPro(false)).toBe(false)
+    expect(mergeIsPro(undefined)).toBe(false)
+    expect(mergeIsPro(null)).toBe(false)
+    expect(mergeIsPro('true' as never)).toBe(false)
   })
 })
 

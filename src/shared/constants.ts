@@ -136,3 +136,7 @@ export function mergeScanReminder(input: unknown): ScanReminderSettings {
 export function mergeLaunchAtLogin(input: unknown): boolean {
   return input === true
 }
+
+export function mergeIsPro(input: unknown): boolean {
+  return input === true
+}
