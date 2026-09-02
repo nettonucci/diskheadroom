@@ -1,0 +1,3 @@
+Error: -69808: Some unexpected internal error or corrupted text output
+<not a valid plist>
+Random binary data: \x00\xff\xfe\xaa

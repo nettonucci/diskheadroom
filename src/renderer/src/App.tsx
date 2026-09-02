@@ -22,6 +22,7 @@ import {
   type Translator
 } from '../../shared/i18n'
 import type {
+  ApfsStorageExplanation,
   AppSettings,
   DiskInfo,
   GrantTarget,
@@ -274,6 +275,10 @@ function AppShell(): JSX.Element {
     await updateSettings((current) => ({ scanReminder: { ...current.scanReminder, ...patch } }))
   }
 
+  async function updateIsPro(isPro: boolean): Promise<void> {
+    await updateSettings(() => ({ isPro }))
+  }
+
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
 
   function requestClean(): void {
@@ -374,7 +379,9 @@ function AppShell(): JSX.Element {
             unusedDays={settings?.unusedDays ?? 90}
             limited={Boolean(perms && !perms.fullDiskAccess)}
             scanFailed={scanFailed}
+            isPro={Boolean(settings?.isPro)}
             onScan={() => void startScan()}
+            onOpenSettings={() => setView('settings')}
           />
         )}
         {view === 'results' && result && (
@@ -413,7 +420,9 @@ function AppShell(): JSX.Element {
             unusedDays={settings?.unusedDays ?? 90}
             limited={Boolean(perms && !perms.fullDiskAccess)}
             scanFailed={scanFailed}
+            isPro={Boolean(settings?.isPro)}
             onScan={() => void startScan()}
+            onOpenSettings={() => setView('settings')}
           />
         )}
         {view === 'settings' && settings && (
@@ -426,6 +435,7 @@ function AppShell(): JSX.Element {
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
             onScanReminder={(patch) => void updateScanReminder(patch)}
+            onPro={(enabled) => void updateIsPro(enabled)}
             onPermissions={() => setView('permissions')}
           />
         )}
@@ -653,6 +663,181 @@ function DiskStat(props: {
   )
 }
 
+function ApfsExplanationCard(props: {
+  t: Translator
+  isPro: boolean
+  onOpenSettings: () => void
+}): JSX.Element {
+  const [explanation, setExplanation] = useState<ApfsStorageExplanation | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
+
+  const fetchExplanation = useCallback(async () => {
+    if (!props.isPro) return
+    setLoading(true)
+    setError(false)
+    try {
+      const data = await window.diskheadroom.getApfsExplanation()
+      setExplanation(data)
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [props.isPro])
+
+  useEffect(() => {
+    void fetchExplanation()
+  }, [fetchExplanation])
+
+  if (!props.isPro) {
+    return (
+      <div className="card apfs-card">
+        <div className="apfs-header">
+          <div>
+            <div className="badge-row">
+              <h3>{props.t('apfs.proCtaTitle')}</h3>
+              <span className="badge badge-pro">{props.t('badge.pro')}</span>
+              <span className="badge badge-experimental">{props.t('badge.experimental')}</span>
+            </div>
+            <p className="muted">{props.t('apfs.proCtaDescription')}</p>
+          </div>
+          <button className="btn" type="button" onClick={props.onOpenSettings}>
+            {props.t('apfs.proCtaButton')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading && !explanation) {
+    return (
+      <div className="card apfs-card">
+        <div className="badge-row">
+          <h3>{props.t('apfs.title')}</h3>
+          <span className="badge badge-pro">{props.t('badge.pro')}</span>
+          <span className="badge badge-experimental">{props.t('badge.experimental')}</span>
+        </div>
+        <p className="muted">
+          <Spinner /> {props.t('apfs.loading')}
+        </p>
+      </div>
+    )
+  }
+
+  if (error || !explanation) {
+    return (
+      <div className="card apfs-card">
+        <div className="badge-row">
+          <h3>{props.t('apfs.title')}</h3>
+          <span className="badge badge-pro">{props.t('badge.pro')}</span>
+          <span className="badge badge-experimental">{props.t('badge.experimental')}</span>
+        </div>
+        <p className="muted">{props.t('apfs.error')}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card apfs-card">
+      <div className="apfs-header">
+        <div>
+          <div className="badge-row">
+            <h3>{props.t('apfs.title')}</h3>
+            <span className="badge badge-pro">{props.t('badge.pro')}</span>
+            <span className="badge badge-experimental">{props.t('badge.experimental')}</span>
+          </div>
+          <p className="muted">{props.t('apfs.description')}</p>
+        </div>
+        <button
+          className={`btn compact${loading ? ' busy' : ''}`}
+          type="button"
+          disabled={loading}
+          onClick={() => void fetchExplanation()}
+        >
+          {loading && <Spinner />}
+          {props.t('apfs.refresh')}
+        </button>
+      </div>
+
+      <div className="notice apfs-notice">
+        <strong>{props.t('apfs.whyTitle')}</strong>
+        <p>{props.t('apfs.whyBody')}</p>
+      </div>
+
+      <div className="apfs-breakdown">
+        <h4>{props.t('apfs.containerTitle')}</h4>
+        <div className="disk-stats apfs-stats">
+          <DiskStat
+            label={props.t('apfs.containerSize', { size: '' }).replace(':', '').trim()}
+            value={formatBytes(explanation.containerSize)}
+          />
+          <DiskStat
+            label={props.t('apfs.containerFree', { size: '' }).replace(':', '').trim()}
+            value={formatBytes(explanation.containerFree)}
+            tone="free"
+          />
+          <DiskStat
+            label={props.t('apfs.purgeable', { size: '' }).replace(':', '').trim()}
+            value={formatBytes(explanation.purgeableBytes)}
+            tone="selected"
+          />
+          <DiskStat
+            label={props.t('apfs.systemVolume', { size: '' }).replace(':', '').trim()}
+            value={formatBytes(explanation.breakdown.systemBytes)}
+            tone="used"
+          />
+          <DiskStat
+            label={props.t('apfs.dataVolume', { size: '' }).replace(':', '').trim()}
+            value={formatBytes(explanation.breakdown.dataBytes)}
+            tone="used"
+          />
+        </div>
+      </div>
+
+      <div className="apfs-snapshots">
+        <div className="apfs-snapshots-header">
+          <h4>{props.t('apfs.snapshotsTitle', { count: explanation.snapshotCount })}</h4>
+          <span className="muted apfs-untouched-badge">{props.t('apfs.systemUntouched')}</span>
+        </div>
+        <p className="muted">{props.t('apfs.snapshotsHint')}</p>
+        {explanation.snapshots.length === 0 ? (
+          <p className="muted">{props.t('apfs.noSnapshots')}</p>
+        ) : (
+          <ul className="apfs-snapshot-list">
+            {explanation.snapshots.map((snap) => (
+              <li key={snap.uuid || snap.name} className="apfs-snapshot-item">
+                <div className="apfs-snapshot-info">
+                  <div className="apfs-snapshot-title">
+                    <strong>{snap.name}</strong>
+                    {snap.isSystem ? (
+                      <span className="badge badge-sys">{props.t('apfs.snapshotSystem')}</span>
+                    ) : (
+                      <span className="badge badge-user">{props.t('apfs.snapshotUser')}</span>
+                    )}
+                    {snap.purgeable ? (
+                      <span className="badge badge-purgeable">
+                        {props.t('apfs.snapshotPurgeable')}
+                      </span>
+                    ) : (
+                      <span className="badge badge-protected">
+                        {props.t('apfs.snapshotProtected')}
+                      </span>
+                    )}
+                  </div>
+                  {snap.uuid && snap.uuid !== snap.name && (
+                    <span className="path apfs-uuid">{snap.uuid}</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function DashboardView(props: {
   t: Translator
   disk: DiskInfo | null
@@ -662,7 +847,9 @@ function DashboardView(props: {
   unusedDays: number
   limited: boolean
   scanFailed: boolean
+  isPro: boolean
   onScan: () => void
+  onOpenSettings: () => void
 }): JSX.Element {
   return (
     <section>
@@ -673,6 +860,11 @@ function DashboardView(props: {
         </div>
       </div>
       <DiskPanel t={props.t} disk={props.disk} usedPct={props.usedPct} />
+      <ApfsExplanationCard
+        t={props.t}
+        isPro={props.isPro}
+        onOpenSettings={props.onOpenSettings}
+      />
       {props.limited && (
         <div className="notice">{props.t('dashboard.limited')}</div>
       )}
@@ -942,6 +1134,7 @@ function SettingsView(props: {
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
   onLaunchAtLogin: (enabled: boolean) => void
   onScanReminder: (patch: Partial<ScanReminderSettings>) => void
+  onPro: (enabled: boolean) => void
   onPermissions: () => void
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
@@ -959,6 +1152,22 @@ function SettingsView(props: {
           <h2>{props.t('settings.title')}</h2>
           <p>{props.t('settings.description')}</p>
         </div>
+      </div>
+      <div className="card">
+        <div className="badge-row">
+          <h3>{props.t('settings.proTitle')}</h3>
+          <span className="badge badge-pro">{props.t('badge.pro')}</span>
+          <span className="badge badge-experimental">{props.t('badge.experimental')}</span>
+        </div>
+        <p className="muted">{props.t('settings.proHint')}</p>
+        <label className="scan-flag">
+          <input
+            type="checkbox"
+            checked={props.settings.isPro}
+            onChange={(event) => props.onPro(event.target.checked)}
+          />
+          <span>{props.t('settings.proEnable')}</span>
+        </label>
       </div>
       <div className="card">
         <h3>{props.t('settings.scanTitle')}</h3>

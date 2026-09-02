@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Snapshots</key>
+	<array>
+		<dict>
+			<key>LimitingContainerShrink</key>
+			<false/>
+			<key>Purgeable</key>
+			<false/>
+			<key>RevertTo</key>
+			<false/>
+			<key>RootTo</key>
+			<false/>
+			<key>SnapshotName</key>
+			<string>com.apple.os.update-9E3B7EFBB732B00D98BF266D7444FDC8348CC3B2CCEF551FF262CA73E4E23BAE</string>
+			<key>SnapshotUUID</key>
+			<string>0184540F-CD97-4494-BC29-29DF5264424F</string>
+			<key>SnapshotXID</key>
+			<integer>10816107</integer>
+		</dict>
+		<dict>
+			<key>LimitingContainerShrink</key>
+			<true/>
+			<key>Purgeable</key>
+			<true/>
+			<key>RevertTo</key>
+			<false/>
+			<key>RootTo</key>
+			<false/>
+			<key>SnapshotName</key>
+			<string>com.apple.TimeMachine.2025-01-15-103000.local</string>
+			<key>SnapshotUUID</key>
+			<string>03A9C2DB-E5EE-4A95-B393-3048E1CFD44F</string>
+			<key>SnapshotXID</key>
+			<integer>28606643</integer>
+		</dict>
+		<dict>
+			<key>LimitingContainerShrink</key>
+			<false/>
+			<key>Purgeable</key>
+			<false/>
+			<key>RevertTo</key>
+			<false/>
+			<key>RootTo</key>
+			<false/>
+			<key>SnapshotName</key>
+			<string>com.apple.os.update-MSUPrepareUpdate</string>
+			<key>SnapshotUUID</key>
+			<string>C1B5256B-980A-422C-BAE0-03C2E408212A</string>
+			<key>SnapshotXID</key>
+			<integer>28606800</integer>
+		</dict>
+	</array>
+</dict>
+</plist>

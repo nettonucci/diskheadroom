@@ -22,7 +22,8 @@ const settings = {
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
-  scanReminder: { enabled: false, intervalDays: 7 as const }
+  scanReminder: { enabled: false, intervalDays: 7 as const },
+  isPro: false
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -53,6 +54,32 @@ const result = {
   ]
 }
 
+const apfsExplanation = {
+  containerSize: 500000000000,
+  containerFree: 150000000000,
+  purgeableBytes: 12000000000,
+  breakdown: {
+    systemBytes: 15000000000,
+    dataBytes: 320000000000,
+    otherVolumesBytes: 3000000000
+  },
+  snapshotCount: 2,
+  snapshots: [
+    {
+      name: 'com.apple.TimeMachine.2025-02-28-103000.local',
+      uuid: 'A1B2C3D4-E5F6-7890-ABCD-EF1234567890',
+      isSystem: false,
+      purgeable: true
+    },
+    {
+      name: 'com.apple.os.update-1234567890ABCDEF',
+      uuid: 'B2C3D4E5-F6A1-8901-BCDE-F12345678901',
+      isSystem: true,
+      purgeable: false
+    }
+  ]
+}
+
 const debugStatus = {
   disk: { mount: '/', totalBytes: 1000, freeBytes: 400, usedBytes: 600 },
   realFreeBytes: 400,
@@ -69,6 +96,7 @@ type Api = Window['diskheadroom']
 function api(overrides: Partial<Api> = {}): Api {
   return {
     getDiskInfo: vi.fn().mockResolvedValue(disk),
+    getApfsExplanation: vi.fn().mockResolvedValue(apfsExplanation),
     getPermissions: vi.fn().mockResolvedValue(granted),
     openFullDiskAccess: vi.fn().mockResolvedValue(undefined),
     getGrantTarget: vi.fn().mockResolvedValue({
@@ -721,4 +749,49 @@ describe('App', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Debug' }))
     expect(await screen.findByText('Debug bridge unavailable.')).toBeInTheDocument()
   })
+
+  it('shows APFS Pro CTA card when Pro is disabled and navigates to Settings', async () => {
+    const bridge = api()
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    expect(screen.getByText('APFS & Local Snapshots')).toBeInTheDocument()
+    expect(screen.getAllByText('Pro').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Experimental').length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('button', { name: 'Enable Pro in Settings' }))
+    expect(await screen.findByText('Disk Headroom Pro')).toBeInTheDocument()
+  })
+
+  it('toggles Pro features in settings and renders APFS breakdown on dashboard', async () => {
+    const bridge = api()
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    const proCheckbox = screen.getByLabelText('Enable Disk Headroom Pro')
+    expect(proCheckbox).not.toBeChecked()
+
+    await user.click(proCheckbox)
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ isPro: true })
+      )
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Scan' }))
+    expect(await screen.findByText('APFS Storage & Snapshots')).toBeInTheDocument()
+    expect(await screen.findByText('Local Snapshots (2)')).toBeInTheDocument()
+    expect(screen.getByText('Purgeable')).toBeInTheDocument()
+    expect(screen.getByText('Protected')).toBeInTheDocument()
+    expect(screen.getByText('System Update')).toBeInTheDocument()
+    expect(
+      screen.getByText('System volume and protected APFS snapshots are untouched.')
+    ).toBeInTheDocument()
+  })
 })
+

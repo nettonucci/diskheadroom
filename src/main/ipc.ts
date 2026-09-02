@@ -1,5 +1,6 @@
 import { clipboard, ipcMain, shell } from 'electron'
 import {
+  mergeIsPro,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeScanCategories,
@@ -7,6 +8,7 @@ import {
   SPONSORS_URL
 } from '../shared/constants'
 import type { AppSettings, CleanRequest, ScanItem } from '../shared/types'
+import { getApfsExplanation } from './apfs'
 import { trashPaths } from './cleaner'
 import { getDiskInfo } from './disk'
 import { applyLaunchAtLogin } from './loginItem'
@@ -31,6 +33,7 @@ export function registerIpc(options: IpcOptions): void {
   let lastItems = new Map<string, ScanItem>()
 
   ipcMain.handle('disk:info', () => getDiskInfo())
+  ipcMain.handle('apfs:explanation', () => getApfsExplanation())
   ipcMain.handle('permissions:status', () => getPermissionStatus())
   ipcMain.handle('permissions:open-fda', () => openFullDiskAccessSettings())
   ipcMain.handle('permissions:grant-target', () => getGrantTarget())
@@ -42,7 +45,8 @@ export function registerIpc(options: IpcOptions): void {
       scanCategories: mergeScanCategories(next.scanCategories),
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
-      scanReminder: mergeScanReminder(next.scanReminder)
+      scanReminder: mergeScanReminder(next.scanReminder),
+      isPro: mergeIsPro(next.isPro)
     }
     await saveSettings(normalized)
     applyLaunchAtLogin(normalized.launchAtLogin)

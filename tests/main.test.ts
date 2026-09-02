@@ -160,13 +160,14 @@ describe('settings', () => {
       scanCategories: DEFAULT_SCAN_CATEGORIES,
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
-      scanReminder: { enabled: false, intervalDays: 7 }
+      scanReminder: { enabled: false, intervalDays: 7 },
+      isPro: false
     })
   })
 
   it('merges persisted settings and normalizes locale', async () => {
-    mocks.readFile.mockResolvedValue(JSON.stringify({ unusedDays: 180, locale: 'es-MX' }))
-    await expect(loadSettings()).resolves.toMatchObject({ unusedDays: 180, locale: 'es' })
+    mocks.readFile.mockResolvedValue(JSON.stringify({ unusedDays: 180, locale: 'es-MX', isPro: true }))
+    await expect(loadSettings()).resolves.toMatchObject({ unusedDays: 180, locale: 'es', isPro: true })
   })
 
   it('keeps disabled scan categories and defaults the ones the file omits', async () => {

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  ApfsStorageExplanation,
   AppSettings,
   CleanRequest,
   CleanResult,
@@ -19,8 +20,6 @@ export interface DebugApi {
   sendLowDiskNotification: () => Promise<{ shown: boolean; status: LowDiskDebugStatus }>
 }
 
-// Dropped from the bundle on a production build, so a packaged app exposes no
-// debug surface at all.
 const debug: DebugApi | null = import.meta.env.DEV
   ? {
       lowDiskStatus: () => ipcRenderer.invoke('debug:low-disk-status'),
@@ -33,6 +32,8 @@ const debug: DebugApi | null = import.meta.env.DEV
 
 const api = {
   getDiskInfo: (): Promise<DiskInfo> => ipcRenderer.invoke('disk:info'),
+  getApfsExplanation: (): Promise<ApfsStorageExplanation> =>
+    ipcRenderer.invoke('apfs:explanation'),
   getPermissions: (): Promise<PermissionStatus> => ipcRenderer.invoke('permissions:status'),
   openFullDiskAccess: (): Promise<void> => ipcRenderer.invoke('permissions:open-fda'),
   getGrantTarget: (): Promise<GrantTarget> => ipcRenderer.invoke('permissions:grant-target'),

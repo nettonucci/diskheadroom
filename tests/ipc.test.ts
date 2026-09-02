@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   runScan: vi.fn(),
   trashPaths: vi.fn(),
-  applyLaunchAtLogin: vi.fn()
+  applyLaunchAtLogin: vi.fn(),
+  getApfsExplanation: vi.fn()
 }))
 
 vi.mock('electron', () => {
@@ -30,6 +31,7 @@ vi.mock('electron', () => {
   return { default: module, ...module }
 })
 vi.mock('../src/main/disk', () => ({ getDiskInfo: mocks.getDiskInfo }))
+vi.mock('../src/main/apfs', () => ({ getApfsExplanation: mocks.getApfsExplanation }))
 vi.mock('../src/main/permissions', () => ({
   getPermissionStatus: mocks.getPermissionStatus,
   openFullDiskAccessSettings: mocks.openFullDiskAccessSettings,
@@ -49,9 +51,9 @@ vi.mock('../src/main/loginItem', () => ({ applyLaunchAtLogin: mocks.applyLaunchA
 
 import { registerIpc } from '../src/main/ipc'
 
-const call = (channel: string, ...args: unknown[]): unknown => {
+function call(channel: string, ...args: unknown[]): unknown {
   const handler = mocks.handlers.get(channel)
-  if (!handler) throw new Error(`Missing handler ${channel}`)
+  if (!handler) throw new Error(`Missing handler: ${channel}`)
   return handler({}, ...args)
 }
 
@@ -63,13 +65,15 @@ beforeEach(() => {
 describe('IPC registration', () => {
   it('wires information and permission handlers', async () => {
     mocks.getDiskInfo.mockResolvedValue({ mount: '/' })
+    mocks.getApfsExplanation.mockResolvedValue({ containerSize: 500000000000 })
     mocks.getPermissionStatus.mockResolvedValue({ fullDiskAccess: true })
     mocks.getGrantTarget.mockReturnValue({ displayName: 'Disk Headroom' })
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(12)
+    expect(mocks.handlers.size).toBe(13)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
+    await expect(call('apfs:explanation')).resolves.toEqual({ containerSize: 500000000000 })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
     expect(call('permissions:grant-target')).toEqual({ displayName: 'Disk Headroom' })
