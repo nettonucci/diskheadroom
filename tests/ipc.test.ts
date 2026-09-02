@@ -14,16 +14,20 @@ const mocks = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   runScan: vi.fn(),
   trashPaths: vi.fn(),
-  applyLaunchAtLogin: vi.fn()
+  applyLaunchAtLogin: vi.fn(),
+  exportCleanReport: vi.fn()
 }))
 
 vi.mock('electron', () => {
   const module = {
     clipboard: { writeText: mocks.writeText },
     ipcMain: {
-    handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
-      mocks.handlers.set(channel, handler)
-    }
+      handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+        mocks.handlers.set(channel, handler)
+      }
+    },
+    BrowserWindow: {
+      fromWebContents: vi.fn(() => null)
     },
     shell: { openExternal: mocks.openExternal, showItemInFolder: mocks.showItemInFolder }
   }
@@ -46,6 +50,7 @@ vi.mock('../src/main/scanner', async () => {
 })
 vi.mock('../src/main/cleaner', () => ({ trashPaths: mocks.trashPaths }))
 vi.mock('../src/main/loginItem', () => ({ applyLaunchAtLogin: mocks.applyLaunchAtLogin }))
+vi.mock('../src/main/report', () => ({ exportCleanReport: mocks.exportCleanReport }))
 
 import { registerIpc } from '../src/main/ipc'
 
@@ -68,7 +73,7 @@ describe('IPC registration', () => {
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(12)
+    expect(mocks.handlers.size).toBe(13)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
@@ -90,7 +95,8 @@ describe('IPC registration', () => {
       unusedDays: 90,
       setupComplete: true,
       locale: 'pt-BR',
-      scanCategories: { unusedApps: false }
+      scanCategories: { unusedApps: false },
+      isPro: true
     }
     const saved = await call('settings:set', next)
     expect(saved).toEqual(
@@ -99,13 +105,27 @@ describe('IPC registration', () => {
         scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true }),
         lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
         launchAtLogin: false,
-        scanReminder: { enabled: false, intervalDays: 7 }
+        scanReminder: { enabled: false, intervalDays: 7 },
+        isPro: true
       })
     )
     expect(mocks.saveSettings).toHaveBeenCalledWith(saved)
     expect(mocks.applyLaunchAtLogin).toHaveBeenCalledWith(false)
     expect(setLocale).toHaveBeenCalledWith('pt-BR')
     expect(onSettingsChanged).toHaveBeenCalledWith(saved)
+  })
+
+  it('delegates report:export to exportCleanReport', async () => {
+    mocks.exportCleanReport.mockResolvedValue({ success: true, filePath: '/Users/test/report.md' })
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+
+    const request = {
+      scanResult: { scannedAt: '2025-01-01', limited: false, items: [] },
+      options: { locale: 'en' as const, format: 'markdown' as const }
+    }
+    const res = await call('report:export', request)
+    expect(res).toEqual({ success: true, filePath: '/Users/test/report.md' })
+    expect(mocks.exportCleanReport).toHaveBeenCalledWith(request, null)
   })
 
   it('persists launch-at-login and scan-reminder flags and applies the login API', async () => {

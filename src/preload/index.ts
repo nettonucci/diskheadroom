@@ -4,6 +4,8 @@ import type {
   CleanRequest,
   CleanResult,
   DiskInfo,
+  ExportReportRequest,
+  ExportReportResult,
   GrantTarget,
   LowDiskDebugStatus,
   PermissionStatus,
@@ -46,6 +48,8 @@ const api = {
   ): Promise<ScanResult> => ipcRenderer.invoke('scan:run', unusedDays, categories),
   trashItems: (request: CleanRequest): Promise<CleanResult> =>
     ipcRenderer.invoke('clean:trash', request),
+  exportReport: (request: ExportReportRequest): Promise<ExportReportResult> =>
+    ipcRenderer.invoke('report:export', request),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
   copyText: (text: string): Promise<void> => ipcRenderer.invoke('shell:copy-text', text),
   revealItem: (path: string): Promise<boolean> => ipcRenderer.invoke('shell:reveal-item', path),

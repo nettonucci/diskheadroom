@@ -2,10 +2,12 @@ import { app } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
+  DEFAULT_IS_PRO,
   DEFAULT_LOW_DISK_ALERT,
   DEFAULT_SCAN_CATEGORIES,
   DEFAULT_SCAN_REMINDER,
   DEFAULT_UNUSED_DAYS,
+  mergeIsPro,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeScanCategories,
@@ -23,7 +25,8 @@ const defaults = (): AppSettings => ({
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   lowDiskAlert: { ...DEFAULT_LOW_DISK_ALERT },
   launchAtLogin: false,
-  scanReminder: { ...DEFAULT_SCAN_REMINDER }
+  scanReminder: { ...DEFAULT_SCAN_REMINDER },
+  isPro: DEFAULT_IS_PRO
 })
 
 export async function loadSettings(): Promise<AppSettings> {
@@ -37,7 +40,8 @@ export async function loadSettings(): Promise<AppSettings> {
       scanCategories: mergeScanCategories(parsed.scanCategories),
       lowDiskAlert: mergeLowDiskAlert(parsed.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(parsed.launchAtLogin),
-      scanReminder: mergeScanReminder(parsed.scanReminder)
+      scanReminder: mergeScanReminder(parsed.scanReminder),
+      isPro: mergeIsPro(parsed.isPro)
     }
   } catch {
     return defaults()

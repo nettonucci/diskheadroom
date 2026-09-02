@@ -77,6 +77,7 @@ export interface AppSettings {
   lowDiskAlert: LowDiskAlertSettings
   launchAtLogin: boolean
   scanReminder: ScanReminderSettings
+  isPro: boolean
 }
 
 /** Development-only snapshot behind the Debug tab. Never registered in a packaged build. */
@@ -100,3 +101,39 @@ export interface CleanResult {
   failed: { path: string; error: string }[]
   bytesRequested: number
 }
+
+/** Configuration options for local report generation. */
+export interface CleanReportOptions {
+  scanResult: ScanResult
+  cleanResult?: CleanResult | null
+  disk?: DiskInfo | null
+  locale?: Locale
+  options?: {
+    locale?: Locale
+    format?: 'markdown' | 'pdf' | 'html' | 'auto'
+  }
+  generatedAt?: string
+}
+
+/** IPC request payload for exporting clean reports. */
+export interface ExportReportRequest {
+  scanResult: ScanResult
+  cleanResult?: CleanResult | null
+  disk?: DiskInfo | null
+  locale?: Locale
+  format?: 'markdown' | 'pdf' | 'auto'
+  options?: {
+    locale?: Locale
+    format?: 'markdown' | 'pdf' | 'auto'
+  }
+}
+
+/** IPC response result from report export. */
+export interface ExportReportResult {
+  success: boolean
+  filePath?: string
+  format?: 'markdown' | 'pdf' | 'html' | 'auto'
+  canceled?: boolean
+  error?: string
+}
+

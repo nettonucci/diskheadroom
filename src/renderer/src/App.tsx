@@ -23,6 +23,7 @@ import {
 } from '../../shared/i18n'
 import type {
   AppSettings,
+  CleanResult,
   DiskInfo,
   GrantTarget,
   LowDiskDebugStatus,
@@ -130,6 +131,7 @@ function AppShell(): JSX.Element {
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [cleanMessage, setCleanMessage] = useState<string | null>(null)
   const [cleanFailed, setCleanFailed] = useState<{ path: string; error: string }[]>([])
+  const [lastCleanResult, setLastCleanResult] = useState<CleanResult | null>(null)
   const [scanFailed, setScanFailed] = useState(false)
   const [busyClean, setBusyClean] = useState(false)
   const [confirmCleanOpen, setConfirmCleanOpen] = useState(false)
@@ -274,6 +276,10 @@ function AppShell(): JSX.Element {
     await updateSettings((current) => ({ scanReminder: { ...current.scanReminder, ...patch } }))
   }
 
+  async function updatePro(isPro: boolean): Promise<void> {
+    await updateSettings(() => ({ isPro }))
+  }
+
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
 
   function requestClean(): void {
@@ -293,6 +299,7 @@ function AppShell(): JSX.Element {
         .filter((item) => outcome.trashed.includes(item.path))
         .reduce((sum, item) => sum + item.bytes, 0)
       setCleanFailed(outcome.failed)
+      setLastCleanResult(outcome)
       setCleanMessage(
         t(outcome.trashed.length === 1 ? 'results.cleanedOne' : 'results.cleanedOther', {
           count: outcome.trashed.length,
@@ -383,6 +390,8 @@ function AppShell(): JSX.Element {
             locale={locale}
             result={result}
             disk={disk}
+            isPro={Boolean(settings?.isPro)}
+            lastCleanResult={lastCleanResult}
             usedPct={usedPct}
             foundBytes={foundBytes}
             selected={selected}
@@ -426,6 +435,7 @@ function AppShell(): JSX.Element {
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
             onScanReminder={(patch) => void updateScanReminder(patch)}
+            onPro={(isPro) => void updatePro(isPro)}
             onPermissions={() => setView('permissions')}
           />
         )}
@@ -779,6 +789,8 @@ function ResultsView(props: {
   locale: Locale
   result: ScanResult
   disk: DiskInfo | null
+  isPro: boolean
+  lastCleanResult: CleanResult | null
   usedPct: number
   foundBytes: number
   selected: Record<string, boolean>
@@ -793,6 +805,45 @@ function ResultsView(props: {
   onRescan: () => void
 }): JSX.Element {
   const [query, setQuery] = useState('')
+  const [busyExport, setBusyExport] = useState(false)
+  const [reportStatus, setReportStatus] = useState<{ message: string; isError?: boolean } | null>(null)
+
+  async function handleExportReport(): Promise<void> {
+    if (!props.isPro) {
+      setReportStatus({ message: props.t('results.proRequired'), isError: true })
+      return
+    }
+    setBusyExport(true)
+    setReportStatus(null)
+    try {
+      const exportRes = await window.diskheadroom.exportReport({
+        scanResult: props.result,
+        cleanResult: props.lastCleanResult ?? undefined,
+        disk: props.disk ?? undefined,
+        options: {
+          locale: props.locale,
+          format: 'markdown'
+        }
+      })
+      if (exportRes.success && exportRes.filePath) {
+        setReportStatus({
+          message: props.t('results.reportSaved', { path: exportRes.filePath }),
+          isError: false
+        })
+      } else if (!exportRes.canceled) {
+        if (exportRes.error === 'PRO_REQUIRED') {
+          setReportStatus({ message: props.t('results.proRequired'), isError: true })
+        } else {
+          setReportStatus({ message: props.t('results.reportFailed'), isError: true })
+        }
+      }
+    } catch {
+      setReportStatus({ message: props.t('results.reportFailed'), isError: true })
+    } finally {
+      setBusyExport(false)
+    }
+  }
+
   const grouped = new Map<ScanItem['categoryId'], ScanItem[]>()
   for (const item of props.result.items) {
     if (!itemMatchesFilter(item, query, props.t)) continue
@@ -842,6 +893,11 @@ function ResultsView(props: {
             </>
           )}
           <p className="muted">{props.t('results.trashHint')}</p>
+        </div>
+      )}
+      {reportStatus && (
+        <div className="card">
+          <p className={reportStatus.isError ? 'notice' : 'muted'}>{reportStatus.message}</p>
         </div>
       )}
       {props.result.items.length > 0 && (
@@ -915,6 +971,20 @@ function ResultsView(props: {
           })}
         </span>
         <div className="row">
+          <button
+            className={`btn${busyExport ? ' busy' : ''}`}
+            type="button"
+            disabled={busyExport}
+            onClick={() => void handleExportReport()}
+          >
+            {busyExport && <Spinner />}
+            {busyExport
+              ? props.t('results.exportingReport')
+              : props.isPro
+                ? props.t('results.exportReport')
+                : props.t('results.exportReportPro')}
+            {!props.isPro && <span className="badge">{props.t('results.proBadge')}</span>}
+          </button>
           <button className="btn" type="button" onClick={props.onRescan}>
             {props.t('results.rescan')}
           </button>
@@ -942,6 +1012,7 @@ function SettingsView(props: {
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
   onLaunchAtLogin: (enabled: boolean) => void
   onScanReminder: (patch: Partial<ScanReminderSettings>) => void
+  onPro: (enabled: boolean) => void
   onPermissions: () => void
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
@@ -959,6 +1030,18 @@ function SettingsView(props: {
           <h2>{props.t('settings.title')}</h2>
           <p>{props.t('settings.description')}</p>
         </div>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.proTitle')}</h3>
+        <p className="muted">{props.t('settings.proHint')}</p>
+        <label className="scan-flag">
+          <input
+            type="checkbox"
+            checked={props.settings.isPro}
+            onChange={(event) => props.onPro(event.target.checked)}
+          />
+          <span>{props.t('settings.proEnable')}</span>
+        </label>
       </div>
       <div className="card">
         <h3>{props.t('settings.scanTitle')}</h3>
