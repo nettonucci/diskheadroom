@@ -22,7 +22,8 @@ const settings = {
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
-  scanReminder: { enabled: false, intervalDays: 7 as const }
+  scanReminder: { enabled: false, intervalDays: 7 as const },
+  isPro: false
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -89,6 +90,7 @@ function api(overrides: Partial<Api> = {}): Api {
     openExternal: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
     revealItem: vi.fn().mockResolvedValue(true),
+    exportReport: vi.fn().mockResolvedValue({ success: true, filePath: '/Users/test/report.md' }),
     debug: {
       lowDiskStatus: vi.fn().mockResolvedValue(debugStatus),
       simulateFreePercent: vi.fn().mockResolvedValue({ ...debugStatus, simulatedFreePercent: 5 }),
@@ -720,5 +722,47 @@ describe('App', () => {
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Debug' }))
     expect(await screen.findByText('Debug bridge unavailable.')).toBeInTheDocument()
+  })
+
+  it('allows enabling Pro in settings and exporting clean report', async () => {
+    const bridge = api({
+      getSettings: vi.fn().mockResolvedValue({ ...settings, isPro: false })
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    // Navigate to Settings and enable Pro
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByText('Disk Headroom Pro')).toBeInTheDocument()
+    const proCheckbox = screen.getByRole('checkbox', { name: 'Enable Disk Headroom Pro' })
+    expect(proCheckbox).not.toBeChecked()
+    await user.click(proCheckbox)
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ isPro: true })
+      )
+    )
+
+    // Navigate to Dashboard and run scan
+    await user.click(screen.getByRole('button', { name: 'Scan' }))
+    await user.click(screen.getByRole('button', { name: 'Scan this Mac' }))
+    expect(await screen.findByText('Review before cleaning')).toBeInTheDocument()
+
+    // Export report
+    const exportBtn = screen.getByRole('button', { name: /Export clean report/i })
+    await user.click(exportBtn)
+    await waitFor(() =>
+      expect(bridge.exportReport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: expect.objectContaining({
+            format: 'markdown',
+            locale: 'en'
+          })
+        })
+      )
+    )
+    expect(await screen.findByText(/Report saved to \/Users\/test\/report\.md/)).toBeInTheDocument()
   })
 })

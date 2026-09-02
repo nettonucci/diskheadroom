@@ -1,12 +1,13 @@
-import { clipboard, ipcMain, shell } from 'electron'
+import { BrowserWindow, clipboard, ipcMain, shell } from 'electron'
 import {
+  mergeIsPro,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeScanCategories,
   mergeScanReminder,
   SPONSORS_URL
 } from '../shared/constants'
-import type { AppSettings, CleanRequest, ScanItem } from '../shared/types'
+import type { AppSettings, CleanRequest, ExportReportRequest, ScanItem } from '../shared/types'
 import { trashPaths } from './cleaner'
 import { getDiskInfo } from './disk'
 import { applyLaunchAtLogin } from './loginItem'
@@ -16,6 +17,7 @@ import {
   openFullDiskAccessSettings,
   revealGrantTarget
 } from './permissions'
+import { exportCleanReport } from './report'
 import { isSafePath, runScan } from './scanner'
 import { loadSettings, saveSettings } from './settings'
 import type { TrayController } from './tray'
@@ -42,13 +44,18 @@ export function registerIpc(options: IpcOptions): void {
       scanCategories: mergeScanCategories(next.scanCategories),
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
-      scanReminder: mergeScanReminder(next.scanReminder)
+      scanReminder: mergeScanReminder(next.scanReminder),
+      isPro: mergeIsPro(next.isPro)
     }
     await saveSettings(normalized)
     applyLaunchAtLogin(normalized.launchAtLogin)
     options.getTrayController()?.setLocale(normalized.locale)
     options.onSettingsChanged?.(normalized)
     return normalized
+  })
+  ipcMain.handle('report:export', async (event, request: ExportReportRequest) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return exportCleanReport(request, win)
   })
   ipcMain.handle(
     'scan:run',

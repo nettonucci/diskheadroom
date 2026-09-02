@@ -136,3 +136,11 @@ export function mergeScanReminder(input: unknown): ScanReminderSettings {
 export function mergeLaunchAtLogin(input: unknown): boolean {
   return input === true
 }
+
+export const DEFAULT_IS_PRO = false
+
+/** Sanitizes and validates the Pro entitlement flag. */
+export function mergeIsPro(input: unknown): boolean {
+  return input === true
+}
+
