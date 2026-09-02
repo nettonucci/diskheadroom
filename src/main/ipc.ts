@@ -1,12 +1,14 @@
 import { clipboard, ipcMain, shell } from 'electron'
 import {
+  mergeIsPro,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeScanCategories,
   mergeScanReminder,
   SPONSORS_URL
 } from '../shared/constants'
-import type { AppSettings, CleanRequest, ScanItem } from '../shared/types'
+import { calculateScanDeltas } from '../shared/deltas'
+import type { AppSettings, CleanRequest, ScanItem, ScanResult } from '../shared/types'
 import { trashPaths } from './cleaner'
 import { getDiskInfo } from './disk'
 import { applyLaunchAtLogin } from './loginItem'
@@ -18,6 +20,7 @@ import {
 } from './permissions'
 import { isSafePath, runScan } from './scanner'
 import { loadSettings, saveSettings } from './settings'
+import { clearSnapshots, loadLastSnapshot, recordScanSnapshot } from './snapshots'
 import type { TrayController } from './tray'
 
 interface IpcOptions {
@@ -42,7 +45,8 @@ export function registerIpc(options: IpcOptions): void {
       scanCategories: mergeScanCategories(next.scanCategories),
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
-      scanReminder: mergeScanReminder(next.scanReminder)
+      scanReminder: mergeScanReminder(next.scanReminder),
+      isPro: mergeIsPro(next.isPro)
     }
     await saveSettings(normalized)
     applyLaunchAtLogin(normalized.launchAtLogin)
@@ -50,13 +54,15 @@ export function registerIpc(options: IpcOptions): void {
     options.onSettingsChanged?.(normalized)
     return normalized
   })
+  ipcMain.handle('snapshot:last', () => loadLastSnapshot())
+  ipcMain.handle('snapshot:clear', () => clearSnapshots())
   ipcMain.handle(
     'scan:run',
     async (
       _event,
       unusedDays: AppSettings['unusedDays'],
       categories?: AppSettings['scanCategories']
-    ) => {
+    ): Promise<ScanResult> => {
       const result = await runScan(
         unusedDays,
         (progress) => {
@@ -65,8 +71,21 @@ export function registerIpc(options: IpcOptions): void {
         mergeScanCategories(categories)
       )
       lastItems = new Map(result.items.map((item) => [item.path, item]))
+
+      const currentSettings = await loadSettings()
+      const { current, previous } = await recordScanSnapshot(result.items, result.scannedAt)
+      const deltas = calculateScanDeltas({
+        current,
+        previous,
+        isPro: currentSettings.isPro,
+        scanCategories: currentSettings.scanCategories
+      })
+
       options.onScanCompleted?.()
-      return result
+      return {
+        ...result,
+        deltas: currentSettings.isPro ? deltas : undefined
+      }
     }
   )
   ipcMain.handle('clean:trash', async (_event, request: CleanRequest) => {
