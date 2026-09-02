@@ -6,7 +6,7 @@ import {
   mergeNeverTouchPaths,
   mergeScanCategories,
   mergeScanReminder,
-  SPONSORS_URL
+  isAllowedExternalUrl
 } from '../shared/constants'
 import type { AppSettings, CleanRequest, ScanItem } from '../shared/types'
 import { trashPaths } from './cleaner'
@@ -113,7 +113,7 @@ export function registerIpc(options: IpcOptions): void {
     return true
   })
   ipcMain.handle('shell:open-external', (_event, url: string) => {
-    if (url === SPONSORS_URL || url.startsWith('https://github.com/')) {
+    if (isAllowedExternalUrl(url)) {
       return shell.openExternal(url)
     }
     return Promise.resolve()

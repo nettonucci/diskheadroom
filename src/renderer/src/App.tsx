@@ -4,6 +4,7 @@ import {
   SCAN_CATEGORY_IDS,
   SPONSORS_URL,
   REPO_URL,
+  PADDLE_CHECKOUT_URL,
   LOW_DISK_ALERT_PRESETS,
   SCAN_REMINDER_INTERVAL_DAYS,
   lowDiskAlertPresetKey,
@@ -33,6 +34,7 @@ import type {
 } from '../../shared/types'
 import { CATEGORY_META, CATEGORY_WARNING, NAV, SCAN_CATEGORY_LABELS, type ViewId } from './lib/copy'
 import { formatBytes, formatDate } from './lib/format'
+import { isProEntitled } from '../../shared/entitlement'
 import markUrl from '@brand/mark-color.svg'
 
 function Spinner(): JSX.Element {
@@ -133,23 +135,26 @@ function AppShell(): JSX.Element {
   const [scanFailed, setScanFailed] = useState(false)
   const [busyClean, setBusyClean] = useState(false)
   const [confirmCleanOpen, setConfirmCleanOpen] = useState(false)
+  const [isPro, setIsPro] = useState(false)
   const bootstrapped = useRef(false)
   const locale = settings?.locale ?? 'en'
   const t = translator(locale)
 
   const refresh = useCallback(async () => {
-    const [nextSettings, nextDisk, nextPerms, nextTarget] = await Promise.all([
+    const [nextSettings, nextDisk, nextPerms, nextTarget, license] = await Promise.all([
       window.diskheadroom.getSettings(),
       // A failed capacity reading must not take the rest of the UI down with it:
       // the panel can be missing, the app still scans and cleans.
       window.diskheadroom.getDiskInfo().catch(() => null),
       window.diskheadroom.getPermissions(),
-      window.diskheadroom.getGrantTarget()
+      window.diskheadroom.getGrantTarget(),
+      window.diskheadroom.getLicenseStatus()
     ])
     setSettings(nextSettings)
     setDisk(nextDisk)
     setPerms(nextPerms)
     setGrantTarget(nextTarget)
+    setIsPro(isProEntitled(license.isPro))
     // Only the first load decides the landing view. Later refreshes come from
     // Recheck or a finished cleanup, and pulling the user out of the screen they
     // opened makes those buttons feel broken.
@@ -431,6 +436,9 @@ function AppShell(): JSX.Element {
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
             onScanReminder={(patch) => void updateScanReminder(patch)}
             onNeverTouchPaths={(paths) => void updateNeverTouchPaths(paths)}
+            isPro={isPro}
+            onLicenseChange={setIsPro}
+            onDonate={() => setView('donate')}
             onPermissions={() => setView('permissions')}
           />
         )}
@@ -948,11 +956,17 @@ function SettingsView(props: {
   onLaunchAtLogin: (enabled: boolean) => void
   onScanReminder: (patch: Partial<ScanReminderSettings>) => void
   onNeverTouchPaths: (paths: string[]) => void
+  isPro: boolean
+  onLicenseChange: (isPro: boolean) => void
+  onDonate: () => void
   onPermissions: () => void
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
   const reminder = props.settings.scanReminder
   const [neverTouchDraft, setNeverTouchDraft] = useState('')
+  const [licenseDraft, setLicenseDraft] = useState('')
+  const [licenseInvalid, setLicenseInvalid] = useState(false)
+  const [activating, setActivating] = useState(false)
   const presets = LOW_DISK_ALERT_PRESETS.some(
     (preset) => preset.kind === alert.kind && preset.value === alert.value
   )
@@ -965,6 +979,22 @@ function SettingsView(props: {
     const merged = Array.from(new Set([...props.settings.neverTouchPaths, trimmed]))
     props.onNeverTouchPaths(merged)
     setNeverTouchDraft('')
+  }
+
+  async function activateLicense(): Promise<void> {
+    const key = licenseDraft.trim()
+    if (!key || activating) return
+    setActivating(true)
+    setLicenseInvalid(false)
+    try {
+      const status = await window.diskheadroom.activateLicense(key)
+      const entitled = isProEntitled(status.isPro)
+      props.onLicenseChange(entitled)
+      setLicenseInvalid(!entitled)
+      if (entitled) setLicenseDraft('')
+    } finally {
+      setActivating(false)
+    }
   }
 
   return (
@@ -1061,6 +1091,54 @@ function SettingsView(props: {
             ))}
           </ul>
         )}
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.proTitle')}</h3>
+        <p className="muted">{props.t('settings.proHint')}</p>
+        <p className={props.isPro ? 'pro-status on' : 'pro-status'}>
+          {props.t(props.isPro ? 'settings.proStatusOn' : 'settings.proStatusOff')}
+        </p>
+        <form
+          className="license-add"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void activateLicense()
+          }}
+        >
+          <label className="field-label" htmlFor="license-key">
+            {props.t('settings.proKeyLabel')}
+          </label>
+          <input
+            id="license-key"
+            type="text"
+            value={licenseDraft}
+            onChange={(event) => {
+              setLicenseDraft(event.target.value)
+              setLicenseInvalid(false)
+            }}
+            placeholder={props.t('settings.proKeyPlaceholder')}
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={licenseInvalid}
+          />
+          {licenseInvalid && <p className="notice">{props.t('settings.proInvalid')}</p>}
+          <div className="row">
+            <button className="btn" type="submit" disabled={activating || !licenseDraft.trim()}>
+              {activating && <Spinner />}
+              {activating ? props.t('settings.proActivating') : props.t('settings.proActivate')}
+            </button>
+            <button
+              className="btn primary"
+              type="button"
+              onClick={() => void window.diskheadroom.openExternal(PADDLE_CHECKOUT_URL)}
+            >
+              {props.t('settings.proBuy')}
+            </button>
+            <button className="btn" type="button" onClick={props.onDonate}>
+              {props.t('settings.proDonate')}
+            </button>
+          </div>
+        </form>
       </div>
       <div className="card">
         <h3>{props.t('settings.idleTitle')}</h3>

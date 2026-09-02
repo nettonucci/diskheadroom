@@ -3,9 +3,11 @@ import {
   DEFAULT_UNUSED_DAYS,
   MAX_NEVER_TOUCH_PATHS,
   UNUSED_DAY_OPTIONS,
+  isAllowedExternalUrl,
   mergeNeverTouchPaths,
   mergeScanCategories
 } from '../src/shared/constants'
+import { isProEntitled } from '../src/shared/entitlement'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
 import { CATEGORY_META, NAV } from '../src/renderer/src/lib/copy'
 import { formatBytes, formatDate } from '../src/renderer/src/lib/format'
@@ -53,6 +55,22 @@ describe('shared helpers', () => {
     expect(mergeNeverTouchPaths(Array.from({ length: 60 }, (_, index) => `/tmp/p${index}`))).toHaveLength(
       MAX_NEVER_TOUCH_PATHS
     )
+  })
+
+  it('allows only HTTPS GitHub and Paddle checkout hosts', () => {
+    expect(isAllowedExternalUrl('https://github.com/sponsors/nettonucci')).toBe(true)
+    expect(isAllowedExternalUrl('https://sandbox-checkout.paddle.com/product/1')).toBe(true)
+    expect(isAllowedExternalUrl('https://buy.paddle.com/product/1')).toBe(true)
+    expect(isAllowedExternalUrl('http://checkout.paddle.com/')).toBe(false)
+    expect(isAllowedExternalUrl('https://example.com')).toBe(false)
+    expect(isAllowedExternalUrl('https://evil.paddle.com/')).toBe(false)
+    expect(isAllowedExternalUrl('https://user:pass@github.com/x')).toBe(false)
+    expect(isAllowedExternalUrl('not-a-url')).toBe(false)
+  })
+
+  it('treats only a true isPro flag as entitled', () => {
+    expect(isProEntitled(true)).toBe(true)
+    expect(isProEntitled(false)).toBe(false)
   })
 })
 

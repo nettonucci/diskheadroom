@@ -2,6 +2,34 @@ export const SPONSORS_URL = 'https://github.com/sponsors/nettonucci'
 export const REPO_URL = 'https://github.com/nettonucci/diskheadroom'
 export const APP_NAME = 'Disk Headroom'
 
+/**
+ * Hosted Paddle checkout for Disk Headroom Pro (lifetime of major 1.x).
+ * Swap in the live overlay URL from the Paddle dashboard. Vendor id, product
+ * id, and API secrets stay in 1Password — never in this repo.
+ */
+export const PADDLE_CHECKOUT_URL = 'https://sandbox-checkout.paddle.com/'
+
+const PADDLE_CHECKOUT_HOSTS = new Set([
+  'buy.paddle.com',
+  'sandbox-buy.paddle.com',
+  'checkout.paddle.com',
+  'sandbox-checkout.paddle.com'
+])
+
+/** HTTPS GitHub Sponsors/repo links and the Paddle checkout hosts only. */
+export function isAllowedExternalUrl(url: unknown): boolean {
+  if (typeof url !== 'string' || !url) return false
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:') return false
+    if (parsed.username || parsed.password) return false
+    if (parsed.hostname === 'github.com') return true
+    return PADDLE_CHECKOUT_HOSTS.has(parsed.hostname)
+  } catch {
+    return false
+  }
+}
+
 export const UNUSED_DAY_OPTIONS = [30, 90, 180, 365] as const
 export type UnusedDays = (typeof UNUSED_DAY_OPTIONS)[number]
 export const DEFAULT_UNUSED_DAYS: UnusedDays = 90

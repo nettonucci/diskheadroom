@@ -223,8 +223,10 @@ describe('IPC registration', () => {
 
     await call('shell:open-external', 'https://github.com/sponsors/nettonucci')
     await call('shell:open-external', 'https://github.com/nettonucci/diskheadroom')
+    await call('shell:open-external', 'https://sandbox-checkout.paddle.com/')
     await call('shell:open-external', 'https://example.com')
-    expect(mocks.openExternal).toHaveBeenCalledTimes(2)
+    await call('shell:open-external', 'http://checkout.paddle.com/')
+    expect(mocks.openExternal).toHaveBeenCalledTimes(3)
   })
 
   it('reveals only paths from the current scan that pass the safety check', async () => {
