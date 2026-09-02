@@ -136,3 +136,25 @@ export function mergeScanReminder(input: unknown): ScanReminderSettings {
 export function mergeLaunchAtLogin(input: unknown): boolean {
   return input === true
 }
+
+export const DEFAULT_NEVER_TOUCH_PATHS: string[] = []
+export const MAX_NEVER_TOUCH_PATHS = 50
+
+/** Absolute prefixes the scanner hides and the cleaner refuses. IPC may send anything. */
+export function mergeNeverTouchPaths(input: unknown): string[] {
+  if (!Array.isArray(input)) return [...DEFAULT_NEVER_TOUCH_PATHS]
+  const seen = new Set<string>()
+  const next: string[] = []
+  for (const item of input) {
+    if (typeof item !== 'string') continue
+    const trimmed = item.trim()
+    if (!trimmed.startsWith('/') || trimmed.includes('\0')) continue
+    const normalized = trimmed.replace(/\/+$/, '')
+    if (!normalized || normalized === '/') continue
+    if (seen.has(normalized)) continue
+    seen.add(normalized)
+    next.push(normalized)
+    if (next.length >= MAX_NEVER_TOUCH_PATHS) break
+  }
+  return next
+}

@@ -77,6 +77,8 @@ export interface AppSettings {
   lowDiskAlert: LowDiskAlertSettings
   launchAtLogin: boolean
   scanReminder: ScanReminderSettings
+  /** Absolute paths/prefixes omitted from scans and refused by trash. */
+  neverTouchPaths: string[]
 }
 
 /** Development-only snapshot behind the Debug tab. Never registered in a packaged build. */

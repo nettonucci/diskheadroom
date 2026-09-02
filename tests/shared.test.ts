@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_UNUSED_DAYS,
+  MAX_NEVER_TOUCH_PATHS,
   UNUSED_DAY_OPTIONS,
+  mergeNeverTouchPaths,
   mergeScanCategories
 } from '../src/shared/constants'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
@@ -43,6 +45,14 @@ describe('shared helpers', () => {
       unusedApps: false,
       userCaches: true
     })
+  })
+
+  it('normalizes never-touch paths and caps the list', () => {
+    expect(mergeNeverTouchPaths(undefined)).toEqual([])
+    expect(mergeNeverTouchPaths(['/', 'relative', '/tmp/keep/', '/tmp/keep'])).toEqual(['/tmp/keep'])
+    expect(mergeNeverTouchPaths(Array.from({ length: 60 }, (_, index) => `/tmp/p${index}`))).toHaveLength(
+      MAX_NEVER_TOUCH_PATHS
+    )
   })
 })
 

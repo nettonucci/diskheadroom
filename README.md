@@ -42,7 +42,7 @@ If you need forensic deletion, secure erase, or Windows/Linux, this is not that 
 
 | System access | Settings |
 | --- | --- |
-| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with scan category toggles, optional low-disk alert, idle app window, and language pickers" width="440"> |
+| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with scan category toggles, never-touch paths, optional low-disk alert, idle app window, and language pickers" width="440"> |
 
 <p align="center">
   <img src="docs/screenshots/developer.png" alt="Optional developer groups showing simulators on older runtimes and Android, Gradle and CocoaPods caches, all unchecked, with a warning that those simulators still work" width="560">
@@ -70,6 +70,7 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Idle apps | `/Applications` and `~/Applications`, skipping Apple system bundles |
 | Menu bar | Open, Scan now, Donate, Quit |
 | Low disk alert | Optional local Notification Center notice when free space drops below a percent or GB threshold (off by default, with a cooldown so it does not spam) |
+| Never-touch paths | Settings list of folders omitted from the next scan and refused by Trash; paste a path or pick a folder |
 | Languages | English, Português (Brasil), Español |
 | Donate | In-app page plus this README, both pointing at GitHub Sponsors |
 
@@ -192,6 +193,8 @@ Useful scripts:
 - Preview first. No silent background deletion.
 - Default selections avoid applications and Xcode leftovers.
 - Removals go to Trash via Electron’s `shell.trashItem`.
+- Only paths from the last successful scan can be trashed.
+- Never-touch prefixes are omitted from scans and refused by Trash.
 - Paths under `/System` and a short list of OS roots are rejected.
 - Settings live in the app’s user-data folder as local JSON.
 - Donate opens [GitHub Sponsors](https://github.com/sponsors/nettonucci) in your browser. Nothing else is sent.

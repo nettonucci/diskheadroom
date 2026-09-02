@@ -19,3 +19,4 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-08-31 | Toggles por categoria no scan | [2026-08-31-scan-categorias](./2026-08-31-scan-categorias/post.md) |
 | 2026-09-01 | Alerta local de disco cheio | [2026-09-01-alerta-disco-local](./2026-09-01-alerta-disco-local/post.md) |
 | 2026-09-01 | Abrir ao login e lembrete de scan | [2026-09-01-abrir-login-lembrete](./2026-09-01-abrir-login-lembrete/post.md) |
+| 2026-09-02 | Caminhos intocáveis + lixeira só do último scan | [2026-09-02-never-touch](./2026-09-02-never-touch/post.md) |

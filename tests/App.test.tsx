@@ -22,7 +22,8 @@ const settings = {
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
-  scanReminder: { enabled: false, intervalDays: 7 as const }
+  scanReminder: { enabled: false, intervalDays: 7 as const },
+  neverTouchPaths: []
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -86,6 +87,7 @@ function api(overrides: Partial<Api> = {}): Api {
       failed: [],
       bytesRequested: 2048
     }),
+    pickFolder: vi.fn().mockResolvedValue(null),
     openExternal: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
     revealItem: vi.fn().mockResolvedValue(true),
@@ -647,6 +649,32 @@ describe('App', () => {
       expect(bridge.setSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true })
+        })
+      )
+    )
+    fireEvent.change(screen.getByLabelText('Path to exclude'), {
+      target: { value: '/Users/test/Library/Caches/keep' }
+    })
+    await user.click(screen.getByRole('button', { name: 'Add path' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ neverTouchPaths: ['/Users/test/Library/Caches/keep'] })
+      )
+    )
+    await user.click(screen.getByRole('button', { name: 'Show in Finder' }))
+    expect(bridge.revealItem).toHaveBeenCalledWith('/Users/test/Library/Caches/keep')
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ neverTouchPaths: [] }))
+    )
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }))
+    expect(bridge.pickFolder).toHaveBeenCalled()
+    bridge.pickFolder.mockResolvedValueOnce('/Users/test/Library/Caches/from-picker')
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          neverTouchPaths: expect.arrayContaining(['/Users/test/Library/Caches/from-picker'])
         })
       )
     )

@@ -601,3 +601,41 @@ select {
 .donate-panel .btn.primary {
   margin-top: 8px;
 }
+
+.never-touch-add {
+  margin-top: 8px;
+}
+
+.never-touch-add input[type='text'] {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.never-touch-add .row,
+.never-touch-list .row {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.never-touch-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.never-touch-list li {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.never-touch-list .path {
+  display: block;
+  word-break: break-all;
+}

@@ -8,6 +8,7 @@ import {
   DEFAULT_UNUSED_DAYS,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
+  mergeNeverTouchPaths,
   mergeScanCategories,
   mergeScanReminder
 } from '../shared/constants'
@@ -23,7 +24,8 @@ const defaults = (): AppSettings => ({
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   lowDiskAlert: { ...DEFAULT_LOW_DISK_ALERT },
   launchAtLogin: false,
-  scanReminder: { ...DEFAULT_SCAN_REMINDER }
+  scanReminder: { ...DEFAULT_SCAN_REMINDER },
+  neverTouchPaths: []
 })
 
 export async function loadSettings(): Promise<AppSettings> {
@@ -37,7 +39,8 @@ export async function loadSettings(): Promise<AppSettings> {
       scanCategories: mergeScanCategories(parsed.scanCategories),
       lowDiskAlert: mergeLowDiskAlert(parsed.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(parsed.launchAtLogin),
-      scanReminder: mergeScanReminder(parsed.scanReminder)
+      scanReminder: mergeScanReminder(parsed.scanReminder),
+      neverTouchPaths: mergeNeverTouchPaths(parsed.neverTouchPaths)
     }
   } catch {
     return defaults()

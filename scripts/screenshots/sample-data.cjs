@@ -133,6 +133,7 @@ module.exports = {
       enabled: true,
       intervalDays: 7
     },
+    neverTouchPaths: ['/Users/alex/Library/Caches/keep-this'],
     scanCategories: {
       userCaches: true,
       userLogs: true,

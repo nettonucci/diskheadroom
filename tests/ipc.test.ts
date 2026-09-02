@@ -14,12 +14,14 @@ const mocks = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   runScan: vi.fn(),
   trashPaths: vi.fn(),
-  applyLaunchAtLogin: vi.fn()
+  applyLaunchAtLogin: vi.fn(),
+  showOpenDialog: vi.fn()
 }))
 
 vi.mock('electron', () => {
   const module = {
     clipboard: { writeText: mocks.writeText },
+    dialog: { showOpenDialog: mocks.showOpenDialog },
     ipcMain: {
     handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
       mocks.handlers.set(channel, handler)
@@ -58,6 +60,7 @@ const call = (channel: string, ...args: unknown[]): unknown => {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.handlers.clear()
+  mocks.loadSettings.mockResolvedValue({ neverTouchPaths: [] })
 })
 
 describe('IPC registration', () => {
@@ -68,7 +71,7 @@ describe('IPC registration', () => {
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(12)
+    expect(mocks.handlers.size).toBe(13)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
@@ -99,13 +102,22 @@ describe('IPC registration', () => {
         scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true }),
         lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
         launchAtLogin: false,
-        scanReminder: { enabled: false, intervalDays: 7 }
+        scanReminder: { enabled: false, intervalDays: 7 },
+        neverTouchPaths: []
       })
     )
     expect(mocks.saveSettings).toHaveBeenCalledWith(saved)
     expect(mocks.applyLaunchAtLogin).toHaveBeenCalledWith(false)
     expect(setLocale).toHaveBeenCalledWith('pt-BR')
     expect(onSettingsChanged).toHaveBeenCalledWith(saved)
+  })
+
+  it('returns a chosen folder from the native picker', async () => {
+    mocks.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/Users/test/Keep'] })
+    mocks.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] })
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    await expect(call('dialog:pick-folder')).resolves.toBe('/Users/test/Keep')
+    await expect(call('dialog:pick-folder')).resolves.toBeNull()
   })
 
   it('persists launch-at-login and scan-reminder flags and applies the login API', async () => {
@@ -150,7 +162,8 @@ describe('IPC registration', () => {
     expect(mocks.runScan).toHaveBeenCalledWith(
       90,
       expect.any(Function),
-      expect.objectContaining({ unusedApps: false, userCaches: true })
+      expect.objectContaining({ unusedApps: false, userCaches: true }),
+      []
     )
     const request = { paths: ['/Users/test/cache', '/Users/test/unknown'] }
     await call('clean:trash', request)
@@ -159,7 +172,41 @@ describe('IPC registration', () => {
       new Map([
         ['/Users/test/cache', 42],
         ['/Users/test/unknown', 0]
-      ])
+      ]),
+      {
+        lastScanPaths: new Set(['/Users/test/cache']),
+        neverTouchPaths: []
+      }
+    )
+  })
+
+  it('passes persisted never-touch prefixes into scan and trash', async () => {
+    mocks.loadSettings.mockResolvedValue({
+      neverTouchPaths: ['/Users/test/Library/Caches/keep']
+    })
+    mocks.runScan.mockResolvedValue({
+      items: [{ path: '/Users/test/cache', bytes: 8 }],
+      scannedAt: '2025-01-01',
+      limited: false
+    })
+    mocks.trashPaths.mockResolvedValue({ trashed: [], failed: [], bytesRequested: 0 })
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+
+    await call('scan:run', 90)
+    expect(mocks.runScan).toHaveBeenCalledWith(
+      90,
+      expect.any(Function),
+      expect.any(Object),
+      ['/Users/test/Library/Caches/keep']
+    )
+    await call('clean:trash', { paths: ['/Users/test/cache'] })
+    expect(mocks.trashPaths).toHaveBeenCalledWith(
+      { paths: ['/Users/test/cache'] },
+      new Map([['/Users/test/cache', 8]]),
+      {
+        lastScanPaths: new Set(['/Users/test/cache']),
+        neverTouchPaths: ['/Users/test/Library/Caches/keep']
+      }
     )
   })
 
@@ -185,16 +232,25 @@ describe('IPC registration', () => {
     })
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
 
-    expect(call('shell:reveal-item', '/Users/test/Library/Caches/a')).toBe(false)
+    await expect(call('shell:reveal-item', '/Users/test/Library/Caches/a')).resolves.toBe(false)
     expect(mocks.showItemInFolder).not.toHaveBeenCalled()
 
     await call('scan:run', 90)
-    expect(call('shell:reveal-item', '/Users/test/Library/Caches/a')).toBe(true)
+    await expect(call('shell:reveal-item', '/Users/test/Library/Caches/a')).resolves.toBe(true)
     expect(mocks.showItemInFolder).toHaveBeenCalledWith('/Users/test/Library/Caches/a')
 
-    expect(call('shell:reveal-item', '/etc/passwd')).toBe(false)
-    expect(call('shell:reveal-item', '/')).toBe(false)
-    expect(call('shell:reveal-item', 42)).toBe(false)
+    await expect(call('shell:reveal-item', '/etc/passwd')).resolves.toBe(false)
+    await expect(call('shell:reveal-item', '/')).resolves.toBe(false)
+    await expect(call('shell:reveal-item', 42)).resolves.toBe(false)
     expect(mocks.showItemInFolder).toHaveBeenCalledTimes(1)
+  })
+
+  it('reveals a never-touch path from settings without a scan', async () => {
+    mocks.loadSettings.mockResolvedValue({
+      neverTouchPaths: ['/Users/test/Library/Caches/keep']
+    })
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    await expect(call('shell:reveal-item', '/Users/test/Library/Caches/keep')).resolves.toBe(true)
+    expect(mocks.showItemInFolder).toHaveBeenCalledWith('/Users/test/Library/Caches/keep')
   })
 })

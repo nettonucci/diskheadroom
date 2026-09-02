@@ -40,7 +40,8 @@ type ProgressFn = (progress: ScanProgress) => void
 export async function runScan(
   unusedDays: UnusedDays,
   onProgress: ProgressFn,
-  categories: ScanCategoryFlags = DEFAULT_SCAN_CATEGORIES
+  categories: ScanCategoryFlags = DEFAULT_SCAN_CATEGORIES,
+  neverTouchPaths: string[] = []
 ): Promise<ScanResult> {
   const items: ScanItem[] = []
   const perms = await getPermissionStatus()
@@ -114,7 +115,10 @@ export async function runScan(
   onProgress({ phase: 'progress.done', percent: 100 })
 
   return {
-    items: items.filter((item) => item.bytes > 0 && isSafePath(item.path)),
+    items: items.filter(
+      (item) =>
+        item.bytes > 0 && isSafePath(item.path) && !isNeverTouchPath(item.path, neverTouchPaths)
+    ),
     scannedAt: new Date().toISOString(),
     limited: !perms.fullDiskAccess
   }
@@ -564,6 +568,17 @@ export function isSafePath(target: string): boolean {
   if (resolved === '/' || resolved === home) return false
   if (resolved === join(home, 'Documents') || resolved === join(home, 'Desktop')) return false
   return !BLOCKED_PREFIXES.some((prefix) => resolved === prefix || resolved.startsWith(`${prefix}/`))
+}
+
+/** True when `target` is the never-touch path itself or a descendant of one. */
+export function isNeverTouchPath(target: string, prefixes: string[]): boolean {
+  if (!Array.isArray(prefixes) || prefixes.length === 0) return false
+  const resolved = resolvePath(target)
+  return prefixes.some((raw) => {
+    if (typeof raw !== 'string' || !raw.trim()) return false
+    const prefix = resolvePath(raw)
+    return resolved === prefix || resolved.startsWith(`${prefix}/`)
+  })
 }
 
 async function directorySize(path: string): Promise<number> {
