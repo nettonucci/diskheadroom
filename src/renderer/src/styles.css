@@ -601,3 +601,40 @@ select {
 .donate-panel .btn.primary {
   margin-top: 8px;
 }
+
+.forecast-card {
+  margin-top: 18px;
+}
+
+.forecast-header h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.forecast-header p {
+  margin: 0 0 12px;
+}
+
+.forecast-headline {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.forecast-details p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.pro-cta .row {
+  margin-top: 8px;
+}
+
+.notice.ok {
+  border-color: rgba(125, 206, 160, 0.28);
+  background: rgba(125, 206, 160, 0.08);
+  color: var(--ok);
+}

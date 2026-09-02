@@ -5,6 +5,8 @@ import type {
   CleanResult,
   DiskInfo,
   GrantTarget,
+  HeadroomForecast,
+  HeadroomSample,
   LowDiskDebugStatus,
   PermissionStatus,
   ScanProgress,
@@ -33,6 +35,8 @@ const debug: DebugApi | null = import.meta.env.DEV
 
 const api = {
   getDiskInfo: (): Promise<DiskInfo> => ipcRenderer.invoke('disk:info'),
+  getForecast: (): Promise<HeadroomForecast> => ipcRenderer.invoke('forecast:get'),
+  getHeadroomSamples: (): Promise<HeadroomSample[]> => ipcRenderer.invoke('forecast:samples'),
   getPermissions: (): Promise<PermissionStatus> => ipcRenderer.invoke('permissions:status'),
   openFullDiskAccess: (): Promise<void> => ipcRenderer.invoke('permissions:open-fda'),
   getGrantTarget: (): Promise<GrantTarget> => ipcRenderer.invoke('permissions:grant-target'),

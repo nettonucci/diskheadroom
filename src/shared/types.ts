@@ -69,6 +69,33 @@ export interface GrantTarget {
   launchedBy: string | null
 }
 
+export interface HeadroomSample {
+  timestamp: number
+  freeBytes: number
+  totalBytes: number
+  junkBytes?: number
+  categoryTotals?: Record<string, number>
+}
+
+export type ForecastStatus =
+  | 'insufficient_data'
+  | 'steady'
+  | 'declining'
+  | 'critical'
+  | 'gated'
+
+export interface HeadroomForecast {
+  status: ForecastStatus
+  daysRemaining: number | null
+  estimatedDate: string | null
+  dailyDeclineBytes: number
+  currentFreeBytes: number
+  thresholdBytes: number
+  sampleCount: number
+  oldestSampleAt: number | null
+  latestSampleAt: number | null
+}
+
 export interface AppSettings {
   unusedDays: UnusedDays
   setupComplete: boolean
@@ -77,6 +104,7 @@ export interface AppSettings {
   lowDiskAlert: LowDiskAlertSettings
   launchAtLogin: boolean
   scanReminder: ScanReminderSettings
+  isPro: boolean
 }
 
 /** Development-only snapshot behind the Debug tab. Never registered in a packaged build. */

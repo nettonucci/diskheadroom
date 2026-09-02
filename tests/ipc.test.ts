@@ -14,7 +14,10 @@ const mocks = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   runScan: vi.fn(),
   trashPaths: vi.fn(),
-  applyLaunchAtLogin: vi.fn()
+  applyLaunchAtLogin: vi.fn(),
+  getHeadroomForecast: vi.fn(),
+  loadHeadroomSamples: vi.fn(),
+  recordHeadroomSample: vi.fn()
 }))
 
 vi.mock('electron', () => {
@@ -46,6 +49,11 @@ vi.mock('../src/main/scanner', async () => {
 })
 vi.mock('../src/main/cleaner', () => ({ trashPaths: mocks.trashPaths }))
 vi.mock('../src/main/loginItem', () => ({ applyLaunchAtLogin: mocks.applyLaunchAtLogin }))
+vi.mock('../src/main/forecast', () => ({
+  getHeadroomForecast: mocks.getHeadroomForecast,
+  loadHeadroomSamples: mocks.loadHeadroomSamples,
+  recordHeadroomSample: mocks.recordHeadroomSample
+}))
 
 import { registerIpc } from '../src/main/ipc'
 
@@ -58,24 +66,32 @@ const call = (channel: string, ...args: unknown[]): unknown => {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.handlers.clear()
+  mocks.recordHeadroomSample.mockResolvedValue([])
+  mocks.loadHeadroomSamples.mockResolvedValue([])
+  mocks.getHeadroomForecast.mockResolvedValue({ status: 'gated' })
 })
 
 describe('IPC registration', () => {
   it('wires information and permission handlers', async () => {
-    mocks.getDiskInfo.mockResolvedValue({ mount: '/' })
+    mocks.getDiskInfo.mockResolvedValue({ mount: '/', freeBytes: 500, totalBytes: 1000 })
     mocks.getPermissionStatus.mockResolvedValue({ fullDiskAccess: true })
     mocks.getGrantTarget.mockReturnValue({ displayName: 'Disk Headroom' })
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
+    mocks.getHeadroomForecast.mockResolvedValue({ status: 'steady' })
+    mocks.loadHeadroomSamples.mockResolvedValue([])
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(12)
-    await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
+    expect(mocks.handlers.size).toBe(15)
+    await expect(call('disk:info')).resolves.toEqual({ mount: '/', freeBytes: 500, totalBytes: 1000 })
+    expect(mocks.recordHeadroomSample).toHaveBeenCalledWith({ freeBytes: 500, totalBytes: 1000 })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
     expect(call('permissions:grant-target')).toEqual({ displayName: 'Disk Headroom' })
     call('permissions:reveal-target')
     expect(mocks.revealGrantTarget).toHaveBeenCalled()
     await expect(call('settings:get')).resolves.toEqual({ locale: 'en' })
+    await expect(call('forecast:get')).resolves.toEqual({ status: 'steady' })
+    await expect(call('forecast:samples')).resolves.toEqual([])
   })
 
   it('saves settings and updates the tray locale when available', async () => {
