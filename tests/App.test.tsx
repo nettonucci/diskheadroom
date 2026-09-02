@@ -88,6 +88,8 @@ function api(overrides: Partial<Api> = {}): Api {
       bytesRequested: 2048
     }),
     pickFolder: vi.fn().mockResolvedValue(null),
+    getLicenseStatus: vi.fn().mockResolvedValue({ isPro: false }),
+    activateLicense: vi.fn().mockResolvedValue({ isPro: false }),
     openExternal: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
     revealItem: vi.fn().mockResolvedValue(true),

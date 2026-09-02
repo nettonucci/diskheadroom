@@ -102,3 +102,8 @@ export interface CleanResult {
   failed: { path: string; error: string }[]
   bytesRequested: number
 }
+
+/** Renderer-facing entitlement. The signed key never crosses the preload. */
+export interface LicenseStatus {
+  isPro: boolean
+}

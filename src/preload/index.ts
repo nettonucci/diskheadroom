@@ -5,6 +5,7 @@ import type {
   CleanResult,
   DiskInfo,
   GrantTarget,
+  LicenseStatus,
   LowDiskDebugStatus,
   PermissionStatus,
   ScanProgress,
@@ -37,6 +38,9 @@ const api = {
   openFullDiskAccess: (): Promise<void> => ipcRenderer.invoke('permissions:open-fda'),
   getGrantTarget: (): Promise<GrantTarget> => ipcRenderer.invoke('permissions:grant-target'),
   revealGrantTarget: (): Promise<void> => ipcRenderer.invoke('permissions:reveal-target'),
+  getLicenseStatus: (): Promise<LicenseStatus> => ipcRenderer.invoke('license:status'),
+  activateLicense: (key: string): Promise<LicenseStatus> =>
+    ipcRenderer.invoke('license:activate', key),
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
   setSettings: (settings: AppSettings): Promise<AppSettings> =>
     ipcRenderer.invoke('settings:set', settings),
