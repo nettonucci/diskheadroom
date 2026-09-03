@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import type { LowDiskDebugStatus } from '../shared/types'
+import { deactivateLicense } from './license'
 import type { LowDiskAlertWatcher } from './lowDiskAlert'
 
 /**
@@ -26,4 +27,8 @@ export function registerDebugIpc(watcher: LowDiskAlertWatcher): void {
     const shown = await watcher.notifyNow()
     return { shown, status: await status() }
   })
+  // Testing a paid finder means seeing both sides of the gate. Activation needs a
+  // signed key, so without this the only way back to the free state is deleting
+  // the license file by hand.
+  ipcMain.handle('debug:license-deactivate', () => deactivateLicense())
 }

@@ -19,6 +19,7 @@ export interface DebugApi {
   runLowDiskCheck: () => Promise<LowDiskDebugStatus>
   resetLowDiskCooldown: () => Promise<LowDiskDebugStatus>
   sendLowDiskNotification: () => Promise<{ shown: boolean; status: LowDiskDebugStatus }>
+  deactivateLicense: () => Promise<LicenseStatus>
 }
 
 // Dropped from the bundle on a production build, so a packaged app exposes no
@@ -29,7 +30,8 @@ const debug: DebugApi | null = import.meta.env.DEV
       simulateFreePercent: (percent) => ipcRenderer.invoke('debug:low-disk-simulate', percent),
       runLowDiskCheck: () => ipcRenderer.invoke('debug:low-disk-check'),
       resetLowDiskCooldown: () => ipcRenderer.invoke('debug:low-disk-reset'),
-      sendLowDiskNotification: () => ipcRenderer.invoke('debug:low-disk-notify')
+      sendLowDiskNotification: () => ipcRenderer.invoke('debug:low-disk-notify'),
+      deactivateLicense: () => ipcRenderer.invoke('debug:license-deactivate')
     }
   : null
 

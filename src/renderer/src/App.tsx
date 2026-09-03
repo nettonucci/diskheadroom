@@ -454,7 +454,9 @@ function AppShell(): JSX.Element {
           />
         )}
         {view === 'donate' && <DonateView t={t} />}
-        {import.meta.env.DEV && view === 'debug' && <DebugView />}
+        {import.meta.env.DEV && view === 'debug' && (
+          <DebugView isPro={isPro} onLicenseChange={setIsPro} />
+        )}
       </main>
       {confirmCleanOpen && (
         <ConfirmDialog
@@ -1304,7 +1306,10 @@ const SIMULATION_OPTIONS = [0, 2, 5, 8, 12, 20, 40] as const
 // Development-only harness for the low disk alert: pin free space, run the real
 // check, and inspect the cooldown without waiting for the disk to fill up.
 // Copy stays in English and out of languages.json because it never ships.
-function DebugView(): JSX.Element {
+function DebugView(props: {
+  isPro: boolean
+  onLicenseChange: (isPro: boolean) => void
+}): JSX.Element {
   const debug = window.diskheadroom.debug
   const [status, setStatus] = useState<LowDiskDebugStatus | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -1444,6 +1449,36 @@ function DebugView(): JSX.Element {
           </button>
         </div>
         {note && <p className="muted">{note}</p>}
+      </div>
+      <div className="card">
+        <h3>Pro license</h3>
+        <dl className="debug-grid">
+          <dt>Entitlement</dt>
+          <dd>{props.isPro ? 'Pro active' : 'free'}</dd>
+        </dl>
+        <p className="muted">
+          Removes the stored key so gated finders fall back to the free state. Paste a signed key
+          under Settings to activate Pro again.
+        </p>
+        <div className="debug-actions">
+          <button
+            className="btn"
+            type="button"
+            disabled={busy || !props.isPro}
+            onClick={() => {
+              setBusy(true)
+              void debug
+                .deactivateLicense()
+                .then((status) => {
+                  props.onLicenseChange(isProEntitled(status.isPro))
+                  setNote(`Pro license removed at ${new Date().toLocaleTimeString()}`)
+                })
+                .finally(() => setBusy(false))
+            }}
+          >
+            Remove Pro license
+          </button>
+        </div>
       </div>
     </section>
   )

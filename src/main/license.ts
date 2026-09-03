@@ -149,6 +149,13 @@ export async function getLicenseStatus(): Promise<LicenseStatus> {
   return { isPro: stored ? verifyLicenseKey(stored) : false }
 }
 
+/** Drops the stored key from both the Keychain blob and the JSON fallback. */
+export async function deactivateLicense(): Promise<LicenseStatus> {
+  await clearKeychainLicense()
+  await setLicenseKeyFallback(null)
+  return { isPro: false }
+}
+
 export async function activateLicense(raw: unknown): Promise<LicenseStatus> {
   if (!verifyLicenseKey(raw)) {
     return { isPro: false }

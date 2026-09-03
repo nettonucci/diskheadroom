@@ -99,7 +99,8 @@ function api(overrides: Partial<Api> = {}): Api {
       simulateFreePercent: vi.fn().mockResolvedValue({ ...debugStatus, simulatedFreePercent: 5 }),
       runLowDiskCheck: vi.fn().mockResolvedValue(debugStatus),
       resetLowDiskCooldown: vi.fn().mockResolvedValue(debugStatus),
-      sendLowDiskNotification: vi.fn().mockResolvedValue({ shown: true, status: debugStatus })
+      sendLowDiskNotification: vi.fn().mockResolvedValue({ shown: true, status: debugStatus }),
+      deactivateLicense: vi.fn().mockResolvedValue({ isPro: false })
     },
     onScanProgress: vi.fn(() => () => {}),
     onTrayScan: vi.fn(() => () => {}),
@@ -832,6 +833,28 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset cooldown' }))
     await waitFor(() => expect(bridge.debug?.resetLowDiskCooldown).toHaveBeenCalled())
+  })
+
+  it('removes the Pro license from the Debug tab so the gate can be retested', async () => {
+    const bridge = api({ getLicenseStatus: vi.fn().mockResolvedValue({ isPro: true }) })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('checkbox', { name: 'Large files' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: 'Debug' }))
+    expect(await screen.findByText('Pro active')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pro license' }))
+    await waitFor(() => expect(bridge.debug?.deactivateLicense).toHaveBeenCalled())
+    expect(await screen.findByText('free')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove Pro license' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('checkbox', { name: /Large files/ })).toBeDisabled()
   })
 
   it('falls back to a notice when the preload exposes no debug bridge', async () => {
