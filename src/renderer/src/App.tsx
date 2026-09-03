@@ -8,9 +8,14 @@ import {
   LOW_DISK_ALERT_PRESETS,
   SCAN_REMINDER_INTERVAL_DAYS,
   LARGE_FILE_MIN_BYTES_OPTIONS,
+  DOWNLOADS_MIN_DAYS_OPTIONS,
+  DOWNLOADS_MIN_BYTES_OPTIONS,
+  isProScanCategory,
   lowDiskAlertPresetKey,
   parseLowDiskAlertPreset,
   type LargeFileMinBytes,
+  type DownloadsMinBytes,
+  type DownloadsMinDays,
   type LowDiskAlertSettings,
   type ScanCategoryFlag,
   type ScanReminderSettings,
@@ -208,7 +213,9 @@ function AppShell(): JSX.Element {
       const next = await window.diskheadroom.runScan({
         unusedDays: settings.unusedDays,
         categories: settings.scanCategories,
-        largeFileMinBytes: settings.largeFileMinBytes
+        largeFileMinBytes: settings.largeFileMinBytes,
+        downloadsMinDays: settings.downloadsMinDays,
+        downloadsMinBytes: settings.downloadsMinBytes
       })
       setResult(next)
       const initial: Record<string, boolean> = {}
@@ -265,6 +272,14 @@ function AppShell(): JSX.Element {
 
   async function updateLargeFileMinBytes(largeFileMinBytes: LargeFileMinBytes): Promise<void> {
     await updateSettings(() => ({ largeFileMinBytes }))
+  }
+
+  async function updateDownloadsMinDays(downloadsMinDays: DownloadsMinDays): Promise<void> {
+    await updateSettings(() => ({ downloadsMinDays }))
+  }
+
+  async function updateDownloadsMinBytes(downloadsMinBytes: DownloadsMinBytes): Promise<void> {
+    await updateSettings(() => ({ downloadsMinBytes }))
   }
 
   async function updateLocale(nextLocale: Locale): Promise<void> {
@@ -441,6 +456,8 @@ function AppShell(): JSX.Element {
             settings={settings}
             onUnusedDays={(value) => void updateUnusedDays(value)}
             onLargeFileMinBytes={(value) => void updateLargeFileMinBytes(value)}
+            onDownloadsMinDays={(value) => void updateDownloadsMinDays(value)}
+            onDownloadsMinBytes={(value) => void updateDownloadsMinBytes(value)}
             onLocale={(value) => void updateLocale(value)}
             onScanCategory={(id, enabled) => void updateScanCategory(id, enabled)}
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
@@ -762,7 +779,9 @@ function ResultItemRow(props: {
         <span>
           <strong>{item.nameKey ? t(item.nameKey) : item.name}</strong>
           <div className="path">{item.path}</div>
-          {(item.categoryId === 'unusedApps' || item.categoryId === 'idleUserFolders') && (
+          {(item.categoryId === 'unusedApps' ||
+            item.categoryId === 'idleUserFolders' ||
+            item.categoryId === 'downloadsReview') && (
             <div className="muted">
               {t('results.lastUsed', {
                 date: item.lastUsedAt
@@ -964,6 +983,8 @@ function SettingsView(props: {
   settings: AppSettings
   onUnusedDays: (value: UnusedDays) => void
   onLargeFileMinBytes: (value: LargeFileMinBytes) => void
+  onDownloadsMinDays: (value: DownloadsMinDays) => void
+  onDownloadsMinBytes: (value: DownloadsMinBytes) => void
   onLocale: (value: Locale) => void
   onScanCategory: (id: ScanCategoryFlag, enabled: boolean) => void
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
@@ -1027,12 +1048,12 @@ function SettingsView(props: {
             <label key={id} className="scan-flag">
               <input
                 type="checkbox"
-                checked={props.settings.scanCategories[id] && (id !== 'largeFiles' || props.isPro)}
-                disabled={id === 'largeFiles' && !props.isPro}
+                checked={props.settings.scanCategories[id] && (!isProScanCategory(id) || props.isPro)}
+                disabled={isProScanCategory(id) && !props.isPro}
                 onChange={(event) => props.onScanCategory(id, event.target.checked)}
               />
               <span>{props.t(SCAN_CATEGORY_LABELS[id])}</span>
-              {id === 'largeFiles' && !props.isPro && (
+              {isProScanCategory(id) && !props.isPro && (
                 <small className="pro-badge">{props.t('settings.proBadge')}</small>
               )}
             </label>
@@ -1050,6 +1071,55 @@ function SettingsView(props: {
           {LARGE_FILE_MIN_BYTES_OPTIONS.map((bytes) => (
             <option key={bytes} value={bytes}>
               {formatBytes(bytes)}
+            </option>
+          ))}
+        </select>
+        {!props.isPro && (
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() =>
+              void window.diskheadroom.openExternal(proCheckoutUrl(props.settings.locale))
+            }
+          >
+            {props.t('settings.largeFilesProCta')}
+          </button>
+        )}
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.downloadsTitle')}</h3>
+        <p className="muted">{props.t('settings.downloadsHint')}</p>
+        <label className="field-label" htmlFor="downloads-min-age">
+          {props.t('settings.downloadsMinAge')}
+        </label>
+        <select
+          id="downloads-min-age"
+          value={props.settings.downloadsMinDays}
+          disabled={!props.isPro}
+          onChange={(event) =>
+            props.onDownloadsMinDays(Number(event.target.value) as DownloadsMinDays)
+          }
+        >
+          {DOWNLOADS_MIN_DAYS_OPTIONS.map((days) => (
+            <option key={days} value={days}>
+              {days === 0 ? props.t('settings.downloadsAgeAny') : props.t('settings.days', { days })}
+            </option>
+          ))}
+        </select>
+        <label className="field-label" htmlFor="downloads-min-size">
+          {props.t('settings.downloadsMinSize')}
+        </label>
+        <select
+          id="downloads-min-size"
+          value={props.settings.downloadsMinBytes}
+          disabled={!props.isPro}
+          onChange={(event) =>
+            props.onDownloadsMinBytes(Number(event.target.value) as DownloadsMinBytes)
+          }
+        >
+          {DOWNLOADS_MIN_BYTES_OPTIONS.map((bytes) => (
+            <option key={bytes} value={bytes}>
+              {bytes === 0 ? props.t('settings.downloadsSizeAny') : formatBytes(bytes)}
             </option>
           ))}
         </select>

@@ -21,6 +21,8 @@ const settings = {
   locale: 'en' as const,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   largeFileMinBytes: 500 * 1024 * 1024 as const,
+  downloadsMinDays: 30 as const,
+  downloadsMinBytes: 50 * 1024 * 1024 as const,
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
   scanReminder: { enabled: false, intervalDays: 7 as const },
@@ -468,9 +470,38 @@ describe('App', () => {
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
 
-    expect(await screen.findByRole('heading', { name: 'Documents & Desktop' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Documents' })).toBeInTheDocument()
     expect(screen.getByText('Archive 2022')).toBeInTheDocument()
     expect(screen.getByText(/These are your files, not caches/)).toBeInTheDocument()
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
+  })
+
+  it('shows old Downloads items unchecked with a warning', async () => {
+    const downloadsResult = {
+      ...result,
+      items: [
+        {
+          id: 'dl-item',
+          categoryId: 'downloadsReview' as const,
+          name: 'OldInstaller.dmg',
+          path: '/Users/test/Downloads/OldInstaller.dmg',
+          bytes: 500 * 1024 * 1024,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: '2022-04-01T00:00:00.000Z',
+          daysIdle: 1400
+        }
+      ]
+    }
+    window.diskheadroom = api({ runScan: vi.fn().mockResolvedValue(downloadsResult) })
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+
+    expect(await screen.findByRole('heading', { name: 'Downloads' })).toBeInTheDocument()
+    expect(screen.getByText('OldInstaller.dmg')).toBeInTheDocument()
+    expect(screen.getByText(/Downloads often contains files and installers/)).toBeInTheDocument()
     expect(screen.getByRole('checkbox')).not.toBeChecked()
     expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
   })
@@ -648,8 +679,11 @@ describe('App', () => {
     await user.click(await screen.findByRole('button', { name: 'Settings' }))
 
     expect(screen.getByRole('checkbox', { name: /Large files/ })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: /Downloads/ })).toBeDisabled()
     expect(screen.getByDisplayValue('500 MB')).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'Get Pro to enable' }))
+    expect(screen.getByLabelText('Minimum age')).toBeDisabled()
+    expect(screen.getByLabelText('Minimum size')).toBeDisabled()
+    await user.click(screen.getAllByRole('button', { name: 'Get Pro to enable' })[0])
     expect(freeBridge.openExternal).toHaveBeenCalledWith('https://www.diskheadroom.com/en/pro')
 
     unmount()
@@ -658,12 +692,27 @@ describe('App', () => {
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Settings' }))
     expect(screen.getByRole('checkbox', { name: /Large files/ })).toBeEnabled()
+    expect(screen.getByRole('checkbox', { name: 'Downloads' })).toBeEnabled()
     fireEvent.change(screen.getByDisplayValue('500 MB'), {
       target: { value: String(1024 * 1024 * 1024) }
     })
     await waitFor(() =>
       expect(proBridge.setSettings).toHaveBeenCalledWith(
         expect.objectContaining({ largeFileMinBytes: 1024 * 1024 * 1024 })
+      )
+    )
+    fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '60' } })
+    await waitFor(() =>
+      expect(proBridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ downloadsMinDays: 60 })
+      )
+    )
+    fireEvent.change(screen.getByLabelText('Minimum size'), {
+      target: { value: String(100 * 1024 * 1024) }
+    })
+    await waitFor(() =>
+      expect(proBridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ downloadsMinBytes: 100 * 1024 * 1024 })
       )
     )
   })
@@ -805,7 +854,9 @@ describe('App', () => {
       expect(bridge.runScan).toHaveBeenCalledWith({
         unusedDays: 90,
         categories: DEFAULT_SCAN_CATEGORIES,
-        largeFileMinBytes: 500 * 1024 * 1024
+        largeFileMinBytes: 500 * 1024 * 1024,
+        downloadsMinDays: 30,
+        downloadsMinBytes: 50 * 1024 * 1024
       })
     )
   })

@@ -66,6 +66,10 @@ export const CATEGORY_META: Record<
     title: 'category.largeFiles.title',
     hint: 'category.largeFiles.hint'
   },
+  downloadsReview: {
+    title: 'category.downloadsReview.title',
+    hint: 'category.downloadsReview.hint'
+  },
   unusedApps: {
     title: 'category.unusedApps.title',
     hint: 'category.unusedApps.hint'
@@ -85,6 +89,7 @@ export const SCAN_CATEGORY_LABELS: Record<ScanCategoryFlag, TranslationKey> = {
   docker: 'progress.docker',
   idleUserFolders: 'progress.documentsDesktop',
   largeFiles: 'progress.largeFiles',
+  downloadsReview: 'progress.downloads',
   unusedApps: 'progress.apps'
 }
 
@@ -92,7 +97,8 @@ export const CATEGORY_WARNING: Partial<Record<ScanCategoryId, TranslationKey>> =
   dockerDesktop: 'category.dockerDesktop.warning',
   outdatedSimulators: 'category.outdatedSimulators.warning',
   idleUserFolders: 'category.idleUserFolders.warning',
-  largeFiles: 'category.largeFiles.warning'
+  largeFiles: 'category.largeFiles.warning',
+  downloadsReview: 'category.downloadsReview.warning'
 }
 
 export const NAV: { id: ViewId; label: TranslationKey }[] = [

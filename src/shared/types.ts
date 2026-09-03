@@ -1,4 +1,6 @@
 import type {
+  DownloadsMinBytes,
+  DownloadsMinDays,
   LargeFileMinBytes,
   LowDiskAlertSettings,
   ScanCategoryFlags,
@@ -23,6 +25,7 @@ export type ScanCategoryId =
   | 'androidDevCaches'
   | 'idleUserFolders'
   | 'largeFiles'
+  | 'downloadsReview'
   | 'unusedApps'
 
 export interface ScanItem {
@@ -54,6 +57,8 @@ export interface ScanOptions {
   unusedDays: UnusedDays
   categories?: Partial<ScanCategoryFlags>
   largeFileMinBytes?: LargeFileMinBytes
+  downloadsMinDays?: DownloadsMinDays
+  downloadsMinBytes?: DownloadsMinBytes
 }
 
 export interface DiskInfo {
@@ -84,6 +89,8 @@ export interface AppSettings {
   locale: Locale
   scanCategories: ScanCategoryFlags
   largeFileMinBytes: LargeFileMinBytes
+  downloadsMinDays: DownloadsMinDays
+  downloadsMinBytes: DownloadsMinBytes
   lowDiskAlert: LowDiskAlertSettings
   launchAtLogin: boolean
   scanReminder: ScanReminderSettings

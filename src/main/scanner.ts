@@ -5,6 +5,8 @@ import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
 import { promisify } from 'node:util'
 import {
+  DEFAULT_DOWNLOADS_MIN_BYTES,
+  DEFAULT_DOWNLOADS_MIN_DAYS,
   DEFAULT_LARGE_FILE_MIN_BYTES,
   DEFAULT_SCAN_CATEGORIES,
   type UnusedDays
@@ -30,6 +32,7 @@ const IDLE_USER_LIMIT = 24
 const LARGE_FILES_MAX_DEPTH = 6
 const LARGE_FILES_MAX_DIRS = 2000
 const LARGE_FILES_LIMIT = 50
+const DOWNLOADS_LIMIT = 50
 
 /** Top-level ~/Library/Caches names scanned as Homebrew or package-manager leftovers. */
 const USER_CACHE_SKIP = new Set([
@@ -60,6 +63,8 @@ export async function runScan(
     unusedDays,
     categories = DEFAULT_SCAN_CATEGORIES,
     largeFileMinBytes = DEFAULT_LARGE_FILE_MIN_BYTES,
+    downloadsMinDays = DEFAULT_DOWNLOADS_MIN_DAYS,
+    downloadsMinBytes = DEFAULT_DOWNLOADS_MIN_BYTES,
     neverTouchPaths = []
   } = options
   const items: ScanItem[] = []
@@ -129,6 +134,11 @@ export async function runScan(
   onProgress({ phase: 'progress.largeFiles', percent: 80 })
   if (categories.largeFiles) {
     items.push(...(await scanLargeHomeFiles(home, largeFileMinBytes)))
+  }
+
+  onProgress({ phase: 'progress.downloads', percent: 83 })
+  if (categories.downloadsReview) {
+    items.push(...(await scanDownloads(home, downloadsMinDays, downloadsMinBytes)))
   }
 
   onProgress({ phase: 'progress.apps', percent: 86 })
@@ -506,6 +516,57 @@ async function scanIdleUserFolders(home: string, unusedDays: UnusedDays): Promis
   return items.sort((left, right) => right.bytes - left.bytes).slice(0, IDLE_USER_LIMIT)
 }
 
+async function scanDownloads(
+  home: string,
+  minDays: number = DEFAULT_DOWNLOADS_MIN_DAYS,
+  minBytes: number = DEFAULT_DOWNLOADS_MIN_BYTES
+): Promise<ScanItem[]> {
+  const root = join(home, 'Downloads')
+  let names: string[] = []
+  try {
+    names = await readdir(root)
+  } catch {
+    return []
+  }
+
+  const now = Date.now()
+  const thresholdMs = minDays * 24 * 60 * 60 * 1000
+  const items: ScanItem[] = []
+
+  for (const name of names) {
+    if (name === '.DS_Store' || name === '.localized') continue
+    const path = join(root, name)
+    if (!isSafePath(path)) continue
+
+    let info
+    try {
+      info = await lstat(path)
+    } catch {
+      continue
+    }
+    if (info.isSymbolicLink()) continue
+    if (!Number.isFinite(info.mtimeMs)) continue
+    if (minDays > 0 && now - info.mtimeMs < thresholdMs) continue
+
+    const bytes = await directorySize(path)
+    if (bytes < minBytes || bytes <= 0) continue
+
+    items.push({
+      id: idFor(path),
+      categoryId: 'downloadsReview',
+      name,
+      path,
+      bytes,
+      selectedByDefault: false,
+      optional: true,
+      lastUsedAt: new Date(info.mtimeMs).toISOString(),
+      daysIdle: Math.floor((now - info.mtimeMs) / (24 * 60 * 60 * 1000))
+    })
+  }
+
+  return items.sort((left, right) => right.bytes - left.bytes).slice(0, DOWNLOADS_LIMIT)
+}
+
 /**
  * Recursively scans under the user's home folder for files exceeding minBytes.
  * Depth, directory visits and returned item count are capped to keep the walk bounded.
@@ -685,7 +746,13 @@ export function isSafePath(target: string): boolean {
   const resolved = resolvePath(target)
   const home = homedir()
   if (resolved === '/' || resolved === home) return false
-  if (resolved === join(home, 'Documents') || resolved === join(home, 'Desktop')) return false
+  if (
+    resolved === join(home, 'Documents') ||
+    resolved === join(home, 'Desktop') ||
+    resolved === join(home, 'Downloads')
+  ) {
+    return false
+  }
   return !BLOCKED_PREFIXES.some((prefix) => resolved === prefix || resolved.startsWith(`${prefix}/`))
 }
 

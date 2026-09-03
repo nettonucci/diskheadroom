@@ -3,15 +3,21 @@ import {
   DEFAULT_LARGE_FILE_MIN_BYTES,
   DEFAULT_UNUSED_DAYS,
   LARGE_FILE_MIN_BYTES_OPTIONS,
+  DEFAULT_DOWNLOADS_MIN_DAYS,
+  DOWNLOADS_MIN_DAYS_OPTIONS,
+  DEFAULT_DOWNLOADS_MIN_BYTES,
+  DOWNLOADS_MIN_BYTES_OPTIONS,
   MAX_NEVER_TOUCH_PATHS,
   UNUSED_DAY_OPTIONS,
   isAllowedExternalUrl,
+  mergeDownloadsMinBytes,
+  mergeDownloadsMinDays,
   mergeLargeFileMinBytes,
   mergeNeverTouchPaths,
   mergeScanCategories,
   proCheckoutUrl
 } from '../src/shared/constants'
-import { isProEntitled } from '../src/shared/entitlement'
+import { gateProScanCategories, isProEntitled } from '../src/shared/entitlement'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
 import { CATEGORY_META, NAV } from '../src/renderer/src/lib/copy'
 import { formatBytes, formatDate } from '../src/renderer/src/lib/format'
@@ -38,23 +44,39 @@ describe('shared helpers', () => {
     expect(LOCALES).toEqual(['en', 'pt-BR', 'es'])
     expect(LOCALE_NAMES['pt-BR']).toContain('Português')
     expect(NAV).toHaveLength(4)
-    expect(Object.keys(CATEGORY_META)).toHaveLength(16)
+    expect(Object.keys(CATEGORY_META)).toHaveLength(17)
     expect(UNUSED_DAY_OPTIONS).toContain(DEFAULT_UNUSED_DAYS)
     expect(LARGE_FILE_MIN_BYTES_OPTIONS).toContain(DEFAULT_LARGE_FILE_MIN_BYTES)
+    expect(DOWNLOADS_MIN_DAYS_OPTIONS).toContain(DEFAULT_DOWNLOADS_MIN_DAYS)
+    expect(DOWNLOADS_MIN_BYTES_OPTIONS).toContain(DEFAULT_DOWNLOADS_MIN_BYTES)
   })
 
-  it('merges scan categories respecting defaults (largeFiles off by default)', () => {
+  it('merges scan categories respecting defaults (largeFiles and downloadsReview off)', () => {
     expect(mergeScanCategories(undefined).unusedApps).toBe(true)
     expect(mergeScanCategories(undefined).largeFiles).toBe(false)
+    expect(mergeScanCategories(undefined).downloadsReview).toBe(false)
     expect(mergeScanCategories(null).unusedApps).toBe(true)
     expect(mergeScanCategories(null).largeFiles).toBe(false)
     expect(mergeScanCategories('all' as never).unusedApps).toBe(true)
     expect(mergeScanCategories({ unusedApps: 'no' } as never).unusedApps).toBe(true)
-    expect(mergeScanCategories({ unusedApps: false, largeFiles: true })).toMatchObject({
+    expect(
+      mergeScanCategories({ unusedApps: false, largeFiles: true, downloadsReview: true })
+    ).toMatchObject({
       unusedApps: false,
       largeFiles: true,
+      downloadsReview: true,
       userCaches: true
     })
+  })
+
+  it('merges downloads min days and bytes onto the allowlists', () => {
+    expect(mergeDownloadsMinDays(60)).toBe(60)
+    expect(mergeDownloadsMinDays(0)).toBe(0)
+    expect(mergeDownloadsMinDays('invalid' as never)).toBe(DEFAULT_DOWNLOADS_MIN_DAYS)
+    expect(mergeDownloadsMinDays(-1)).toBe(DEFAULT_DOWNLOADS_MIN_DAYS)
+    expect(mergeDownloadsMinBytes(10 * 1024 * 1024)).toBe(10 * 1024 * 1024)
+    expect(mergeDownloadsMinBytes(0)).toBe(0)
+    expect(mergeDownloadsMinBytes(999)).toBe(DEFAULT_DOWNLOADS_MIN_BYTES)
   })
 
   it('merges large file min bytes floor safely', () => {
@@ -92,6 +114,19 @@ describe('shared helpers', () => {
   it('treats only a true isPro flag as entitled', () => {
     expect(isProEntitled(true)).toBe(true)
     expect(isProEntitled(false)).toBe(false)
+  })
+
+  it('turns paid scan walks off unless the signed key is valid', () => {
+    const requested = mergeScanCategories({ largeFiles: true, downloadsReview: true })
+    expect(gateProScanCategories(requested, false)).toMatchObject({
+      largeFiles: false,
+      downloadsReview: false,
+      userCaches: true
+    })
+    expect(gateProScanCategories(requested, true)).toMatchObject({
+      largeFiles: true,
+      downloadsReview: true
+    })
   })
 })
 
