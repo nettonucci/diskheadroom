@@ -46,10 +46,19 @@ export const SCAN_CATEGORY_IDS = [
   'docker',
   'idleUserFolders',
   'largeFiles',
+  'downloadsReview',
   'unusedApps'
 ] as const
 export type ScanCategoryFlag = (typeof SCAN_CATEGORY_IDS)[number]
 export type ScanCategoryFlags = Record<ScanCategoryFlag, boolean>
+
+/** Categories that walk user files and require a valid Pro key in main. */
+export const PRO_SCAN_CATEGORY_IDS = ['largeFiles', 'downloadsReview'] as const
+export type ProScanCategoryId = (typeof PRO_SCAN_CATEGORY_IDS)[number]
+
+export function isProScanCategory(id: ScanCategoryFlag): boolean {
+  return (PRO_SCAN_CATEGORY_IDS as readonly string[]).includes(id)
+}
 
 export const DEFAULT_SCAN_CATEGORIES: ScanCategoryFlags = {
   userCaches: true,
@@ -62,6 +71,7 @@ export const DEFAULT_SCAN_CATEGORIES: ScanCategoryFlags = {
   docker: true,
   idleUserFolders: true,
   largeFiles: false,
+  downloadsReview: false,
   unusedApps: true
 }
 
@@ -97,6 +107,41 @@ export function mergeLargeFileMinBytes(input: unknown): LargeFileMinBytes {
     return input as LargeFileMinBytes
   }
   return DEFAULT_LARGE_FILE_MIN_BYTES
+}
+
+export const DOWNLOADS_MIN_DAYS_OPTIONS = [0, 7, 14, 30, 60, 90, 180, 365] as const
+export type DownloadsMinDays = (typeof DOWNLOADS_MIN_DAYS_OPTIONS)[number]
+export const DEFAULT_DOWNLOADS_MIN_DAYS: DownloadsMinDays = 30
+
+export const DOWNLOADS_MIN_BYTES_OPTIONS = [
+  0,
+  10 * 1024 * 1024,
+  50 * 1024 * 1024,
+  100 * 1024 * 1024,
+  500 * 1024 * 1024,
+  1024 * 1024 * 1024
+] as const
+export type DownloadsMinBytes = (typeof DOWNLOADS_MIN_BYTES_OPTIONS)[number]
+export const DEFAULT_DOWNLOADS_MIN_BYTES: DownloadsMinBytes = 50 * 1024 * 1024
+
+export function mergeDownloadsMinDays(input: unknown): DownloadsMinDays {
+  if (
+    typeof input === 'number' &&
+    (DOWNLOADS_MIN_DAYS_OPTIONS as readonly number[]).includes(input)
+  ) {
+    return input as DownloadsMinDays
+  }
+  return DEFAULT_DOWNLOADS_MIN_DAYS
+}
+
+export function mergeDownloadsMinBytes(input: unknown): DownloadsMinBytes {
+  if (
+    typeof input === 'number' &&
+    (DOWNLOADS_MIN_BYTES_OPTIONS as readonly number[]).includes(input)
+  ) {
+    return input as DownloadsMinBytes
+  }
+  return DEFAULT_DOWNLOADS_MIN_BYTES
 }
 
 export const LOW_DISK_ALERT_KINDS = ['percent', 'gigabytes'] as const

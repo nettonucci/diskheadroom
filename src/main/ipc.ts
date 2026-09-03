@@ -1,13 +1,16 @@
 import { clipboard, dialog, ipcMain, shell } from 'electron'
 import { resolve as resolvePath } from 'node:path'
 import {
+  mergeDownloadsMinBytes,
+  mergeDownloadsMinDays,
   mergeLargeFileMinBytes,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeNeverTouchPaths,
   mergeScanCategories,
   mergeScanReminder,
-  isAllowedExternalUrl
+  isAllowedExternalUrl,
+  PRO_SCAN_CATEGORY_IDS
 } from '../shared/constants'
 import type { AppSettings, CleanRequest, ScanItem, ScanOptions } from '../shared/types'
 import { trashPaths } from './cleaner'
@@ -22,6 +25,7 @@ import {
 import { isSafePath, runScan } from './scanner'
 import { activateLicense, getLicenseStatus } from './license'
 import { loadSettings, saveSettings } from './settings'
+import { gateProScanCategories } from '../shared/entitlement'
 import type { TrayController } from './tray'
 
 interface IpcOptions {
@@ -54,6 +58,8 @@ export function registerIpc(options: IpcOptions): void {
       ...next,
       scanCategories: mergeScanCategories(next.scanCategories),
       largeFileMinBytes: mergeLargeFileMinBytes(next.largeFileMinBytes),
+      downloadsMinDays: mergeDownloadsMinDays(next.downloadsMinDays),
+      downloadsMinBytes: mergeDownloadsMinBytes(next.downloadsMinBytes),
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
       scanReminder: mergeScanReminder(next.scanReminder),
@@ -69,17 +75,19 @@ export function registerIpc(options: IpcOptions): void {
     'scan:run',
     async (_event, input: ScanOptions) => {
       const settings = await loadSettings()
-      const categories = mergeScanCategories(input?.categories)
-      if (categories.largeFiles) {
+      let categories = mergeScanCategories(input?.categories)
+      if (PRO_SCAN_CATEGORY_IDS.some((id) => categories[id])) {
         // Entitlement is verified from the signed key in main on every requested
-        // home walk. Renderer state can only affect presentation, never access.
-        categories.largeFiles = (await getLicenseStatus()).isPro
+        // paid walk. Renderer state can only affect presentation, never access.
+        categories = gateProScanCategories(categories, (await getLicenseStatus()).isPro)
       }
       const result = await runScan(
         {
           unusedDays: input?.unusedDays,
           categories,
           largeFileMinBytes: mergeLargeFileMinBytes(input?.largeFileMinBytes),
+          downloadsMinDays: mergeDownloadsMinDays(input?.downloadsMinDays),
+          downloadsMinBytes: mergeDownloadsMinBytes(input?.downloadsMinBytes),
           neverTouchPaths: mergeNeverTouchPaths(settings.neverTouchPaths)
         },
         (progress) => {

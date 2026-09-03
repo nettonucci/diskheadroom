@@ -108,6 +108,8 @@ describe('IPC registration', () => {
         locale: 'pt-BR',
         scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true, largeFiles: false }),
         largeFileMinBytes: 500 * 1024 * 1024,
+        downloadsMinDays: 30,
+        downloadsMinBytes: 50 * 1024 * 1024,
         lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
         launchAtLogin: false,
         scanReminder: { enabled: false, intervalDays: 7 },
@@ -136,12 +138,16 @@ describe('IPC registration', () => {
       locale: 'en',
       scanCategories: {},
       largeFileMinBytes: 250 * 1024 * 1024,
+      downloadsMinDays: 60,
+      downloadsMinBytes: 100 * 1024 * 1024,
       launchAtLogin: true,
       scanReminder: { enabled: true, intervalDays: 14 }
     })
     expect(saved).toEqual(
       expect.objectContaining({
         largeFileMinBytes: 250 * 1024 * 1024,
+        downloadsMinDays: 60,
+        downloadsMinBytes: 100 * 1024 * 1024,
         launchAtLogin: true,
         scanReminder: { enabled: true, intervalDays: 14 }
       })
@@ -166,7 +172,9 @@ describe('IPC registration', () => {
     await call('scan:run', {
       unusedDays: 90,
       categories: { unusedApps: false },
-      largeFileMinBytes: 100 * 1024 * 1024
+      largeFileMinBytes: 100 * 1024 * 1024,
+      downloadsMinDays: 7,
+      downloadsMinBytes: 10 * 1024 * 1024
     })
     expect(onScanCompleted).toHaveBeenCalledTimes(1)
     expect(sendToRenderer).toHaveBeenCalledWith('scan:progress', {
@@ -178,6 +186,8 @@ describe('IPC registration', () => {
         unusedDays: 90,
         categories: expect.objectContaining({ unusedApps: false, userCaches: true }),
         largeFileMinBytes: 100 * 1024 * 1024,
+        downloadsMinDays: 7,
+        downloadsMinBytes: 10 * 1024 * 1024,
         neverTouchPaths: []
       }),
       expect.any(Function)
@@ -229,20 +239,24 @@ describe('IPC registration', () => {
     )
   })
 
-  it('allows the large-files home walk only with a valid main-process entitlement', async () => {
+  it('allows paid scan walks only with a valid main-process entitlement', async () => {
     mocks.runScan.mockResolvedValue({ items: [], scannedAt: '2025-01-01', limited: false })
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
     const request = {
       unusedDays: 90,
-      categories: { largeFiles: true },
-      largeFileMinBytes: 1024 * 1024 * 1024
+      categories: { largeFiles: true, downloadsReview: true },
+      largeFileMinBytes: 1024 * 1024 * 1024,
+      downloadsMinDays: 14,
+      downloadsMinBytes: 100 * 1024 * 1024
     }
 
     await call('scan:run', request)
     expect(mocks.getLicenseStatus).toHaveBeenCalledTimes(1)
     expect(mocks.runScan).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        categories: expect.objectContaining({ largeFiles: false })
+        categories: expect.objectContaining({ largeFiles: false, downloadsReview: false }),
+        downloadsMinDays: 14,
+        downloadsMinBytes: 100 * 1024 * 1024
       }),
       expect.any(Function)
     )
@@ -251,7 +265,24 @@ describe('IPC registration', () => {
     await call('scan:run', request)
     expect(mocks.runScan).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        categories: expect.objectContaining({ largeFiles: true })
+        categories: expect.objectContaining({ largeFiles: true, downloadsReview: true })
+      }),
+      expect.any(Function)
+    )
+  })
+
+  it('rejects unsanitized downloads thresholds on scan:run', async () => {
+    mocks.runScan.mockResolvedValue({ items: [], scannedAt: '2025-01-01', limited: false })
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    await call('scan:run', {
+      unusedDays: 90,
+      downloadsMinDays: -1,
+      downloadsMinBytes: 999
+    })
+    expect(mocks.runScan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        downloadsMinDays: 30,
+        downloadsMinBytes: 50 * 1024 * 1024
       }),
       expect.any(Function)
     )

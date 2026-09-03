@@ -42,19 +42,25 @@ import {
   type ScanCategoryFlags,
   type UnusedDays
 } from '../src/shared/constants'
+import type { ScanRunOptions } from '../src/main/scanner'
 
 function runScan(
   unusedDays: UnusedDays,
   onProgress: Parameters<typeof runScanWithOptions>[1],
   categories: ScanCategoryFlags = DEFAULT_SCAN_CATEGORIES,
-  extra?: LargeFileMinBytes | string[]
+  extra?: LargeFileMinBytes | string[] | Partial<ScanRunOptions>
 ): ReturnType<typeof runScanWithOptions> {
+  const extraOptions =
+    typeof extra === 'number'
+      ? { largeFileMinBytes: extra }
+      : Array.isArray(extra)
+        ? { neverTouchPaths: extra }
+        : (extra ?? {})
   return runScanWithOptions(
     {
       unusedDays,
       categories,
-      ...(typeof extra === 'number' ? { largeFileMinBytes: extra } : {}),
-      ...(Array.isArray(extra) ? { neverTouchPaths: extra } : {})
+      ...extraOptions
     },
     onProgress
   )
@@ -121,8 +127,11 @@ describe('path safety', () => {
     ['/Users/test/Library/Android/sdk/cache', true],
     ['/Users/test/Documents', false],
     ['/Users/test/Desktop', false],
+    ['/Users/test/Downloads', false],
     ['/Users/test/Documents/Archive 2022', true],
-    ['/Users/test/Desktop/OldBackup.iso', true]
+    ['/Users/test/Desktop/OldBackup.iso', true],
+    ['/Users/test/Downloads/installer.dmg', true],
+    ['/Users/test/Downloads/OldFolder', true]
   ])('classifies %s', (path, safe) => {
     expect(isSafePath(path)).toBe(safe)
   })
@@ -205,12 +214,13 @@ describe('runScan', () => {
       'Never'
     ])
     expect(result.items.every((item) => item.bytes > 0)).toBe(true)
-    expect(progress).toHaveBeenCalledTimes(12)
+    expect(progress).toHaveBeenCalledTimes(13)
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.packageManagers', percent: 44 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.androidDev', percent: 68 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.docker', percent: 72 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.documentsDesktop', percent: 76 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.largeFiles', percent: 80 })
+    expect(progress).toHaveBeenCalledWith({ phase: 'progress.downloads', percent: 83 })
     expect(progress).toHaveBeenLastCalledWith({ phase: 'progress.done', percent: 100 })
   })
 
@@ -271,7 +281,7 @@ describe('runScan', () => {
     expect(mocks.lstat).not.toHaveBeenCalled()
     expect(mocks.execFile).not.toHaveBeenCalled()
     // Every phase is still announced so the progress bar does not look stuck.
-    expect(progress).toHaveBeenCalledTimes(12)
+    expect(progress).toHaveBeenCalledTimes(13)
   })
 
   it('scans Xcode Archives, CoreSimulator caches and unavailable simulators as opt-in', async () => {
@@ -701,6 +711,69 @@ describe('runScan', () => {
     const result = await runScan(90, vi.fn())
     expect(result.items).toHaveLength(1)
     expect(result.items[0]).toMatchObject({ name: 'FreshUnknown', lastUsedAt: null })
+  })
+
+  it('scans Downloads with age and size filters, skips symlinks and caps at 50', async () => {
+    const home = '/Users/test'
+    const downloads = `${home}/Downloads`
+    const now = Date.now()
+    const ninetyDaysAgo = now - 90 * 86400000
+    const tenDaysAgo = now - 10 * 86400000
+
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === downloads) {
+        return [
+          '.DS_Store',
+          '.localized',
+          'symlink.zip',
+          'old_large.dmg',
+          'old_small.txt',
+          'recent_large.iso',
+          'old_folder',
+          ...Array.from({ length: 51 }, (_, index) => `cap-${index}.bin`)
+        ]
+      }
+      if (path === `${downloads}/old_folder`) return ['nested_file.bin']
+      return []
+    })
+
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path.endsWith('.DS_Store') || path.endsWith('.localized')) return file(100)
+      if (path.endsWith('symlink.zip')) return symlink
+      if (path.endsWith('old_large.dmg')) return { ...file(100 * 1024 * 1024), mtimeMs: ninetyDaysAgo }
+      if (path.endsWith('old_small.txt')) return { ...file(1024), mtimeMs: ninetyDaysAgo }
+      if (path.endsWith('recent_large.iso')) return { ...file(500 * 1024 * 1024), mtimeMs: tenDaysAgo }
+      if (path.endsWith('old_folder')) return { ...directory, mtimeMs: ninetyDaysAgo }
+      if (path.endsWith('nested_file.bin')) return file(200 * 1024 * 1024)
+      if (path.includes('/cap-')) return { ...file(60 * 1024 * 1024), mtimeMs: ninetyDaysAgo }
+      return directory
+    })
+
+    const result = await runScan(90, vi.fn(), { ...DEFAULT_SCAN_CATEGORIES, downloadsReview: true }, {
+      downloadsMinDays: 30,
+      downloadsMinBytes: 50 * 1024 * 1024
+    })
+
+    const dlItems = result.items.filter((item) => item.categoryId === 'downloadsReview')
+    expect(dlItems).toHaveLength(50)
+    expect(dlItems.every((item) => item.selectedByDefault === false && item.optional === true)).toBe(
+      true
+    )
+    expect(dlItems.every((item) => item.daysIdle !== null && item.daysIdle >= 30)).toBe(true)
+    expect(dlItems.some((item) => item.name === 'old_small.txt')).toBe(false)
+    expect(dlItems.some((item) => item.name === 'recent_large.iso')).toBe(false)
+    expect(dlItems.some((item) => item.name === 'symlink.zip')).toBe(false)
+    expect(dlItems[0]?.name).toBe('old_folder')
+  })
+
+  it('handles a missing Downloads folder without failing the scan', async () => {
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === '/Users/test/Downloads') throw new Error('ENOENT')
+      return []
+    })
+
+    const result = await runScan(90, vi.fn(), { ...DEFAULT_SCAN_CATEGORIES, downloadsReview: true })
+    expect(result.items.filter((item) => item.categoryId === 'downloadsReview')).toEqual([])
   })
 
   describe('large files scanner', () => {

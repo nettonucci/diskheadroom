@@ -22,3 +22,4 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-09-02 | Caminhos intocáveis + lixeira só do último scan | [2026-09-02-never-touch](./2026-09-02-never-touch/post.md) |
 | 2026-09-02 | Pro: chave no app + checkout no site | [2026-09-02-pro-license](./2026-09-02-pro-license/post.md) |
 | 2026-09-03 | Finder Pro de arquivos grandes | [2026-09-03-arquivos-grandes-pro](./2026-09-03-arquivos-grandes-pro/post.md) |
+| 2026-09-03 | Revisão Pro de Downloads | [2026-09-03-downloads-review-pro](./2026-09-03-downloads-review-pro/post.md) |
