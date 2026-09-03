@@ -7,12 +7,16 @@ import { promisify } from 'node:util'
 import {
   DEFAULT_LARGE_FILE_MIN_BYTES,
   DEFAULT_SCAN_CATEGORIES,
-  type LargeFileMinBytes,
-  type ScanCategoryFlags,
   type UnusedDays
 } from '../shared/constants'
 import type { TranslationKey } from '../shared/i18n'
-import type { ScanCategoryId, ScanItem, ScanProgress, ScanResult } from '../shared/types'
+import type {
+  ScanCategoryId,
+  ScanItem,
+  ScanOptions,
+  ScanProgress,
+  ScanResult
+} from '../shared/types'
 import { getPermissionStatus } from './permissions'
 
 const execFileAsync = promisify(execFile)
@@ -43,12 +47,21 @@ const USER_CACHE_SKIP = new Set([
 
 type ProgressFn = (progress: ScanProgress) => void
 
+export interface ScanRunOptions extends ScanOptions {
+  /** Main-process-only exclusions loaded from persisted settings. */
+  neverTouchPaths?: string[]
+}
+
 export async function runScan(
-  unusedDays: UnusedDays,
-  onProgress: ProgressFn,
-  categories: ScanCategoryFlags = DEFAULT_SCAN_CATEGORIES,
-  largeFileMinBytes: LargeFileMinBytes = DEFAULT_LARGE_FILE_MIN_BYTES
+  options: ScanRunOptions,
+  onProgress: ProgressFn
 ): Promise<ScanResult> {
+  const {
+    unusedDays,
+    categories = DEFAULT_SCAN_CATEGORIES,
+    largeFileMinBytes = DEFAULT_LARGE_FILE_MIN_BYTES,
+    neverTouchPaths = []
+  } = options
   const items: ScanItem[] = []
   const perms = await getPermissionStatus()
   const home = homedir()
@@ -126,7 +139,10 @@ export async function runScan(
   onProgress({ phase: 'progress.done', percent: 100 })
 
   return {
-    items: items.filter((item) => item.bytes > 0 && isSafePath(item.path)),
+    items: items.filter(
+      (item) =>
+        item.bytes > 0 && isSafePath(item.path) && !isNeverTouchPath(item.path, neverTouchPaths)
+    ),
     scannedAt: new Date().toISOString(),
     limited: !perms.fullDiskAccess
   }
@@ -499,26 +515,24 @@ export async function scanLargeHomeFiles(
   home: string,
   minBytes: number = DEFAULT_LARGE_FILE_MIN_BYTES,
   maxDepth = LARGE_FILES_MAX_DEPTH,
-  limit = LARGE_FILES_LIMIT
+  limit = LARGE_FILES_LIMIT,
+  maxDirs = LARGE_FILES_MAX_DIRS
 ): Promise<ScanItem[]> {
   const items: ScanItem[] = []
   const seen = new Set<string>()
   let visitedDirs = 0
 
   async function walk(dir: string, depth: number): Promise<void> {
-    if (depth > maxDepth || visitedDirs >= LARGE_FILES_MAX_DIRS) return
+    if (depth > maxDepth || visitedDirs >= maxDirs) return
 
-    let realDir = dir
     try {
       const lst = await lstat(dir)
-      if (lst.isSymbolicLink()) {
-        const link = await readlink(dir).catch(() => dir)
-        realDir = isAbsolute(link) ? link : resolvePath(dirname(dir), link)
-      }
+      if (lst.isSymbolicLink() || !lst.isDirectory()) return
     } catch {
       return
     }
 
+    const realDir = resolvePath(dir)
     if (seen.has(realDir)) return
     seen.add(realDir)
     visitedDirs++
@@ -531,7 +545,7 @@ export async function scanLargeHomeFiles(
     }
 
     for (const name of entries) {
-      if (visitedDirs >= LARGE_FILES_MAX_DIRS) break
+      if (visitedDirs >= maxDirs) break
       if (name === '.Trash' || name === '.git') continue
 
       const fullPath = join(dir, name)
@@ -673,6 +687,17 @@ export function isSafePath(target: string): boolean {
   if (resolved === '/' || resolved === home) return false
   if (resolved === join(home, 'Documents') || resolved === join(home, 'Desktop')) return false
   return !BLOCKED_PREFIXES.some((prefix) => resolved === prefix || resolved.startsWith(`${prefix}/`))
+}
+
+/** True when `target` is the never-touch path itself or a descendant of one. */
+export function isNeverTouchPath(target: string, prefixes: string[]): boolean {
+  if (!Array.isArray(prefixes) || prefixes.length === 0) return false
+  const resolved = resolvePath(target)
+  return prefixes.some((raw) => {
+    if (typeof raw !== 'string' || !raw.trim()) return false
+    const prefix = resolvePath(raw)
+    return resolved === prefix || resolved.startsWith(`${prefix}/`)
+  })
 }
 
 async function directorySize(path: string): Promise<number> {

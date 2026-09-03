@@ -30,8 +30,35 @@ vi.mock('../src/main/permissions', () => ({
   getPermissionStatus: mocks.getPermissionStatus
 }))
 
-import { isSafePath, runScan, scanLargeHomeFiles } from '../src/main/scanner'
-import { DEFAULT_SCAN_CATEGORIES } from '../src/shared/constants'
+import {
+  isNeverTouchPath,
+  isSafePath,
+  runScan as runScanWithOptions,
+  scanLargeHomeFiles
+} from '../src/main/scanner'
+import {
+  DEFAULT_SCAN_CATEGORIES,
+  type LargeFileMinBytes,
+  type ScanCategoryFlags,
+  type UnusedDays
+} from '../src/shared/constants'
+
+function runScan(
+  unusedDays: UnusedDays,
+  onProgress: Parameters<typeof runScanWithOptions>[1],
+  categories: ScanCategoryFlags = DEFAULT_SCAN_CATEGORIES,
+  extra?: LargeFileMinBytes | string[]
+): ReturnType<typeof runScanWithOptions> {
+  return runScanWithOptions(
+    {
+      unusedDays,
+      categories,
+      ...(typeof extra === 'number' ? { largeFileMinBytes: extra } : {}),
+      ...(Array.isArray(extra) ? { neverTouchPaths: extra } : {})
+    },
+    onProgress
+  )
+}
 
 const directory = {
   isSymbolicLink: () => false,
@@ -98,6 +125,15 @@ describe('path safety', () => {
     ['/Users/test/Desktop/OldBackup.iso', true]
   ])('classifies %s', (path, safe) => {
     expect(isSafePath(path)).toBe(safe)
+  })
+
+  it.each([
+    ['/Users/test/Library/Caches/keep', ['/Users/test/Library/Caches/keep'], true],
+    ['/Users/test/Library/Caches/keep/child', ['/Users/test/Library/Caches/keep'], true],
+    ['/Users/test/Library/Caches/other', ['/Users/test/Library/Caches/keep'], false],
+    ['/Users/test/Library/Caches', ['/Users/test/Library/Caches/keep'], false]
+  ])('never-touch classifies %s', (path, prefixes, excluded) => {
+    expect(isNeverTouchPath(path, prefixes)).toBe(excluded)
   })
 })
 
@@ -176,6 +212,29 @@ describe('runScan', () => {
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.documentsDesktop', percent: 76 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.largeFiles', percent: 80 })
     expect(progress).toHaveBeenLastCalledWith({ phase: 'progress.done', percent: 100 })
+  })
+
+  it('omits items under never-touch prefixes', async () => {
+    const home = '/Users/test'
+    const caches = `${home}/Library/Caches`
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (path === caches) return ['Homebrew', 'good']
+      if (path === `${caches}/Homebrew` || path === `${home}/.Trash`) return ['payload']
+      if (path === '/Applications' || path === `${home}/Applications`) return []
+      return []
+    })
+    mocks.lstat.mockImplementation(async (path: string) => {
+      if (path.endsWith('/good')) return file(200)
+      if (path.endsWith('/payload')) return file(100)
+      return directory
+    })
+    execResult(() => new Error('spotlight unavailable'))
+
+    const result = await runScan(90, vi.fn(), DEFAULT_SCAN_CATEGORIES, [
+      `${home}/Library/Caches/Homebrew`
+    ])
+    expect(result.items.some((item) => item.categoryId === 'homebrewCache')).toBe(false)
+    expect(result.items.some((item) => item.name === 'good')).toBe(true)
   })
 
   it('skips a disabled category without touching Spotlight', async () => {
@@ -716,6 +775,76 @@ describe('runScan', () => {
       // Depth 6 maxDepth shouldn't reach d7/deep.bin
       const items = await scanLargeHomeFiles(home, 500 * 1024 * 1024, 6)
       expect(items).toHaveLength(0)
+    })
+
+    it('stops at the directory cap and never enters blocked prefixes', async () => {
+      mocks.readdir.mockImplementation(async (path: string) => {
+        if (path === '/') return ['System', 'Users']
+        if (path === '/Users') return ['test']
+        if (path === '/Users/test') return ['large.bin']
+        return []
+      })
+      mocks.lstat.mockImplementation(async (path: string) => {
+        if (path === '/Users/test/large.bin') return file(700 * 1024 * 1024)
+        return directory
+      })
+
+      const items = await scanLargeHomeFiles('/', 500 * 1024 * 1024, 6, 50, 2)
+      expect(items).toEqual([])
+      expect(mocks.lstat).not.toHaveBeenCalledWith('/System')
+      expect(mocks.readdir).not.toHaveBeenCalledWith('/Users/test')
+    })
+
+    it('aborts unreadable and symlink roots without walking them', async () => {
+      mocks.lstat.mockRejectedValueOnce(new Error('gone'))
+      await expect(scanLargeHomeFiles('/Users/test/missing')).resolves.toEqual([])
+
+      mocks.lstat.mockResolvedValueOnce(symlink)
+      await expect(scanLargeHomeFiles('/Users/test/link')).resolves.toEqual([])
+      expect(mocks.readdir).not.toHaveBeenCalled()
+    })
+
+    it('returns safely when a visited directory cannot be read', async () => {
+      mocks.lstat.mockResolvedValue(directory)
+      mocks.readdir.mockRejectedValue(new Error('denied'))
+      await expect(scanLargeHomeFiles('/Users/test')).resolves.toEqual([])
+    })
+
+    it('sorts and caps matches while preserving safe file metadata', async () => {
+      const home = '/Users/test'
+      const now = Date.now()
+      mocks.readdir.mockImplementation(async (path: string) => {
+        if (path === home) return ['older.bin', 'future.bin', 'small.bin', 'socket']
+        return []
+      })
+      mocks.lstat.mockImplementation(async (path: string) => {
+        if (path === home) return directory
+        if (path.endsWith('older.bin')) {
+          return { ...file(900 * 1024 * 1024), mtimeMs: now - 10 * 86400000 }
+        }
+        if (path.endsWith('future.bin')) {
+          return { ...file(800 * 1024 * 1024), mtimeMs: now + 86400000 }
+        }
+        if (path.endsWith('small.bin')) return file(20 * 1024 * 1024)
+        return {
+          isSymbolicLink: () => false,
+          isDirectory: () => false,
+          isFile: () => false,
+          size: 0
+        }
+      })
+
+      const items = await scanLargeHomeFiles(home, 500 * 1024 * 1024, 6, 1)
+      expect(items).toHaveLength(1)
+      expect(items[0]).toMatchObject({
+        name: 'older.bin',
+        daysIdle: 10,
+        selectedByDefault: false,
+        optional: true
+      })
+
+      const all = await scanLargeHomeFiles(home, 500 * 1024 * 1024)
+      expect(all.find((item) => item.name === 'future.bin')?.daysIdle).toBe(0)
     })
 
     it('runs largeFiles in runScan only when category is enabled', async () => {

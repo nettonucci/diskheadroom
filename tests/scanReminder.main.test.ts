@@ -48,7 +48,8 @@ const enabled: AppSettings = {
   scanCategories: DEFAULT_SCAN_CATEGORIES,
   lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
   launchAtLogin: false,
-  scanReminder: { enabled: true, intervalDays: 7 }
+  scanReminder: { enabled: true, intervalDays: 7 },
+  neverTouchPaths: []
 }
 
 const disabled: AppSettings = {

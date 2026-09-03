@@ -23,7 +23,8 @@ const settings = {
   largeFileMinBytes: 500 * 1024 * 1024 as const,
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
-  scanReminder: { enabled: false, intervalDays: 7 as const }
+  scanReminder: { enabled: false, intervalDays: 7 as const },
+  neverTouchPaths: []
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -87,6 +88,9 @@ function api(overrides: Partial<Api> = {}): Api {
       failed: [],
       bytesRequested: 2048
     }),
+    pickFolder: vi.fn().mockResolvedValue(null),
+    getLicenseStatus: vi.fn().mockResolvedValue({ isPro: false }),
+    activateLicense: vi.fn().mockResolvedValue({ isPro: false }),
     openExternal: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
     revealItem: vi.fn().mockResolvedValue(true),
@@ -635,6 +639,34 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Scan this Mac' })).toBeEnabled()
   })
 
+  it('shows large files as Pro-only and enables its controls for Pro', async () => {
+    const freeBridge = api()
+    window.diskheadroom = freeBridge
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+
+    expect(screen.getByRole('checkbox', { name: /Large files/ })).toBeDisabled()
+    expect(screen.getByDisplayValue('500 MB')).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Get Pro to enable' }))
+    expect(freeBridge.openExternal).toHaveBeenCalledWith('https://www.diskheadroom.com/en/pro')
+
+    unmount()
+    const proBridge = api({ getLicenseStatus: vi.fn().mockResolvedValue({ isPro: true }) })
+    window.diskheadroom = proBridge
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('checkbox', { name: /Large files/ })).toBeEnabled()
+    fireEvent.change(screen.getByDisplayValue('500 MB'), {
+      target: { value: String(1024 * 1024 * 1024) }
+    })
+    await waitFor(() =>
+      expect(proBridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ largeFileMinBytes: 1024 * 1024 * 1024 })
+      )
+    )
+  })
+
   it('updates settings, opens permissions, and opens external links', async () => {
     const bridge = api()
     window.diskheadroom = bridge
@@ -646,12 +678,6 @@ describe('App', () => {
     fireEvent.change(screen.getByDisplayValue('90 days'), { target: { value: '180' } })
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ unusedDays: 180 }))
-    )
-    fireEvent.change(screen.getByDisplayValue('500 MB'), { target: { value: String(1024 * 1024 * 1024) } })
-    await waitFor(() =>
-      expect(bridge.setSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ largeFileMinBytes: 1024 * 1024 * 1024 })
-      )
     )
     await user.click(screen.getByRole('checkbox', { name: 'Start Disk Headroom at login' }))
     await waitFor(() =>
@@ -699,8 +725,48 @@ describe('App', () => {
         })
       )
     )
+    fireEvent.change(screen.getByLabelText('Path to exclude'), {
+      target: { value: '/Users/test/Library/Caches/keep' }
+    })
+    await user.click(screen.getByRole('button', { name: 'Add path' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ neverTouchPaths: ['/Users/test/Library/Caches/keep'] })
+      )
+    )
+    await user.click(screen.getByRole('button', { name: 'Show in Finder' }))
+    expect(bridge.revealItem).toHaveBeenCalledWith('/Users/test/Library/Caches/keep')
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ neverTouchPaths: [] }))
+    )
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }))
+    expect(bridge.pickFolder).toHaveBeenCalled()
+    bridge.pickFolder.mockResolvedValueOnce('/Users/test/Library/Caches/from-picker')
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          neverTouchPaths: expect.arrayContaining(['/Users/test/Library/Caches/from-picker'])
+        })
+      )
+    )
     await user.click(screen.getByRole('button', { name: 'Open permissions' }))
     expect(await screen.findByText('System access')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByText('Pro is not active.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('License key'), { target: { value: 'dh1.bad' } })
+    await user.click(screen.getByRole('button', { name: 'Activate' }))
+    await waitFor(() => expect(bridge.activateLicense).toHaveBeenCalledWith('dh1.bad'))
+    expect(await screen.findByText('That key is not valid for this product.')).toBeInTheDocument()
+    bridge.activateLicense.mockResolvedValueOnce({ isPro: true })
+    await user.click(screen.getByRole('button', { name: 'Activate' }))
+    expect(await screen.findByText('Pro is active on this Mac.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Buy Pro' }))
+    expect(bridge.openExternal).toHaveBeenCalledWith('https://www.diskheadroom.com/en/pro')
+    await user.click(screen.getByRole('button', { name: 'Donate instead' }))
+    expect(await screen.findByRole('button', { name: 'Sponsor on GitHub' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Donate' }))
     await user.click(await screen.findByRole('button', { name: 'Sponsor on GitHub' }))
@@ -735,7 +801,11 @@ describe('App', () => {
     expect(await screen.findByText('Keep the lights on')).toBeInTheDocument()
     act(() => scan?.())
     await waitFor(() =>
-      expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES, 500 * 1024 * 1024)
+      expect(bridge.runScan).toHaveBeenCalledWith({
+        unusedDays: 90,
+        categories: DEFAULT_SCAN_CATEGORIES,
+        largeFileMinBytes: 500 * 1024 * 1024
+      })
     )
   })
 

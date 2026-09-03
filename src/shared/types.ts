@@ -49,6 +49,13 @@ export interface ScanResult {
   limited: boolean
 }
 
+/** Extensible payload used by the renderer, preload and main scan boundary. */
+export interface ScanOptions {
+  unusedDays: UnusedDays
+  categories?: Partial<ScanCategoryFlags>
+  largeFileMinBytes?: LargeFileMinBytes
+}
+
 export interface DiskInfo {
   mount: string
   totalBytes: number
@@ -80,6 +87,8 @@ export interface AppSettings {
   lowDiskAlert: LowDiskAlertSettings
   launchAtLogin: boolean
   scanReminder: ScanReminderSettings
+  /** Absolute paths/prefixes omitted from scans and refused by trash. */
+  neverTouchPaths: string[]
 }
 
 /** Development-only snapshot behind the Debug tab. Never registered in a packaged build. */
@@ -102,4 +111,9 @@ export interface CleanResult {
   trashed: string[]
   failed: { path: string; error: string }[]
   bytesRequested: number
+}
+
+/** Renderer-facing entitlement. The signed key never crosses the preload. */
+export interface LicenseStatus {
+  isPro: boolean
 }

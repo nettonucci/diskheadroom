@@ -326,10 +326,21 @@ input {
 
 .scan-flag {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   gap: 10px;
   align-items: center;
   font-size: 14px;
+}
+
+.scan-flag:has(input:disabled) {
+  color: var(--muted);
+}
+
+.pro-badge {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .debug-grid {
@@ -600,4 +611,57 @@ select {
 
 .donate-panel .btn.primary {
   margin-top: 8px;
+}
+
+.never-touch-add {
+  margin-top: 8px;
+}
+
+.never-touch-add input[type='text'],
+.license-add input[type='text'] {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.never-touch-add .row,
+.license-add .row,
+.never-touch-list .row {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.never-touch-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.never-touch-list li {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.never-touch-list .path {
+  display: block;
+  word-break: break-all;
+}
+
+.pro-status {
+  margin: 10px 0 0;
+  font-weight: 600;
+}
+
+.pro-status.on {
+  color: var(--ok);
+}
+
+.license-add {
+  margin-top: 4px;
 }

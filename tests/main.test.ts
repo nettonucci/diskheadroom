@@ -89,7 +89,7 @@ import {
   revealGrantTarget
 } from '../src/main/permissions'
 import { applyLaunchAtLogin, shouldShowWindowOnLaunch } from '../src/main/loginItem'
-import { loadSettings, saveSettings } from '../src/main/settings'
+import { loadSettings, peekLicenseKeyFallback, saveSettings, setLicenseKeyFallback } from '../src/main/settings'
 import { createTray } from '../src/main/tray'
 import { DEFAULT_LARGE_FILE_MIN_BYTES, DEFAULT_SCAN_CATEGORIES } from '../src/shared/constants'
 
@@ -161,7 +161,8 @@ describe('settings', () => {
       largeFileMinBytes: DEFAULT_LARGE_FILE_MIN_BYTES,
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
-      scanReminder: { enabled: false, intervalDays: 7 }
+      scanReminder: { enabled: false, intervalDays: 7 },
+      neverTouchPaths: []
     })
   })
 
@@ -189,19 +190,70 @@ describe('settings', () => {
     })
   })
 
-  it('keeps launch-at-login and a custom reminder interval when present', async () => {
+  it('keeps never-touch prefixes and drops junk entries', async () => {
     mocks.readFile.mockResolvedValue(
-      JSON.stringify({ launchAtLogin: true, scanReminder: { enabled: true, intervalDays: 30 } })
+      JSON.stringify({
+        neverTouchPaths: ['/Users/test/Library/Caches/keep', '/', 'relative', '/Users/test/Library/Caches/keep']
+      })
     )
     await expect(loadSettings()).resolves.toMatchObject({
-      launchAtLogin: true,
-      scanReminder: { enabled: true, intervalDays: 30 }
+      neverTouchPaths: ['/Users/test/Library/Caches/keep']
     })
   })
 
   it('uses the default locale when omitted', async () => {
     mocks.readFile.mockResolvedValue(JSON.stringify({ setupComplete: true }))
     await expect(loadSettings()).resolves.toMatchObject({ setupComplete: true, locale: 'pt-BR' })
+  })
+
+  it('strips a fallback license key from settings returned to the renderer', async () => {
+    mocks.readFile.mockResolvedValue(
+      JSON.stringify({ locale: 'en', licenseKey: 'dh1.should-not-leak' })
+    )
+    const loaded = await loadSettings()
+    expect(loaded).not.toHaveProperty('licenseKey')
+    expect(JSON.stringify(loaded)).not.toContain('dh1.should-not-leak')
+  })
+
+  it('keeps a fallback license key when the rest of settings are saved', async () => {
+    mocks.readFile.mockResolvedValue(
+      JSON.stringify({ locale: 'en', licenseKey: 'dh1.keep-me' })
+    )
+    const value = {
+      unusedDays: 30 as const,
+      setupComplete: true,
+      locale: 'en' as const,
+      scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
+      lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
+      launchAtLogin: false,
+      scanReminder: { enabled: false, intervalDays: 7 as const },
+      neverTouchPaths: []
+    }
+    await saveSettings(value)
+    const written = JSON.parse(String(mocks.writeFile.mock.calls[0][1])) as {
+      licenseKey?: string
+      locale: string
+    }
+    expect(written.licenseKey).toBe('dh1.keep-me')
+    expect(written.locale).toBe('en')
+  })
+
+  it('reads and writes the fallback license field without exposing it through loadSettings', async () => {
+    mocks.readFile.mockResolvedValue(
+      JSON.stringify({ locale: 'en', licenseKey: '  dh1.from-file  ' })
+    )
+    await expect(peekLicenseKeyFallback()).resolves.toBe('dh1.from-file')
+    mocks.readFile.mockResolvedValue(JSON.stringify({ locale: 'en', licenseKey: 12 }))
+    await expect(peekLicenseKeyFallback()).resolves.toBeNull()
+    mocks.readFile.mockResolvedValue(JSON.stringify({ locale: 'en' }))
+    await setLicenseKeyFallback('dh1.stored')
+    expect(JSON.parse(String(mocks.writeFile.mock.calls.at(-1)?.[1]))).toEqual(
+      expect.objectContaining({ licenseKey: 'dh1.stored', locale: 'en' })
+    )
+    await setLicenseKeyFallback(null)
+    expect(JSON.parse(String(mocks.writeFile.mock.calls.at(-1)?.[1]))).not.toHaveProperty(
+      'licenseKey'
+    )
   })
 
   it('creates the directory and writes formatted JSON', async () => {
@@ -212,7 +264,8 @@ describe('settings', () => {
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
       lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
       launchAtLogin: false,
-      scanReminder: { enabled: false, intervalDays: 7 as const }
+      scanReminder: { enabled: false, intervalDays: 7 as const },
+      neverTouchPaths: []
     }
     await saveSettings(value)
     expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/diskheadroom', { recursive: true })
@@ -230,12 +283,19 @@ describe('cleaner', () => {
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('locked'))
       .mockRejectedValueOnce('unknown')
+    const lastScanPaths = new Set([
+      '/',
+      '/Users/test/cache-a',
+      '/Users/test/cache-b',
+      '/Users/test/cache-c'
+    ])
     const result = await trashPaths(
       { paths: ['/', '/Users/test/cache-a', '/Users/test/cache-b', '/Users/test/cache-c'] },
       new Map([
         ['/Users/test/cache-a', 10],
         ['/Users/test/cache-b', 20]
-      ])
+      ]),
+      { lastScanPaths, neverTouchPaths: [] }
     )
     expect(result).toEqual({
       trashed: ['/Users/test/cache-a'],
@@ -245,6 +305,38 @@ describe('cleaner', () => {
         { path: '/Users/test/cache-c', error: 'Could not move to Trash' }
       ],
       bytesRequested: 30
+    })
+  })
+
+  it('does not trash paths that were not in the last scan', async () => {
+    const result = await trashPaths(
+      { paths: ['/Users/test/cache-a', '/Users/test/unknown'] },
+      new Map([['/Users/test/cache-a', 10]]),
+      { lastScanPaths: new Set(['/Users/test/cache-a']), neverTouchPaths: [] }
+    )
+    expect(mocks.trashItem).toHaveBeenCalledTimes(1)
+    expect(mocks.trashItem).toHaveBeenCalledWith('/Users/test/cache-a')
+    expect(result).toEqual({
+      trashed: ['/Users/test/cache-a'],
+      failed: [{ path: '/Users/test/unknown', error: 'Path was not in the last scan' }],
+      bytesRequested: 10
+    })
+  })
+
+  it('refuses never-touch paths even when they were in the last scan', async () => {
+    const result = await trashPaths(
+      { paths: ['/Users/test/Library/Caches/keep'] },
+      new Map([['/Users/test/Library/Caches/keep', 99]]),
+      {
+        lastScanPaths: new Set(['/Users/test/Library/Caches/keep']),
+        neverTouchPaths: ['/Users/test/Library/Caches/keep']
+      }
+    )
+    expect(mocks.trashItem).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      trashed: [],
+      failed: [{ path: '/Users/test/Library/Caches/keep', error: 'Path is on the never-touch list' }],
+      bytesRequested: 0
     })
   })
 })

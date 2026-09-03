@@ -42,7 +42,7 @@ If you need forensic deletion, secure erase, or Windows/Linux, this is not that 
 
 | System access | Settings |
 | --- | --- |
-| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with scan category toggles, optional low-disk alert, idle app window, and language pickers" width="440"> |
+| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with scan category toggles, never-touch paths, optional low-disk alert, idle app window, and language pickers" width="440"> |
 
 <p align="center">
   <img src="docs/screenshots/developer.png" alt="Optional developer groups showing simulators on older runtimes and Android, Gradle and CocoaPods caches, all unchecked, with a warning that those simulators still work" width="560">
@@ -67,11 +67,14 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Android / Gradle / CocoaPods (opt-in) | `~/.gradle/caches`, CocoaPods cache, and conservative Android SDK leftover dirs — **unchecked**; the SDK install and AVDs are never listed |
 | Docker Desktop (opt-in) | Disk image and Buildx cache — **unchecked**, warning that images, containers, and volumes can be lost |
 | Documents & Desktop (opt-in) | First-level files and folders older than the idle window and at least 100 MB — **unchecked**; the Documents and Desktop folders themselves are never listed |
+| Large files (Pro, opt-in) | Bounded finder under the home folder with a configurable 100 MB–5 GB floor — **unchecked**; symlinks, Trash, Git metadata, and protected paths are skipped |
 | Idle apps | `/Applications` and `~/Applications`, skipping Apple system bundles |
 | Menu bar | Open, Scan now, Donate, Quit |
 | Low disk alert | Optional local Notification Center notice when free space drops below a percent or GB threshold (off by default, with a cooldown so it does not spam) |
+| Never-touch paths | Settings list of folders omitted from the next scan and refused by Trash; paste a path or pick a folder |
 | Languages | English, Português (Brasil), Español |
 | Donate | In-app page plus this README, both pointing at GitHub Sponsors |
+| Pro (optional) | Paddle checkout + offline license key under Settings; core scan and Trash stay free, while paid finders require a valid key |
 
 The app follows the macOS language on first launch (with English as the fallback).
 You can change it at any time under **Settings → Language**; the window and menu
@@ -184,6 +187,7 @@ Useful scripts:
 | `npm run icons` | Rasterize `assets/brand` into `build/icon.icns` and the menu bar templates |
 | `npm run screenshots` | Rebuild and capture `docs/screenshots` from the UI using sample data |
 | `npm run screenshots:notification` | Render the low disk alert banner for release notes (`-- --locale=pt-BR --percent=5`) |
+| `node scripts/sign-license.mjs` | Sign a Pro license with `.license-private.pem` (not in git) |
 | `npm run commitlint` | Check the latest commit message against Conventional Commits |
 | `npm run release:dry` | Preview the next SemVer bump without tagging |
 
@@ -192,9 +196,20 @@ Useful scripts:
 - Preview first. No silent background deletion.
 - Default selections avoid applications and Xcode leftovers.
 - Removals go to Trash via Electron’s `shell.trashItem`.
+- Only paths from the last successful scan can be trashed.
+- Never-touch prefixes are omitted from scans and refused by Trash.
 - Paths under `/System` and a short list of OS roots are rejected.
 - Settings live in the app’s user-data folder as local JSON.
+- A signed Pro license (when one exists) is verified **offline** in the main process. The public key ships in source; the private signing key does not. The renderer only sees `isPro`.
 - Donate opens [GitHub Sponsors](https://github.com/sponsors/nettonucci) in your browser. Nothing else is sent.
+
+## Pro (optional)
+
+Core scan, review, and Trash stay free. Paid finders such as **Large files** require Disk Headroom Pro. It is a lifetime license for **major 1.x**, sold through [Paddle](https://www.paddle.com/) (Merchant of Record). After purchase, Paddle emails a signed key; you paste it under **Settings**. Verification is offline in the main process on every gated scan. There is no account.
+
+**Buy Pro** opens `https://www.diskheadroom.com/<language>/pro` in your browser, where Paddle.js runs the overlay checkout ([site repository](https://github.com/nettonucci/diskheadroom-web)). Payment stays on the web: no Paddle token, product id, or API secret exists in this repository, and the app only ever verifies a signed key. Generate keys with `node scripts/sign-license.mjs` and upload them to Paddle fulfillment, or let Paddle issue keys that match this format.
+
+People who only want to support the free app can still use **Donate** / GitHub Sponsors.
 
 Treat this like any disk utility: do not select folders you do not recognize. Clearing caches is usually harmless; removing an application you still need is not.
 
@@ -230,7 +245,7 @@ The same link is on the in-app **Donate** screen. Sponsorships help with signing
 ## Project layout
 
 ```
-src/main/          Window, menu bar, IPC, scan, trash
+src/main/          Window, menu bar, IPC, scan, trash, offline license verify
 src/preload/       contextBridge API
 src/renderer/      React UI
 src/shared/        Types, constants, translations

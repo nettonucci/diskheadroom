@@ -73,6 +73,7 @@ web_modules/
 .env
 .env.*
 !.env.example
+.license-private.pem
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

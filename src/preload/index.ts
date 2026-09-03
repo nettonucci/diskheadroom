@@ -5,8 +5,10 @@ import type {
   CleanResult,
   DiskInfo,
   GrantTarget,
+  LicenseStatus,
   LowDiskDebugStatus,
   PermissionStatus,
+  ScanOptions,
   ScanProgress,
   ScanResult
 } from '../shared/types'
@@ -37,17 +39,16 @@ const api = {
   openFullDiskAccess: (): Promise<void> => ipcRenderer.invoke('permissions:open-fda'),
   getGrantTarget: (): Promise<GrantTarget> => ipcRenderer.invoke('permissions:grant-target'),
   revealGrantTarget: (): Promise<void> => ipcRenderer.invoke('permissions:reveal-target'),
+  getLicenseStatus: (): Promise<LicenseStatus> => ipcRenderer.invoke('license:status'),
+  activateLicense: (key: string): Promise<LicenseStatus> =>
+    ipcRenderer.invoke('license:activate', key),
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
   setSettings: (settings: AppSettings): Promise<AppSettings> =>
     ipcRenderer.invoke('settings:set', settings),
-  runScan: (
-    unusedDays: AppSettings['unusedDays'],
-    categories?: AppSettings['scanCategories'],
-    largeFileMinBytes?: AppSettings['largeFileMinBytes']
-  ): Promise<ScanResult> =>
-    ipcRenderer.invoke('scan:run', unusedDays, categories, largeFileMinBytes),
+  runScan: (options: ScanOptions): Promise<ScanResult> => ipcRenderer.invoke('scan:run', options),
   trashItems: (request: CleanRequest): Promise<CleanResult> =>
     ipcRenderer.invoke('clean:trash', request),
+  pickFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-folder'),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
   copyText: (text: string): Promise<void> => ipcRenderer.invoke('shell:copy-text', text),
   revealItem: (path: string): Promise<boolean> => ipcRenderer.invoke('shell:reveal-item', path),

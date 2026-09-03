@@ -1,6 +1,34 @@
+import type { Locale } from './i18n'
+
 export const SPONSORS_URL = 'https://github.com/sponsors/nettonucci'
 export const REPO_URL = 'https://github.com/nettonucci/diskheadroom'
+export const SITE_URL = 'https://www.diskheadroom.com'
 export const APP_NAME = 'Disk Headroom'
+
+const SITE_HOSTS = new Set(['diskheadroom.com', 'www.diskheadroom.com'])
+
+/**
+ * Pro checkout lives on the site, where Paddle.js opens the overlay. The app
+ * only ever verifies the signed key offline, so no Paddle token, product id, or
+ * API secret needs to exist in this repository.
+ */
+export function proCheckoutUrl(locale: Locale): string {
+  return `${SITE_URL}/${locale}/pro`
+}
+
+/** HTTPS GitHub links and the Disk Headroom site only. */
+export function isAllowedExternalUrl(url: unknown): boolean {
+  if (typeof url !== 'string' || !url) return false
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:') return false
+    if (parsed.username || parsed.password) return false
+    if (parsed.hostname === 'github.com') return true
+    return SITE_HOSTS.has(parsed.hostname)
+  } catch {
+    return false
+  }
+}
 
 export const UNUSED_DAY_OPTIONS = [30, 90, 180, 365] as const
 export type UnusedDays = (typeof UNUSED_DAY_OPTIONS)[number]
@@ -158,4 +186,26 @@ export function mergeScanReminder(input: unknown): ScanReminderSettings {
 
 export function mergeLaunchAtLogin(input: unknown): boolean {
   return input === true
+}
+
+export const DEFAULT_NEVER_TOUCH_PATHS: string[] = []
+export const MAX_NEVER_TOUCH_PATHS = 50
+
+/** Absolute prefixes the scanner hides and the cleaner refuses. IPC may send anything. */
+export function mergeNeverTouchPaths(input: unknown): string[] {
+  if (!Array.isArray(input)) return [...DEFAULT_NEVER_TOUCH_PATHS]
+  const seen = new Set<string>()
+  const next: string[] = []
+  for (const item of input) {
+    if (typeof item !== 'string') continue
+    const trimmed = item.trim()
+    if (!trimmed.startsWith('/') || trimmed.includes('\0')) continue
+    const normalized = trimmed.replace(/\/+$/, '')
+    if (!normalized || normalized === '/') continue
+    if (seen.has(normalized)) continue
+    seen.add(normalized)
+    next.push(normalized)
+    if (next.length >= MAX_NEVER_TOUCH_PATHS) break
+  }
+  return next
 }

@@ -4,6 +4,7 @@ import {
   SCAN_CATEGORY_IDS,
   SPONSORS_URL,
   REPO_URL,
+  proCheckoutUrl,
   LOW_DISK_ALERT_PRESETS,
   SCAN_REMINDER_INTERVAL_DAYS,
   LARGE_FILE_MIN_BYTES_OPTIONS,
@@ -35,6 +36,7 @@ import type {
 } from '../../shared/types'
 import { CATEGORY_META, CATEGORY_WARNING, NAV, SCAN_CATEGORY_LABELS, type ViewId } from './lib/copy'
 import { formatBytes, formatDate } from './lib/format'
+import { isProEntitled } from '../../shared/entitlement'
 import markUrl from '@brand/mark-color.svg'
 
 function Spinner(): JSX.Element {
@@ -135,23 +137,26 @@ function AppShell(): JSX.Element {
   const [scanFailed, setScanFailed] = useState(false)
   const [busyClean, setBusyClean] = useState(false)
   const [confirmCleanOpen, setConfirmCleanOpen] = useState(false)
+  const [isPro, setIsPro] = useState(false)
   const bootstrapped = useRef(false)
   const locale = settings?.locale ?? 'en'
   const t = translator(locale)
 
   const refresh = useCallback(async () => {
-    const [nextSettings, nextDisk, nextPerms, nextTarget] = await Promise.all([
+    const [nextSettings, nextDisk, nextPerms, nextTarget, license] = await Promise.all([
       window.diskheadroom.getSettings(),
       // A failed capacity reading must not take the rest of the UI down with it:
       // the panel can be missing, the app still scans and cleans.
       window.diskheadroom.getDiskInfo().catch(() => null),
       window.diskheadroom.getPermissions(),
-      window.diskheadroom.getGrantTarget()
+      window.diskheadroom.getGrantTarget(),
+      window.diskheadroom.getLicenseStatus()
     ])
     setSettings(nextSettings)
     setDisk(nextDisk)
     setPerms(nextPerms)
     setGrantTarget(nextTarget)
+    setIsPro(isProEntitled(license.isPro))
     // Only the first load decides the landing view. Later refreshes come from
     // Recheck or a finished cleanup, and pulling the user out of the screen they
     // opened makes those buttons feel broken.
@@ -200,11 +205,11 @@ function AppShell(): JSX.Element {
     // sign of work; the dashboard is where the progress bar lives.
     setView('dashboard')
     try {
-      const next = await window.diskheadroom.runScan(
-        settings.unusedDays,
-        settings.scanCategories,
-        settings.largeFileMinBytes
-      )
+      const next = await window.diskheadroom.runScan({
+        unusedDays: settings.unusedDays,
+        categories: settings.scanCategories,
+        largeFileMinBytes: settings.largeFileMinBytes
+      })
       setResult(next)
       const initial: Record<string, boolean> = {}
       for (const item of next.items) {
@@ -282,6 +287,10 @@ function AppShell(): JSX.Element {
 
   async function updateScanReminder(patch: Partial<ScanReminderSettings>): Promise<void> {
     await updateSettings((current) => ({ scanReminder: { ...current.scanReminder, ...patch } }))
+  }
+
+  async function updateNeverTouchPaths(neverTouchPaths: string[]): Promise<void> {
+    await updateSettings(() => ({ neverTouchPaths }))
   }
 
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
@@ -437,6 +446,10 @@ function AppShell(): JSX.Element {
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
             onScanReminder={(patch) => void updateScanReminder(patch)}
+            onNeverTouchPaths={(paths) => void updateNeverTouchPaths(paths)}
+            isPro={isPro}
+            onLicenseChange={setIsPro}
+            onDonate={() => setView('donate')}
             onPermissions={() => setView('permissions')}
           />
         )}
@@ -954,15 +967,47 @@ function SettingsView(props: {
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
   onLaunchAtLogin: (enabled: boolean) => void
   onScanReminder: (patch: Partial<ScanReminderSettings>) => void
+  onNeverTouchPaths: (paths: string[]) => void
+  isPro: boolean
+  onLicenseChange: (isPro: boolean) => void
+  onDonate: () => void
   onPermissions: () => void
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
   const reminder = props.settings.scanReminder
+  const [neverTouchDraft, setNeverTouchDraft] = useState('')
+  const [licenseDraft, setLicenseDraft] = useState('')
+  const [licenseInvalid, setLicenseInvalid] = useState(false)
+  const [activating, setActivating] = useState(false)
   const presets = LOW_DISK_ALERT_PRESETS.some(
     (preset) => preset.kind === alert.kind && preset.value === alert.value
   )
     ? LOW_DISK_ALERT_PRESETS
     : [{ kind: alert.kind, value: alert.value }, ...LOW_DISK_ALERT_PRESETS]
+
+  function addNeverTouchPath(raw: string): void {
+    const trimmed = raw.trim()
+    if (!trimmed) return
+    const merged = Array.from(new Set([...props.settings.neverTouchPaths, trimmed]))
+    props.onNeverTouchPaths(merged)
+    setNeverTouchDraft('')
+  }
+
+  async function activateLicense(): Promise<void> {
+    const key = licenseDraft.trim()
+    if (!key || activating) return
+    setActivating(true)
+    setLicenseInvalid(false)
+    try {
+      const status = await window.diskheadroom.activateLicense(key)
+      const entitled = isProEntitled(status.isPro)
+      props.onLicenseChange(entitled)
+      setLicenseInvalid(!entitled)
+      if (entitled) setLicenseDraft('')
+    } finally {
+      setActivating(false)
+    }
+  }
 
   return (
     <section>
@@ -980,10 +1025,14 @@ function SettingsView(props: {
             <label key={id} className="scan-flag">
               <input
                 type="checkbox"
-                checked={props.settings.scanCategories[id]}
+                checked={props.settings.scanCategories[id] && (id !== 'largeFiles' || props.isPro)}
+                disabled={id === 'largeFiles' && !props.isPro}
                 onChange={(event) => props.onScanCategory(id, event.target.checked)}
               />
               <span>{props.t(SCAN_CATEGORY_LABELS[id])}</span>
+              {id === 'largeFiles' && !props.isPro && (
+                <small className="pro-badge">{props.t('settings.proBadge')}</small>
+              )}
             </label>
           ))}
         </div>
@@ -993,6 +1042,7 @@ function SettingsView(props: {
         <p className="muted">{props.t('settings.largeFilesHint')}</p>
         <select
           value={props.settings.largeFileMinBytes}
+          disabled={!props.isPro}
           onChange={(event) => props.onLargeFileMinBytes(Number(event.target.value) as LargeFileMinBytes)}
         >
           {LARGE_FILE_MIN_BYTES_OPTIONS.map((bytes) => (
@@ -1001,6 +1051,138 @@ function SettingsView(props: {
             </option>
           ))}
         </select>
+        {!props.isPro && (
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() =>
+              void window.diskheadroom.openExternal(proCheckoutUrl(props.settings.locale))
+            }
+          >
+            {props.t('settings.largeFilesProCta')}
+          </button>
+        )}
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.neverTouchTitle')}</h3>
+        <p className="muted">{props.t('settings.neverTouchHint')}</p>
+        <form
+          className="never-touch-add"
+          onSubmit={(event) => {
+            event.preventDefault()
+            addNeverTouchPath(neverTouchDraft)
+          }}
+        >
+          <label className="field-label" htmlFor="never-touch-path">
+            {props.t('settings.neverTouchPaste')}
+          </label>
+          <input
+            id="never-touch-path"
+            type="text"
+            value={neverTouchDraft}
+            onChange={(event) => setNeverTouchDraft(event.target.value)}
+            placeholder={props.t('settings.neverTouchPlaceholder')}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <div className="row">
+            <button className="btn" type="submit">
+              {props.t('settings.neverTouchAdd')}
+            </button>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => {
+                void window.diskheadroom.pickFolder().then((picked) => {
+                  if (picked) addNeverTouchPath(picked)
+                })
+              }}
+            >
+              {props.t('settings.neverTouchChoose')}
+            </button>
+          </div>
+        </form>
+        {props.settings.neverTouchPaths.length === 0 ? (
+          <p className="muted">{props.t('settings.neverTouchEmpty')}</p>
+        ) : (
+          <ul className="never-touch-list">
+            {props.settings.neverTouchPaths.map((path) => (
+              <li key={path}>
+                <code className="path">{path}</code>
+                <div className="row">
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => void window.diskheadroom.revealItem(path)}
+                  >
+                    {props.t('settings.neverTouchReveal')}
+                  </button>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() =>
+                      props.onNeverTouchPaths(
+                        props.settings.neverTouchPaths.filter((item) => item !== path)
+                      )
+                    }
+                  >
+                    {props.t('settings.neverTouchRemove')}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.proTitle')}</h3>
+        <p className="muted">{props.t('settings.proHint')}</p>
+        <p className={props.isPro ? 'pro-status on' : 'pro-status'}>
+          {props.t(props.isPro ? 'settings.proStatusOn' : 'settings.proStatusOff')}
+        </p>
+        <form
+          className="license-add"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void activateLicense()
+          }}
+        >
+          <label className="field-label" htmlFor="license-key">
+            {props.t('settings.proKeyLabel')}
+          </label>
+          <input
+            id="license-key"
+            type="text"
+            value={licenseDraft}
+            onChange={(event) => {
+              setLicenseDraft(event.target.value)
+              setLicenseInvalid(false)
+            }}
+            placeholder={props.t('settings.proKeyPlaceholder')}
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={licenseInvalid}
+          />
+          {licenseInvalid && <p className="notice">{props.t('settings.proInvalid')}</p>}
+          <div className="row">
+            <button className="btn" type="submit" disabled={activating || !licenseDraft.trim()}>
+              {activating && <Spinner />}
+              {activating ? props.t('settings.proActivating') : props.t('settings.proActivate')}
+            </button>
+            <button
+              className="btn primary"
+              type="button"
+              onClick={() =>
+                void window.diskheadroom.openExternal(proCheckoutUrl(props.settings.locale))
+              }
+            >
+              {props.t('settings.proBuy')}
+            </button>
+            <button className="btn" type="button" onClick={props.onDonate}>
+              {props.t('settings.proDonate')}
+            </button>
+          </div>
+        </form>
       </div>
       <div className="card">
         <h3>{props.t('settings.idleTitle')}</h3>

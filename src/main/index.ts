@@ -79,9 +79,15 @@ function applyAppMenu(): void {
     copyright: 'MIT licensed'
   })
 
-  Menu.setApplicationMenu(
-    Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }])
-  )
+  // A packaged build ships without the View menu, so the DevTools shortcut only
+  // exists while developing.
+  const template: Electron.MenuItemConstructorOptions[] = [
+    { role: 'appMenu' },
+    { role: 'editMenu' },
+    ...(app.isPackaged ? [] : [{ role: 'viewMenu' as const }]),
+    { role: 'windowMenu' }
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
 function showWindow(): void {
