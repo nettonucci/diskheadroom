@@ -1,7 +1,7 @@
 # Pro: colar chave e abrir a Paddle
 
 - **Data:** 2026-09-02
-- **Commit / PR:** #42 #43
+- **Commit / PR:** #62
 - **Tipo:** feat
 - **Público:** quem já usa o scan grátis e pode querer Pro depois; quem só doa no GitHub Sponsors
 - **Formato sugerido no Instagram:** carrossel
