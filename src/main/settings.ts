@@ -28,26 +28,65 @@ const defaults = (): AppSettings => ({
   neverTouchPaths: []
 })
 
+function appSettingsBody(next: AppSettings): AppSettings {
+  return {
+    unusedDays: next.unusedDays,
+    setupComplete: next.setupComplete,
+    locale: next.locale,
+    scanCategories: next.scanCategories,
+    lowDiskAlert: next.lowDiskAlert,
+    launchAtLogin: next.launchAtLogin,
+    scanReminder: next.scanReminder,
+    neverTouchPaths: next.neverTouchPaths
+  }
+}
+
+function parseSettings(raw: string): AppSettings {
+  const parsed = JSON.parse(raw) as Record<string, unknown>
+  delete parsed.licenseKey
+  const data = parsed as Partial<AppSettings>
+  return {
+    ...defaults(),
+    ...data,
+    locale: data.locale ? resolveLocale(data.locale) : defaults().locale,
+    scanCategories: mergeScanCategories(data.scanCategories),
+    lowDiskAlert: mergeLowDiskAlert(data.lowDiskAlert),
+    launchAtLogin: mergeLaunchAtLogin(data.launchAtLogin),
+    scanReminder: mergeScanReminder(data.scanReminder),
+    neverTouchPaths: mergeNeverTouchPaths(data.neverTouchPaths)
+  }
+}
+
 export async function loadSettings(): Promise<AppSettings> {
   try {
-    const raw = await readFile(filePath(), 'utf8')
-    const parsed = JSON.parse(raw) as Partial<AppSettings>
-    return {
-      ...defaults(),
-      ...parsed,
-      locale: parsed.locale ? resolveLocale(parsed.locale) : defaults().locale,
-      scanCategories: mergeScanCategories(parsed.scanCategories),
-      lowDiskAlert: mergeLowDiskAlert(parsed.lowDiskAlert),
-      launchAtLogin: mergeLaunchAtLogin(parsed.launchAtLogin),
-      scanReminder: mergeScanReminder(parsed.scanReminder),
-      neverTouchPaths: mergeNeverTouchPaths(parsed.neverTouchPaths)
-    }
+    return parseSettings(await readFile(filePath(), 'utf8'))
   } catch {
     return defaults()
   }
 }
 
-export async function saveSettings(next: AppSettings): Promise<void> {
+/** Fallback copy of a license key. Never returned from `loadSettings`. */
+export async function peekLicenseKeyFallback(): Promise<string | null> {
+  try {
+    const parsed = JSON.parse(await readFile(filePath(), 'utf8')) as { licenseKey?: unknown }
+    return typeof parsed.licenseKey === 'string' && parsed.licenseKey.trim()
+      ? parsed.licenseKey.trim()
+      : null
+  } catch {
+    return null
+  }
+}
+
+export async function setLicenseKeyFallback(key: string | null): Promise<void> {
+  const settings = await loadSettings()
   await mkdir(app.getPath('userData'), { recursive: true })
-  await writeFile(filePath(), JSON.stringify(next, null, 2), 'utf8')
+  const body = key ? { ...settings, licenseKey: key } : settings
+  await writeFile(filePath(), JSON.stringify(body, null, 2), 'utf8')
+}
+
+export async function saveSettings(next: AppSettings): Promise<void> {
+  const licenseKey = await peekLicenseKeyFallback()
+  await mkdir(app.getPath('userData'), { recursive: true })
+  const body = licenseKey ? { ...appSettingsBody(next), licenseKey } : appSettingsBody(next)
+  await writeFile(filePath(), JSON.stringify(body, null, 2), 'utf8')
 }

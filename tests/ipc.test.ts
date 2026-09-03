@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({
   runScan: vi.fn(),
   trashPaths: vi.fn(),
   applyLaunchAtLogin: vi.fn(),
-  showOpenDialog: vi.fn()
+  showOpenDialog: vi.fn(),
+  getLicenseStatus: vi.fn(),
+  activateLicense: vi.fn()
 }))
 
 vi.mock('electron', () => {
@@ -48,6 +50,10 @@ vi.mock('../src/main/scanner', async () => {
 })
 vi.mock('../src/main/cleaner', () => ({ trashPaths: mocks.trashPaths }))
 vi.mock('../src/main/loginItem', () => ({ applyLaunchAtLogin: mocks.applyLaunchAtLogin }))
+vi.mock('../src/main/license', () => ({
+  getLicenseStatus: mocks.getLicenseStatus,
+  activateLicense: mocks.activateLicense
+}))
 
 import { registerIpc } from '../src/main/ipc'
 
@@ -71,7 +77,7 @@ describe('IPC registration', () => {
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(13)
+    expect(mocks.handlers.size).toBe(15)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
@@ -252,5 +258,15 @@ describe('IPC registration', () => {
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
     await expect(call('shell:reveal-item', '/Users/test/Library/Caches/keep')).resolves.toBe(true)
     expect(mocks.showItemInFolder).toHaveBeenCalledWith('/Users/test/Library/Caches/keep')
+  })
+
+  it('exposes license status as a boolean and never returns the key', async () => {
+    mocks.getLicenseStatus.mockResolvedValue({ isPro: false })
+    mocks.activateLicense.mockResolvedValue({ isPro: true })
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    await expect(call('license:status')).resolves.toEqual({ isPro: false })
+    await expect(call('license:activate', 'dh1.fixture')).resolves.toEqual({ isPro: true })
+    expect(mocks.activateLicense).toHaveBeenCalledWith('dh1.fixture')
+    expect(mocks.getLicenseStatus).toHaveBeenCalled()
   })
 })

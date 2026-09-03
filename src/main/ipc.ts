@@ -19,6 +19,7 @@ import {
   revealGrantTarget
 } from './permissions'
 import { isSafePath, runScan } from './scanner'
+import { activateLicense, getLicenseStatus } from './license'
 import { loadSettings, saveSettings } from './settings'
 import type { TrayController } from './tray'
 
@@ -44,6 +45,8 @@ export function registerIpc(options: IpcOptions): void {
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0]
   })
+  ipcMain.handle('license:status', () => getLicenseStatus())
+  ipcMain.handle('license:activate', (_event, key: unknown) => activateLicense(key))
   ipcMain.handle('settings:get', () => loadSettings())
   ipcMain.handle('settings:set', async (_event, next: AppSettings) => {
     const normalized: AppSettings = {

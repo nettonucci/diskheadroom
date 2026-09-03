@@ -185,6 +185,7 @@ Useful scripts:
 | `npm run icons` | Rasterize `assets/brand` into `build/icon.icns` and the menu bar templates |
 | `npm run screenshots` | Rebuild and capture `docs/screenshots` from the UI using sample data |
 | `npm run screenshots:notification` | Render the low disk alert banner for release notes (`-- --locale=pt-BR --percent=5`) |
+| `node scripts/sign-license.mjs` | Sign a Pro license with `.license-private.pem` (not in git) |
 | `npm run commitlint` | Check the latest commit message against Conventional Commits |
 | `npm run release:dry` | Preview the next SemVer bump without tagging |
 
@@ -197,6 +198,7 @@ Useful scripts:
 - Never-touch prefixes are omitted from scans and refused by Trash.
 - Paths under `/System` and a short list of OS roots are rejected.
 - Settings live in the app’s user-data folder as local JSON.
+- A signed Pro license (when one exists) is verified **offline** in the main process. The public key ships in source; the private signing key does not. The renderer only sees `isPro`.
 - Donate opens [GitHub Sponsors](https://github.com/sponsors/nettonucci) in your browser. Nothing else is sent.
 
 Treat this like any disk utility: do not select folders you do not recognize. Clearing caches is usually harmless; removing an application you still need is not.
@@ -233,7 +235,7 @@ The same link is on the in-app **Donate** screen. Sponsorships help with signing
 ## Project layout
 
 ```
-src/main/          Window, menu bar, IPC, scan, trash
+src/main/          Window, menu bar, IPC, scan, trash, offline license verify
 src/preload/       contextBridge API
 src/renderer/      React UI
 src/shared/        Types, constants, translations

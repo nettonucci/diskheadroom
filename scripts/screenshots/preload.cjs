@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('diskheadroom', {
   getGrantTarget: async () => sample.grantTarget,
   revealGrantTarget: async () => {},
   getSettings: async () => settings,
+  getLicenseStatus: async () => ({ isPro: false }),
+  activateLicense: async () => ({ isPro: false }),
   setSettings: async (next) => {
     settings = { ...next }
     return settings
