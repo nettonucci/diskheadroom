@@ -19,7 +19,7 @@ export default defineConfig({
       reporter: ['text', 'json-summary', 'html'],
       include: [
         'src/main/{cleaner,disk,ipc,license,permissions,scanner,settings,tray}.ts',
-        'src/shared/{constants,i18n}.ts',
+        'src/shared/{constants,entitlement,i18n}.ts',
         'src/renderer/src/{App.tsx,lib/*.ts}'
       ],
       thresholds: {
