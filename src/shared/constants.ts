@@ -1,6 +1,34 @@
+import type { Locale } from './i18n'
+
 export const SPONSORS_URL = 'https://github.com/sponsors/nettonucci'
 export const REPO_URL = 'https://github.com/nettonucci/diskheadroom'
+export const SITE_URL = 'https://www.diskheadroom.com'
 export const APP_NAME = 'Disk Headroom'
+
+const SITE_HOSTS = new Set(['diskheadroom.com', 'www.diskheadroom.com'])
+
+/**
+ * Pro checkout lives on the site, where Paddle.js opens the overlay. The app
+ * only ever verifies the signed key offline, so no Paddle token, product id, or
+ * API secret needs to exist in this repository.
+ */
+export function proCheckoutUrl(locale: Locale): string {
+  return `${SITE_URL}/${locale}/pro`
+}
+
+/** HTTPS GitHub links and the Disk Headroom site only. */
+export function isAllowedExternalUrl(url: unknown): boolean {
+  if (typeof url !== 'string' || !url) return false
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:') return false
+    if (parsed.username || parsed.password) return false
+    if (parsed.hostname === 'github.com') return true
+    return SITE_HOSTS.has(parsed.hostname)
+  } catch {
+    return false
+  }
+}
 
 export const UNUSED_DAY_OPTIONS = [30, 90, 180, 365] as const
 export type UnusedDays = (typeof UNUSED_DAY_OPTIONS)[number]

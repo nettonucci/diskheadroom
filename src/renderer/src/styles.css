@@ -606,7 +606,8 @@ select {
   margin-top: 8px;
 }
 
-.never-touch-add input[type='text'] {
+.never-touch-add input[type='text'],
+.license-add input[type='text'] {
   width: 100%;
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
@@ -616,6 +617,7 @@ select {
 }
 
 .never-touch-add .row,
+.license-add .row,
 .never-touch-list .row {
   margin-top: 8px;
   display: flex;
@@ -638,4 +640,17 @@ select {
 .never-touch-list .path {
   display: block;
   word-break: break-all;
+}
+
+.pro-status {
+  margin: 10px 0 0;
+  font-weight: 600;
+}
+
+.pro-status.on {
+  color: var(--ok);
+}
+
+.license-add {
+  margin-top: 4px;
 }

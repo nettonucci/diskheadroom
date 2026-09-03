@@ -73,6 +73,7 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Never-touch paths | Settings list of folders omitted from the next scan and refused by Trash; paste a path or pick a folder |
 | Languages | English, Português (Brasil), Español |
 | Donate | In-app page plus this README, both pointing at GitHub Sponsors |
+| Pro (optional) | Paddle checkout + offline license key under Settings; scan and Trash stay free without it |
 
 The app follows the macOS language on first launch (with English as the fallback).
 You can change it at any time under **Settings → Language**; the window and menu
@@ -200,6 +201,14 @@ Useful scripts:
 - Settings live in the app’s user-data folder as local JSON.
 - A signed Pro license (when one exists) is verified **offline** in the main process. The public key ships in source; the private signing key does not. The renderer only sees `isPro`.
 - Donate opens [GitHub Sponsors](https://github.com/sponsors/nettonucci) in your browser. Nothing else is sent.
+
+## Pro (optional)
+
+Scan, review, and Trash stay free. **Disk Headroom Pro** is a lifetime license for **major 1.x**, sold through [Paddle](https://www.paddle.com/) (Merchant of Record). After purchase, Paddle emails a signed key; you paste it under **Settings**. Verification is offline in the app. There is no account.
+
+**Buy Pro** opens `https://www.diskheadroom.com/<language>/pro` in your browser, where Paddle.js runs the overlay checkout ([site repository](https://github.com/nettonucci/diskheadroom-web)). Payment stays on the web: no Paddle token, product id, or API secret exists in this repository, and the app only ever verifies a signed key. Generate keys with `node scripts/sign-license.mjs` and upload them to Paddle fulfillment, or let Paddle issue keys that match this format.
+
+People who only want to support the free app can still use **Donate** / GitHub Sponsors.
 
 Treat this like any disk utility: do not select folders you do not recognize. Clearing caches is usually harmless; removing an application you still need is not.
 
