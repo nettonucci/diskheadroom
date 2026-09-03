@@ -67,6 +67,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.handlers.clear()
   mocks.loadSettings.mockResolvedValue({ neverTouchPaths: [] })
+  mocks.getLicenseStatus.mockResolvedValue({ isPro: false })
 })
 
 describe('IPC registration', () => {
@@ -105,7 +106,8 @@ describe('IPC registration', () => {
     expect(saved).toEqual(
       expect.objectContaining({
         locale: 'pt-BR',
-        scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true }),
+        scanCategories: expect.objectContaining({ unusedApps: false, userCaches: true, largeFiles: false }),
+        largeFileMinBytes: 500 * 1024 * 1024,
         lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
         launchAtLogin: false,
         scanReminder: { enabled: false, intervalDays: 7 },
@@ -133,11 +135,13 @@ describe('IPC registration', () => {
       setupComplete: true,
       locale: 'en',
       scanCategories: {},
+      largeFileMinBytes: 250 * 1024 * 1024,
       launchAtLogin: true,
       scanReminder: { enabled: true, intervalDays: 14 }
     })
     expect(saved).toEqual(
       expect.objectContaining({
+        largeFileMinBytes: 250 * 1024 * 1024,
         launchAtLogin: true,
         scanReminder: { enabled: true, intervalDays: 14 }
       })
@@ -159,17 +163,24 @@ describe('IPC registration', () => {
     mocks.trashPaths.mockResolvedValue({ trashed: [], failed: [], bytesRequested: 42 })
     registerIpc({ sendToRenderer, getTrayController: () => null, onScanCompleted })
 
-    await call('scan:run', 90, { unusedApps: false })
+    await call('scan:run', {
+      unusedDays: 90,
+      categories: { unusedApps: false },
+      largeFileMinBytes: 100 * 1024 * 1024
+    })
     expect(onScanCompleted).toHaveBeenCalledTimes(1)
     expect(sendToRenderer).toHaveBeenCalledWith('scan:progress', {
       phase: 'progress.done',
       percent: 100
     })
     expect(mocks.runScan).toHaveBeenCalledWith(
-      90,
-      expect.any(Function),
-      expect.objectContaining({ unusedApps: false, userCaches: true }),
-      []
+      expect.objectContaining({
+        unusedDays: 90,
+        categories: expect.objectContaining({ unusedApps: false, userCaches: true }),
+        largeFileMinBytes: 100 * 1024 * 1024,
+        neverTouchPaths: []
+      }),
+      expect.any(Function)
     )
     const request = { paths: ['/Users/test/cache', '/Users/test/unknown'] }
     await call('clean:trash', request)
@@ -198,12 +209,14 @@ describe('IPC registration', () => {
     mocks.trashPaths.mockResolvedValue({ trashed: [], failed: [], bytesRequested: 0 })
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
 
-    await call('scan:run', 90)
+    await call('scan:run', { unusedDays: 90 })
     expect(mocks.runScan).toHaveBeenCalledWith(
-      90,
-      expect.any(Function),
-      expect.any(Object),
-      ['/Users/test/Library/Caches/keep']
+      expect.objectContaining({
+        unusedDays: 90,
+        categories: expect.any(Object),
+        neverTouchPaths: ['/Users/test/Library/Caches/keep']
+      }),
+      expect.any(Function)
     )
     await call('clean:trash', { paths: ['/Users/test/cache'] })
     expect(mocks.trashPaths).toHaveBeenCalledWith(
@@ -213,6 +226,34 @@ describe('IPC registration', () => {
         lastScanPaths: new Set(['/Users/test/cache']),
         neverTouchPaths: ['/Users/test/Library/Caches/keep']
       }
+    )
+  })
+
+  it('allows the large-files home walk only with a valid main-process entitlement', async () => {
+    mocks.runScan.mockResolvedValue({ items: [], scannedAt: '2025-01-01', limited: false })
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    const request = {
+      unusedDays: 90,
+      categories: { largeFiles: true },
+      largeFileMinBytes: 1024 * 1024 * 1024
+    }
+
+    await call('scan:run', request)
+    expect(mocks.getLicenseStatus).toHaveBeenCalledTimes(1)
+    expect(mocks.runScan).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        categories: expect.objectContaining({ largeFiles: false })
+      }),
+      expect.any(Function)
+    )
+
+    mocks.getLicenseStatus.mockResolvedValueOnce({ isPro: true })
+    await call('scan:run', request)
+    expect(mocks.runScan).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        categories: expect.objectContaining({ largeFiles: true })
+      }),
+      expect.any(Function)
     )
   })
 
@@ -243,7 +284,7 @@ describe('IPC registration', () => {
     await expect(call('shell:reveal-item', '/Users/test/Library/Caches/a')).resolves.toBe(false)
     expect(mocks.showItemInFolder).not.toHaveBeenCalled()
 
-    await call('scan:run', 90)
+    await call('scan:run', { unusedDays: 90 })
     await expect(call('shell:reveal-item', '/Users/test/Library/Caches/a')).resolves.toBe(true)
     expect(mocks.showItemInFolder).toHaveBeenCalledWith('/Users/test/Library/Caches/a')
 

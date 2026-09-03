@@ -1,6 +1,7 @@
 import { clipboard, dialog, ipcMain, shell } from 'electron'
 import { resolve as resolvePath } from 'node:path'
 import {
+  mergeLargeFileMinBytes,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeNeverTouchPaths,
@@ -8,7 +9,7 @@ import {
   mergeScanReminder,
   isAllowedExternalUrl
 } from '../shared/constants'
-import type { AppSettings, CleanRequest, ScanItem } from '../shared/types'
+import type { AppSettings, CleanRequest, ScanItem, ScanOptions } from '../shared/types'
 import { trashPaths } from './cleaner'
 import { getDiskInfo } from './disk'
 import { applyLaunchAtLogin } from './loginItem'
@@ -52,6 +53,7 @@ export function registerIpc(options: IpcOptions): void {
     const normalized: AppSettings = {
       ...next,
       scanCategories: mergeScanCategories(next.scanCategories),
+      largeFileMinBytes: mergeLargeFileMinBytes(next.largeFileMinBytes),
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
       scanReminder: mergeScanReminder(next.scanReminder),
@@ -65,19 +67,24 @@ export function registerIpc(options: IpcOptions): void {
   })
   ipcMain.handle(
     'scan:run',
-    async (
-      _event,
-      unusedDays: AppSettings['unusedDays'],
-      categories?: AppSettings['scanCategories']
-    ) => {
+    async (_event, input: ScanOptions) => {
       const settings = await loadSettings()
+      const categories = mergeScanCategories(input?.categories)
+      if (categories.largeFiles) {
+        // Entitlement is verified from the signed key in main on every requested
+        // home walk. Renderer state can only affect presentation, never access.
+        categories.largeFiles = (await getLicenseStatus()).isPro
+      }
       const result = await runScan(
-        unusedDays,
+        {
+          unusedDays: input?.unusedDays,
+          categories,
+          largeFileMinBytes: mergeLargeFileMinBytes(input?.largeFileMinBytes),
+          neverTouchPaths: mergeNeverTouchPaths(settings.neverTouchPaths)
+        },
         (progress) => {
           options.sendToRenderer('scan:progress', progress)
-        },
-        mergeScanCategories(categories),
-        mergeNeverTouchPaths(settings.neverTouchPaths)
+        }
       )
       lastItems = new Map(result.items.map((item) => [item.path, item]))
       options.onScanCompleted?.()

@@ -67,13 +67,14 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Android / Gradle / CocoaPods (opt-in) | `~/.gradle/caches`, CocoaPods cache, and conservative Android SDK leftover dirs — **unchecked**; the SDK install and AVDs are never listed |
 | Docker Desktop (opt-in) | Disk image and Buildx cache — **unchecked**, warning that images, containers, and volumes can be lost |
 | Documents & Desktop (opt-in) | First-level files and folders older than the idle window and at least 100 MB — **unchecked**; the Documents and Desktop folders themselves are never listed |
+| Large files (Pro, opt-in) | Bounded finder under the home folder with a configurable 100 MB–5 GB floor — **unchecked**; symlinks, Trash, Git metadata, and protected paths are skipped |
 | Idle apps | `/Applications` and `~/Applications`, skipping Apple system bundles |
 | Menu bar | Open, Scan now, Donate, Quit |
 | Low disk alert | Optional local Notification Center notice when free space drops below a percent or GB threshold (off by default, with a cooldown so it does not spam) |
 | Never-touch paths | Settings list of folders omitted from the next scan and refused by Trash; paste a path or pick a folder |
 | Languages | English, Português (Brasil), Español |
 | Donate | In-app page plus this README, both pointing at GitHub Sponsors |
-| Pro (optional) | Paddle checkout + offline license key under Settings; scan and Trash stay free without it |
+| Pro (optional) | Paddle checkout + offline license key under Settings; core scan and Trash stay free, while paid finders require a valid key |
 
 The app follows the macOS language on first launch (with English as the fallback).
 You can change it at any time under **Settings → Language**; the window and menu
@@ -204,7 +205,7 @@ Useful scripts:
 
 ## Pro (optional)
 
-Scan, review, and Trash stay free. **Disk Headroom Pro** is a lifetime license for **major 1.x**, sold through [Paddle](https://www.paddle.com/) (Merchant of Record). After purchase, Paddle emails a signed key; you paste it under **Settings**. Verification is offline in the app. There is no account.
+Core scan, review, and Trash stay free. Paid finders such as **Large files** require Disk Headroom Pro. It is a lifetime license for **major 1.x**, sold through [Paddle](https://www.paddle.com/) (Merchant of Record). After purchase, Paddle emails a signed key; you paste it under **Settings**. Verification is offline in the main process on every gated scan. There is no account.
 
 **Buy Pro** opens `https://www.diskheadroom.com/<language>/pro` in your browser, where Paddle.js runs the overlay checkout ([site repository](https://github.com/nettonucci/diskheadroom-web)). Payment stays on the web: no Paddle token, product id, or API secret exists in this repository, and the app only ever verifies a signed key. Generate keys with `node scripts/sign-license.mjs` and upload them to Paddle fulfillment, or let Paddle issue keys that match this format.
 

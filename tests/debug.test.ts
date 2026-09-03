@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LowDiskDebugStatus } from '../src/shared/types'
 
 const mocks = vi.hoisted(() => ({
-  handlers: new Map<string, (...args: unknown[]) => unknown>()
+  handlers: new Map<string, (...args: unknown[]) => unknown>(),
+  deactivateLicense: vi.fn()
 }))
 
 vi.mock('electron', () => {
@@ -15,6 +16,10 @@ vi.mock('electron', () => {
   }
   return { default: module, ...module }
 })
+
+vi.mock('../src/main/license', () => ({
+  deactivateLicense: mocks.deactivateLicense
+}))
 
 import { registerDebugIpc } from '../src/main/debug'
 
@@ -41,6 +46,7 @@ const call = (channel: string, ...args: unknown[]): unknown => {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.handlers.clear()
+  mocks.deactivateLicense.mockResolvedValue({ isPro: false })
 })
 
 describe('debug IPC', () => {
@@ -51,8 +57,16 @@ describe('debug IPC', () => {
       'debug:low-disk-simulate',
       'debug:low-disk-check',
       'debug:low-disk-reset',
-      'debug:low-disk-notify'
+      'debug:low-disk-notify',
+      'debug:license-deactivate'
     ])
+  })
+
+  it('drops the stored Pro license so the free state can be retested', async () => {
+    registerDebugIpc(watcher())
+
+    await expect(call('debug:license-deactivate')).resolves.toEqual({ isPro: false })
+    expect(mocks.deactivateLicense).toHaveBeenCalledTimes(1)
   })
 
   it('delegates to the watcher and answers with a fresh status', async () => {

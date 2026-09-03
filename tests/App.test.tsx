@@ -20,6 +20,7 @@ const settings = {
   setupComplete: true,
   locale: 'en' as const,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
+  largeFileMinBytes: 500 * 1024 * 1024 as const,
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
   scanReminder: { enabled: false, intervalDays: 7 as const },
@@ -98,7 +99,8 @@ function api(overrides: Partial<Api> = {}): Api {
       simulateFreePercent: vi.fn().mockResolvedValue({ ...debugStatus, simulatedFreePercent: 5 }),
       runLowDiskCheck: vi.fn().mockResolvedValue(debugStatus),
       resetLowDiskCooldown: vi.fn().mockResolvedValue(debugStatus),
-      sendLowDiskNotification: vi.fn().mockResolvedValue({ shown: true, status: debugStatus })
+      sendLowDiskNotification: vi.fn().mockResolvedValue({ shown: true, status: debugStatus }),
+      deactivateLicense: vi.fn().mockResolvedValue({ isPro: false })
     },
     onScanProgress: vi.fn(() => () => {}),
     onTrayScan: vi.fn(() => () => {}),
@@ -302,6 +304,48 @@ describe('App', () => {
     await user.click(screen.getByRole('checkbox'))
     await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
     expect(screen.getByRole('dialog')).toHaveTextContent(/Docker Desktop/)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(bridge.trashItems).toHaveBeenCalled())
+  })
+
+  it('shows large home files unchecked with a warning before trash', async () => {
+    const largeFilesResult = {
+      ...result,
+      items: [
+        {
+          id: 'large-file',
+          categoryId: 'largeFiles' as const,
+          name: 'large_archive.iso',
+          path: '/Users/test/Downloads/large_archive.iso',
+          bytes: 1024 * 1024 * 1024,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: null,
+          daysIdle: null
+        }
+      ]
+    }
+    const bridge = api({
+      runScan: vi.fn().mockResolvedValue(largeFilesResult),
+      trashItems: vi.fn().mockResolvedValue({
+        trashed: [largeFilesResult.items[0].path],
+        failed: [],
+        bytesRequested: 1024 * 1024 * 1024
+      })
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+
+    expect(await screen.findByText('large_archive.iso')).toBeInTheDocument()
+    expect(screen.getByText(/individual files in your home folder/)).toBeInTheDocument()
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Move to Trash' })).toBeDisabled()
+
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent(/Move 1 item \(1.0 GB\) to Trash/)
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(bridge.trashItems).toHaveBeenCalled())
   })
@@ -596,6 +640,34 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Scan this Mac' })).toBeEnabled()
   })
 
+  it('shows large files as Pro-only and enables its controls for Pro', async () => {
+    const freeBridge = api()
+    window.diskheadroom = freeBridge
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+
+    expect(screen.getByRole('checkbox', { name: /Large files/ })).toBeDisabled()
+    expect(screen.getByDisplayValue('500 MB')).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Get Pro to enable' }))
+    expect(freeBridge.openExternal).toHaveBeenCalledWith('https://www.diskheadroom.com/en/pro')
+
+    unmount()
+    const proBridge = api({ getLicenseStatus: vi.fn().mockResolvedValue({ isPro: true }) })
+    window.diskheadroom = proBridge
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('checkbox', { name: /Large files/ })).toBeEnabled()
+    fireEvent.change(screen.getByDisplayValue('500 MB'), {
+      target: { value: String(1024 * 1024 * 1024) }
+    })
+    await waitFor(() =>
+      expect(proBridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ largeFileMinBytes: 1024 * 1024 * 1024 })
+      )
+    )
+  })
+
   it('updates settings, opens permissions, and opens external links', async () => {
     const bridge = api()
     window.diskheadroom = bridge
@@ -729,7 +801,13 @@ describe('App', () => {
     act(() => donate?.())
     expect(await screen.findByText('Keep the lights on')).toBeInTheDocument()
     act(() => scan?.())
-    await waitFor(() => expect(bridge.runScan).toHaveBeenCalledWith(90, DEFAULT_SCAN_CATEGORIES))
+    await waitFor(() =>
+      expect(bridge.runScan).toHaveBeenCalledWith({
+        unusedDays: 90,
+        categories: DEFAULT_SCAN_CATEGORIES,
+        largeFileMinBytes: 500 * 1024 * 1024
+      })
+    )
   })
 
   it('drives the low disk alert from the development-only Debug tab', async () => {
@@ -755,6 +833,28 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset cooldown' }))
     await waitFor(() => expect(bridge.debug?.resetLowDiskCooldown).toHaveBeenCalled())
+  })
+
+  it('removes the Pro license from the Debug tab so the gate can be retested', async () => {
+    const bridge = api({ getLicenseStatus: vi.fn().mockResolvedValue({ isPro: true }) })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('Reclaim storage')
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('checkbox', { name: 'Large files' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: 'Debug' }))
+    expect(await screen.findByText('Pro active')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pro license' }))
+    await waitFor(() => expect(bridge.debug?.deactivateLicense).toHaveBeenCalled())
+    expect(await screen.findByText('free')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove Pro license' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('checkbox', { name: /Large files/ })).toBeDisabled()
   })
 
   it('falls back to a notice when the preload exposes no debug bridge', async () => {

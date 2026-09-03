@@ -45,6 +45,7 @@ export const SCAN_CATEGORY_IDS = [
   'androidDev',
   'docker',
   'idleUserFolders',
+  'largeFiles',
   'unusedApps'
 ] as const
 export type ScanCategoryFlag = (typeof SCAN_CATEGORY_IDS)[number]
@@ -60,6 +61,7 @@ export const DEFAULT_SCAN_CATEGORIES: ScanCategoryFlags = {
   androidDev: true,
   docker: true,
   idleUserFolders: true,
+  largeFiles: false,
   unusedApps: true
 }
 
@@ -74,6 +76,27 @@ export function mergeScanCategories(
     if (typeof input[id] === 'boolean') next[id] = input[id]
   }
   return next
+}
+
+export const LARGE_FILE_MIN_BYTES_OPTIONS = [
+  100 * 1024 * 1024,
+  250 * 1024 * 1024,
+  500 * 1024 * 1024,
+  1024 * 1024 * 1024,
+  2 * 1024 * 1024 * 1024,
+  5 * 1024 * 1024 * 1024
+] as const
+export type LargeFileMinBytes = (typeof LARGE_FILE_MIN_BYTES_OPTIONS)[number]
+export const DEFAULT_LARGE_FILE_MIN_BYTES: LargeFileMinBytes = 500 * 1024 * 1024
+
+export function mergeLargeFileMinBytes(input: unknown): LargeFileMinBytes {
+  if (
+    typeof input === 'number' &&
+    (LARGE_FILE_MIN_BYTES_OPTIONS as readonly number[]).includes(input)
+  ) {
+    return input as LargeFileMinBytes
+  }
+  return DEFAULT_LARGE_FILE_MIN_BYTES
 }
 
 export const LOW_DISK_ALERT_KINDS = ['percent', 'gigabytes'] as const

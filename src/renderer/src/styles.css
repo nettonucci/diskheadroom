@@ -326,10 +326,21 @@ input {
 
 .scan-flag {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   gap: 10px;
   align-items: center;
   font-size: 14px;
+}
+
+.scan-flag:has(input:disabled) {
+  color: var(--muted);
+}
+
+.pro-badge {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .debug-grid {

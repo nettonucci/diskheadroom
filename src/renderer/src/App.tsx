@@ -7,8 +7,10 @@ import {
   proCheckoutUrl,
   LOW_DISK_ALERT_PRESETS,
   SCAN_REMINDER_INTERVAL_DAYS,
+  LARGE_FILE_MIN_BYTES_OPTIONS,
   lowDiskAlertPresetKey,
   parseLowDiskAlertPreset,
+  type LargeFileMinBytes,
   type LowDiskAlertSettings,
   type ScanCategoryFlag,
   type ScanReminderSettings,
@@ -203,7 +205,11 @@ function AppShell(): JSX.Element {
     // sign of work; the dashboard is where the progress bar lives.
     setView('dashboard')
     try {
-      const next = await window.diskheadroom.runScan(settings.unusedDays, settings.scanCategories)
+      const next = await window.diskheadroom.runScan({
+        unusedDays: settings.unusedDays,
+        categories: settings.scanCategories,
+        largeFileMinBytes: settings.largeFileMinBytes
+      })
       setResult(next)
       const initial: Record<string, boolean> = {}
       for (const item of next.items) {
@@ -255,6 +261,10 @@ function AppShell(): JSX.Element {
 
   async function updateUnusedDays(unusedDays: UnusedDays): Promise<void> {
     await updateSettings(() => ({ unusedDays }))
+  }
+
+  async function updateLargeFileMinBytes(largeFileMinBytes: LargeFileMinBytes): Promise<void> {
+    await updateSettings(() => ({ largeFileMinBytes }))
   }
 
   async function updateLocale(nextLocale: Locale): Promise<void> {
@@ -430,6 +440,7 @@ function AppShell(): JSX.Element {
             t={t}
             settings={settings}
             onUnusedDays={(value) => void updateUnusedDays(value)}
+            onLargeFileMinBytes={(value) => void updateLargeFileMinBytes(value)}
             onLocale={(value) => void updateLocale(value)}
             onScanCategory={(id, enabled) => void updateScanCategory(id, enabled)}
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
@@ -443,7 +454,9 @@ function AppShell(): JSX.Element {
           />
         )}
         {view === 'donate' && <DonateView t={t} />}
-        {import.meta.env.DEV && view === 'debug' && <DebugView />}
+        {import.meta.env.DEV && view === 'debug' && (
+          <DebugView isPro={isPro} onLicenseChange={setIsPro} />
+        )}
       </main>
       {confirmCleanOpen && (
         <ConfirmDialog
@@ -950,6 +963,7 @@ function SettingsView(props: {
   t: Translator
   settings: AppSettings
   onUnusedDays: (value: UnusedDays) => void
+  onLargeFileMinBytes: (value: LargeFileMinBytes) => void
   onLocale: (value: Locale) => void
   onScanCategory: (id: ScanCategoryFlag, enabled: boolean) => void
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
@@ -1013,13 +1027,43 @@ function SettingsView(props: {
             <label key={id} className="scan-flag">
               <input
                 type="checkbox"
-                checked={props.settings.scanCategories[id]}
+                checked={props.settings.scanCategories[id] && (id !== 'largeFiles' || props.isPro)}
+                disabled={id === 'largeFiles' && !props.isPro}
                 onChange={(event) => props.onScanCategory(id, event.target.checked)}
               />
               <span>{props.t(SCAN_CATEGORY_LABELS[id])}</span>
+              {id === 'largeFiles' && !props.isPro && (
+                <small className="pro-badge">{props.t('settings.proBadge')}</small>
+              )}
             </label>
           ))}
         </div>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.largeFilesTitle')}</h3>
+        <p className="muted">{props.t('settings.largeFilesHint')}</p>
+        <select
+          value={props.settings.largeFileMinBytes}
+          disabled={!props.isPro}
+          onChange={(event) => props.onLargeFileMinBytes(Number(event.target.value) as LargeFileMinBytes)}
+        >
+          {LARGE_FILE_MIN_BYTES_OPTIONS.map((bytes) => (
+            <option key={bytes} value={bytes}>
+              {formatBytes(bytes)}
+            </option>
+          ))}
+        </select>
+        {!props.isPro && (
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() =>
+              void window.diskheadroom.openExternal(proCheckoutUrl(props.settings.locale))
+            }
+          >
+            {props.t('settings.largeFilesProCta')}
+          </button>
+        )}
       </div>
       <div className="card">
         <h3>{props.t('settings.neverTouchTitle')}</h3>
@@ -1262,7 +1306,10 @@ const SIMULATION_OPTIONS = [0, 2, 5, 8, 12, 20, 40] as const
 // Development-only harness for the low disk alert: pin free space, run the real
 // check, and inspect the cooldown without waiting for the disk to fill up.
 // Copy stays in English and out of languages.json because it never ships.
-function DebugView(): JSX.Element {
+function DebugView(props: {
+  isPro: boolean
+  onLicenseChange: (isPro: boolean) => void
+}): JSX.Element {
   const debug = window.diskheadroom.debug
   const [status, setStatus] = useState<LowDiskDebugStatus | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -1402,6 +1449,36 @@ function DebugView(): JSX.Element {
           </button>
         </div>
         {note && <p className="muted">{note}</p>}
+      </div>
+      <div className="card">
+        <h3>Pro license</h3>
+        <dl className="debug-grid">
+          <dt>Entitlement</dt>
+          <dd>{props.isPro ? 'Pro active' : 'free'}</dd>
+        </dl>
+        <p className="muted">
+          Removes the stored key so gated finders fall back to the free state. Paste a signed key
+          under Settings to activate Pro again.
+        </p>
+        <div className="debug-actions">
+          <button
+            className="btn"
+            type="button"
+            disabled={busy || !props.isPro}
+            onClick={() => {
+              setBusy(true)
+              void debug
+                .deactivateLicense()
+                .then((status) => {
+                  props.onLicenseChange(isProEntitled(status.isPro))
+                  setNote(`Pro license removed at ${new Date().toLocaleTimeString()}`)
+                })
+                .finally(() => setBusy(false))
+            }}
+          >
+            Remove Pro license
+          </button>
+        </div>
       </div>
     </section>
   )
