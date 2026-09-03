@@ -223,9 +223,9 @@ describe('IPC registration', () => {
 
     await call('shell:open-external', 'https://github.com/sponsors/nettonucci')
     await call('shell:open-external', 'https://github.com/nettonucci/diskheadroom')
-    await call('shell:open-external', 'https://sandbox-checkout.paddle.com/')
+    await call('shell:open-external', 'https://www.diskheadroom.com/en/pro')
     await call('shell:open-external', 'https://example.com')
-    await call('shell:open-external', 'http://checkout.paddle.com/')
+    await call('shell:open-external', 'http://www.diskheadroom.com/en/pro')
     expect(mocks.openExternal).toHaveBeenCalledTimes(3)
   })
 

@@ -8,7 +8,8 @@
 
 ## O que mudou
 
-- Em Ajustes, seção **Disk Headroom Pro**: colar a chave, ver se é válida, comprar (Paddle).
+- Em Ajustes, seção **Disk Headroom Pro**: colar a chave, ver se é válida, comprar.
+- **Comprar** abre a página Pro em diskheadroom.com, no idioma do app, onde o checkout da Paddle roda em overlay. O pagamento fica no navegador; o app só confere a chave.
 - Scan e Lixeira continuam iguais **sem** chave.
 - Doar / GitHub Sponsors permanece na barra e na tela Donate.
 - A chave é verificada neste Mac, sem conta e sem rede. `en`, `pt-BR`, `es`.
@@ -21,7 +22,7 @@ O app continua local e opcional: quem não compra Pro não perde o fluxo conserv
 
 O Disk Headroom ganhou um lugar para ativar o Pro.
 
-Cola a chave em Ajustes. Se for válida, o app marca Pro neste Mac — offline, sem conta. Comprar abre o checkout da Paddle. Quem só quer apoiar o app grátis continua no Donate / GitHub Sponsors.
+Cola a chave em Ajustes. Se for válida, o app marca Pro neste Mac — offline, sem conta. Comprar abre a página Pro no site, no seu idioma, com o checkout da Paddle em overlay. Quem só quer apoiar o app grátis continua no Donate / GitHub Sponsors.
 
 Scan, revisão e Lixeira seguem iguais sem pagar. Sem milagre, sem telemetria.
 

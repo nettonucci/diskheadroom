@@ -693,7 +693,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Activate' }))
     expect(await screen.findByText('Pro is active on this Mac.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Buy Pro' }))
-    expect(bridge.openExternal).toHaveBeenCalledWith('https://sandbox-checkout.paddle.com/')
+    expect(bridge.openExternal).toHaveBeenCalledWith('https://www.diskheadroom.com/en/pro')
     await user.click(screen.getByRole('button', { name: 'Donate instead' }))
     expect(await screen.findByRole('button', { name: 'Sponsor on GitHub' })).toBeInTheDocument()
 

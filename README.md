@@ -206,7 +206,7 @@ Useful scripts:
 
 Scan, review, and Trash stay free. **Disk Headroom Pro** is a lifetime license for **major 1.x**, sold through [Paddle](https://www.paddle.com/) (Merchant of Record). After purchase, Paddle emails a signed key; you paste it under **Settings**. Verification is offline in the app. There is no account.
 
-Vendor id, product id, and API secrets are not in this repository. Generate keys with `node scripts/sign-license.mjs` and upload them to Paddle fulfillment, or let Paddle issue keys that match this format. Replace `PADDLE_CHECKOUT_URL` in `src/shared/constants.ts` with the live overlay URL from the dashboard.
+**Buy Pro** opens `https://www.diskheadroom.com/<language>/pro` in your browser, where Paddle.js runs the overlay checkout ([site repository](https://github.com/nettonucci/diskheadroom-web)). Payment stays on the web: no Paddle token, product id, or API secret exists in this repository, and the app only ever verifies a signed key. Generate keys with `node scripts/sign-license.mjs` and upload them to Paddle fulfillment, or let Paddle issue keys that match this format.
 
 People who only want to support the free app can still use **Donate** / GitHub Sponsors.
 

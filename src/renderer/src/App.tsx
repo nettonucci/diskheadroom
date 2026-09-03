@@ -4,7 +4,7 @@ import {
   SCAN_CATEGORY_IDS,
   SPONSORS_URL,
   REPO_URL,
-  PADDLE_CHECKOUT_URL,
+  proCheckoutUrl,
   LOW_DISK_ALERT_PRESETS,
   SCAN_REMINDER_INTERVAL_DAYS,
   lowDiskAlertPresetKey,
@@ -1130,7 +1130,9 @@ function SettingsView(props: {
             <button
               className="btn primary"
               type="button"
-              onClick={() => void window.diskheadroom.openExternal(PADDLE_CHECKOUT_URL)}
+              onClick={() =>
+                void window.diskheadroom.openExternal(proCheckoutUrl(props.settings.locale))
+              }
             >
               {props.t('settings.proBuy')}
             </button>

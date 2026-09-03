@@ -1,22 +1,22 @@
+import type { Locale } from './i18n'
+
 export const SPONSORS_URL = 'https://github.com/sponsors/nettonucci'
 export const REPO_URL = 'https://github.com/nettonucci/diskheadroom'
+export const SITE_URL = 'https://www.diskheadroom.com'
 export const APP_NAME = 'Disk Headroom'
 
+const SITE_HOSTS = new Set(['diskheadroom.com', 'www.diskheadroom.com'])
+
 /**
- * Hosted Paddle checkout for Disk Headroom Pro (lifetime of major 1.x).
- * Swap in the live overlay URL from the Paddle dashboard. Vendor id, product
- * id, and API secrets stay in 1Password — never in this repo.
+ * Pro checkout lives on the site, where Paddle.js opens the overlay. The app
+ * only ever verifies the signed key offline, so no Paddle token, product id, or
+ * API secret needs to exist in this repository.
  */
-export const PADDLE_CHECKOUT_URL = 'https://sandbox-checkout.paddle.com/'
+export function proCheckoutUrl(locale: Locale): string {
+  return `${SITE_URL}/${locale}/pro`
+}
 
-const PADDLE_CHECKOUT_HOSTS = new Set([
-  'buy.paddle.com',
-  'sandbox-buy.paddle.com',
-  'checkout.paddle.com',
-  'sandbox-checkout.paddle.com'
-])
-
-/** HTTPS GitHub Sponsors/repo links and the Paddle checkout hosts only. */
+/** HTTPS GitHub links and the Disk Headroom site only. */
 export function isAllowedExternalUrl(url: unknown): boolean {
   if (typeof url !== 'string' || !url) return false
   try {
@@ -24,7 +24,7 @@ export function isAllowedExternalUrl(url: unknown): boolean {
     if (parsed.protocol !== 'https:') return false
     if (parsed.username || parsed.password) return false
     if (parsed.hostname === 'github.com') return true
-    return PADDLE_CHECKOUT_HOSTS.has(parsed.hostname)
+    return SITE_HOSTS.has(parsed.hostname)
   } catch {
     return false
   }
