@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { lstat, readdir, readlink, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
@@ -7,6 +8,7 @@ import { promisify } from 'node:util'
 import {
   DEFAULT_DOWNLOADS_MIN_BYTES,
   DEFAULT_DOWNLOADS_MIN_DAYS,
+  DEFAULT_DUPLICATE_FOLDERS,
   DEFAULT_LARGE_FILE_MIN_BYTES,
   DEFAULT_SCAN_CATEGORIES,
   type UnusedDays
@@ -33,6 +35,10 @@ const LARGE_FILES_MAX_DEPTH = 6
 const LARGE_FILES_MAX_DIRS = 2000
 const LARGE_FILES_LIMIT = 50
 const DOWNLOADS_LIMIT = 50
+const DUPLICATE_FILES_LIMIT = 50
+const DUPLICATE_FILES_MAX_DEPTH = 8
+const DUPLICATE_FILES_MAX_DIRS = 2000
+const DUPLICATE_FILES_MAX_FILES = 10000
 
 /** Top-level ~/Library/Caches names scanned as Homebrew or package-manager leftovers. */
 const USER_CACHE_SKIP = new Set([
@@ -65,6 +71,7 @@ export async function runScan(
     largeFileMinBytes = DEFAULT_LARGE_FILE_MIN_BYTES,
     downloadsMinDays = DEFAULT_DOWNLOADS_MIN_DAYS,
     downloadsMinBytes = DEFAULT_DOWNLOADS_MIN_BYTES,
+    duplicateFolders = DEFAULT_DUPLICATE_FOLDERS,
     neverTouchPaths = []
   } = options
   const items: ScanItem[] = []
@@ -139,6 +146,11 @@ export async function runScan(
   onProgress({ phase: 'progress.downloads', percent: 83 })
   if (categories.downloadsReview) {
     items.push(...(await scanDownloads(home, downloadsMinDays, downloadsMinBytes)))
+  }
+
+  onProgress({ phase: 'progress.duplicates', percent: 84 })
+  if (categories.duplicateFiles && duplicateFolders.length > 0) {
+    items.push(...(await scanDuplicateFiles(duplicateFolders, neverTouchPaths)))
   }
 
   onProgress({ phase: 'progress.apps', percent: 86 })
@@ -712,6 +724,188 @@ async function scanUnusedApps(unusedDays: UnusedDays): Promise<ScanItem[]> {
         daysIdle
       })
     }
+  }
+
+  return items
+}
+
+interface DuplicateCandidate {
+  path: string
+  name: string
+  size: number
+  mtimeMs: number
+  hash?: string
+}
+
+export async function computeFileSha256(filePath: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      const hash = createHash('sha256')
+      const stream = createReadStream(filePath)
+      stream.on('data', (chunk) => {
+        hash.update(chunk)
+      })
+      stream.on('end', () => resolve(hash.digest('hex')))
+      stream.on('error', () => resolve(null))
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+/** User-chosen roots may be Documents/Desktop/Downloads; those folders themselves stay unlistable as trash items. */
+export function isAllowedDuplicateRoot(target: string): boolean {
+  if (typeof target !== 'string' || !target.trim()) return false
+  const resolved = resolvePath(target)
+  const home = homedir()
+  if (resolved === '/' || resolved === home) return false
+  return !BLOCKED_PREFIXES.some((prefix) => resolved === prefix || resolved.startsWith(`${prefix}/`))
+}
+
+function shouldSkipDuplicateEntry(fullPath: string): boolean {
+  const resolved = resolvePath(fullPath)
+  const home = homedir()
+  if (resolved === '/' || resolved === home) return true
+  return BLOCKED_PREFIXES.some((prefix) => resolved === prefix || resolved.startsWith(`${prefix}/`))
+}
+
+export async function scanDuplicateFiles(
+  folders: string[],
+  neverTouchPaths: string[] = [],
+  limit = DUPLICATE_FILES_LIMIT,
+  maxDepth = DUPLICATE_FILES_MAX_DEPTH,
+  maxDirs = DUPLICATE_FILES_MAX_DIRS,
+  maxFiles = DUPLICATE_FILES_MAX_FILES
+): Promise<ScanItem[]> {
+  if (!Array.isArray(folders) || folders.length === 0) return []
+
+  const candidates: DuplicateCandidate[] = []
+  let totalDirsVisited = 0
+  let totalFilesExamined = 0
+  const visitedRealDirs = new Set<string>()
+
+  async function walkDir(dirPath: string, depth: number): Promise<void> {
+    if (depth > maxDepth || totalDirsVisited >= maxDirs || totalFilesExamined >= maxFiles) {
+      return
+    }
+    if (isNeverTouchPath(dirPath, neverTouchPaths) || shouldSkipDuplicateEntry(dirPath)) return
+
+    try {
+      const lst = await lstat(dirPath)
+      if (lst.isSymbolicLink() || !lst.isDirectory()) return
+    } catch {
+      return
+    }
+
+    const realPath = resolvePath(dirPath)
+    if (visitedRealDirs.has(realPath)) return
+    visitedRealDirs.add(realPath)
+    totalDirsVisited++
+
+    let entries: string[] = []
+    try {
+      entries = await readdir(dirPath)
+    } catch {
+      return
+    }
+
+    for (const entry of entries) {
+      if (totalFilesExamined >= maxFiles || totalDirsVisited >= maxDirs) break
+      if (entry.startsWith('.')) continue
+
+      const fullPath = join(dirPath, entry)
+      if (isNeverTouchPath(fullPath, neverTouchPaths) || shouldSkipDuplicateEntry(fullPath)) continue
+
+      try {
+        const st = await lstat(fullPath)
+        if (st.isSymbolicLink()) continue
+
+        if (st.isDirectory()) {
+          await walkDir(fullPath, depth + 1)
+        } else if (st.isFile()) {
+          totalFilesExamined++
+          if (st.size > 0 && isSafePath(fullPath)) {
+            candidates.push({
+              path: fullPath,
+              name: entry,
+              size: st.size,
+              mtimeMs:
+                typeof st.mtimeMs === 'number' && Number.isFinite(st.mtimeMs)
+                  ? st.mtimeMs
+                  : Date.now()
+            })
+          }
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  for (const folder of folders) {
+    if (typeof folder !== 'string' || !folder.trim() || !isAllowedDuplicateRoot(folder)) continue
+    if (isNeverTouchPath(folder, neverTouchPaths)) continue
+    await walkDir(resolvePath(folder), 0)
+  }
+
+  if (candidates.length < 2) return []
+
+  const sizeMap = new Map<number, DuplicateCandidate[]>()
+  for (const candidate of candidates) {
+    const list = sizeMap.get(candidate.size)
+    if (list) list.push(candidate)
+    else sizeMap.set(candidate.size, [candidate])
+  }
+
+  const hashMap = new Map<string, DuplicateCandidate[]>()
+  for (const [size, sameSizeCandidates] of sizeMap.entries()) {
+    if (sameSizeCandidates.length < 2) continue
+    for (const candidate of sameSizeCandidates) {
+      const hash = await computeFileSha256(candidate.path)
+      if (!hash) continue
+      candidate.hash = hash
+      const groupKey = `${size}:${hash}`
+      const list = hashMap.get(groupKey)
+      if (list) list.push(candidate)
+      else hashMap.set(groupKey, [candidate])
+    }
+  }
+
+  const duplicateGroups: DuplicateCandidate[][] = []
+  for (const group of hashMap.values()) {
+    if (group.length < 2) continue
+    group.sort((a, b) => a.mtimeMs - b.mtimeMs || a.path.localeCompare(b.path))
+    duplicateGroups.push(group)
+  }
+
+  duplicateGroups.sort((a, b) => b[0].size * (b.length - 1) - a[0].size * (a.length - 1))
+
+  const now = Date.now()
+  const items: ScanItem[] = []
+
+  for (const group of duplicateGroups) {
+    const duplicateGroupId = createHash('sha1')
+      .update(`${group[0].size}:${group[0].hash ?? group[0].path}`)
+      .digest('hex')
+      .slice(0, 16)
+    for (const [index, file] of group.entries()) {
+      if (items.length >= limit) break
+      const daysIdle = Math.max(0, Math.floor((now - file.mtimeMs) / (24 * 60 * 60 * 1000)))
+      items.push({
+        id: idFor(file.path),
+        categoryId: 'duplicateFiles',
+        name: file.name,
+        path: file.path,
+        bytes: file.size,
+        selectedByDefault: false,
+        optional: true,
+        lastUsedAt: new Date(file.mtimeMs).toISOString(),
+        daysIdle,
+        duplicateGroupId,
+        duplicateKeep: index === 0
+      })
+    }
+    if (items.length >= limit) break
   }
 
   return items

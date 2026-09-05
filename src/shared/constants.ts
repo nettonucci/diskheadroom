@@ -47,13 +47,14 @@ export const SCAN_CATEGORY_IDS = [
   'idleUserFolders',
   'largeFiles',
   'downloadsReview',
+  'duplicateFiles',
   'unusedApps'
 ] as const
 export type ScanCategoryFlag = (typeof SCAN_CATEGORY_IDS)[number]
 export type ScanCategoryFlags = Record<ScanCategoryFlag, boolean>
 
 /** Categories that walk user files and require a valid Pro key in main. */
-export const PRO_SCAN_CATEGORY_IDS = ['largeFiles', 'downloadsReview'] as const
+export const PRO_SCAN_CATEGORY_IDS = ['largeFiles', 'downloadsReview', 'duplicateFiles'] as const
 export type ProScanCategoryId = (typeof PRO_SCAN_CATEGORY_IDS)[number]
 
 export function isProScanCategory(id: ScanCategoryFlag): boolean {
@@ -72,6 +73,7 @@ export const DEFAULT_SCAN_CATEGORIES: ScanCategoryFlags = {
   idleUserFolders: true,
   largeFiles: false,
   downloadsReview: false,
+  duplicateFiles: false,
   unusedApps: true
 }
 
@@ -235,6 +237,8 @@ export function mergeLaunchAtLogin(input: unknown): boolean {
 
 export const DEFAULT_NEVER_TOUCH_PATHS: string[] = []
 export const MAX_NEVER_TOUCH_PATHS = 50
+export const DEFAULT_DUPLICATE_FOLDERS: string[] = []
+export const MAX_DUPLICATE_FOLDERS = 20
 
 /** Absolute prefixes the scanner hides and the cleaner refuses. IPC may send anything. */
 export function mergeNeverTouchPaths(input: unknown): string[] {
@@ -251,6 +255,25 @@ export function mergeNeverTouchPaths(input: unknown): string[] {
     seen.add(normalized)
     next.push(normalized)
     if (next.length >= MAX_NEVER_TOUCH_PATHS) break
+  }
+  return next
+}
+
+/** Absolute existing-folder candidates for the duplicate finder. IPC may send anything. */
+export function mergeDuplicateFolders(input: unknown): string[] {
+  if (!Array.isArray(input)) return [...DEFAULT_DUPLICATE_FOLDERS]
+  const seen = new Set<string>()
+  const next: string[] = []
+  for (const item of input) {
+    if (typeof item !== 'string') continue
+    const trimmed = item.trim()
+    if (!trimmed.startsWith('/') || trimmed.includes('\0')) continue
+    const normalized = trimmed.replace(/\/+$/, '')
+    if (!normalized || normalized === '/') continue
+    if (seen.has(normalized)) continue
+    seen.add(normalized)
+    next.push(normalized)
+    if (next.length >= MAX_DUPLICATE_FOLDERS) break
   }
   return next
 }

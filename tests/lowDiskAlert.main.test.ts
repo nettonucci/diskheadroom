@@ -53,7 +53,8 @@ const enabled: AppSettings = {
   lowDiskAlert: { enabled: true, kind: 'percent', value: 10 },
   launchAtLogin: false,
   scanReminder: { enabled: false, intervalDays: 7 },
-  neverTouchPaths: []
+  neverTouchPaths: [],
+  duplicateFolders: []
 }
 
 const disabled: AppSettings = {

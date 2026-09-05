@@ -42,6 +42,11 @@ import type {
 import { CATEGORY_META, CATEGORY_WARNING, NAV, SCAN_CATEGORY_LABELS, type ViewId } from './lib/copy'
 import { formatBytes, formatDate } from './lib/format'
 import { isProEntitled } from '../../shared/entitlement'
+import {
+  categoryExtrasSelected,
+  isLastUnselectedDuplicate,
+  selectionAfterCategoryToggle
+} from '../../shared/duplicates'
 import markUrl from '@brand/mark-color.svg'
 
 function Spinner(): JSX.Element {
@@ -308,6 +313,10 @@ function AppShell(): JSX.Element {
     await updateSettings(() => ({ neverTouchPaths }))
   }
 
+  async function updateDuplicateFolders(duplicateFolders: string[]): Promise<void> {
+    await updateSettings(() => ({ duplicateFolders }))
+  }
+
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
 
   function requestClean(): void {
@@ -425,13 +434,12 @@ function AppShell(): JSX.Element {
             busyClean={busyClean}
             cleanMessage={cleanMessage}
             cleanFailed={cleanFailed}
-            onToggle={(item, value) => setSelected((current) => ({ ...current, [item.id]: value }))}
+            onToggle={(item, value) => {
+              if (value && isLastUnselectedDuplicate(item, result.items, selected)) return
+              setSelected((current) => ({ ...current, [item.id]: value }))
+            }}
             onToggleCategory={(ids, value) => {
-              setSelected((current) => {
-                const next = { ...current }
-                for (const id of ids) next[id] = value
-                return next
-              })
+              setSelected((current) => selectionAfterCategoryToggle(result.items, ids, value, current))
             }}
             onClean={requestClean}
             onRescan={() => void startScan()}
@@ -464,6 +472,7 @@ function AppShell(): JSX.Element {
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
             onScanReminder={(patch) => void updateScanReminder(patch)}
             onNeverTouchPaths={(paths) => void updateNeverTouchPaths(paths)}
+            onDuplicateFolders={(paths) => void updateDuplicateFolders(paths)}
             isPro={isPro}
             onLicenseChange={setIsPro}
             onDonate={() => setView('donate')}
@@ -757,6 +766,7 @@ function ResultItemRow(props: {
   locale: Locale
   item: ScanItem
   checked: boolean
+  keepLocked: boolean
   onToggle: (item: ScanItem, value: boolean) => void
 }): JSX.Element {
   const { t, item } = props
@@ -774,6 +784,7 @@ function ResultItemRow(props: {
         <input
           type="checkbox"
           checked={props.checked}
+          disabled={props.keepLocked}
           onChange={(event) => props.onToggle(item, event.target.checked)}
         />
         <span>
@@ -781,7 +792,8 @@ function ResultItemRow(props: {
           <div className="path">{item.path}</div>
           {(item.categoryId === 'unusedApps' ||
             item.categoryId === 'idleUserFolders' ||
-            item.categoryId === 'downloadsReview') && (
+            item.categoryId === 'downloadsReview' ||
+            item.categoryId === 'duplicateFiles') && (
             <div className="muted">
               {t('results.lastUsed', {
                 date: item.lastUsedAt
@@ -904,7 +916,7 @@ function ResultsView(props: {
         // Select/clear group only toggles the rows currently on screen, so a
         // filter cannot silently change hidden items in the same category.
         const ids = items.map((item) => item.id)
-        const allOn = ids.every((id) => props.selected[id])
+        const allOn = categoryExtrasSelected(items, props.selected)
         const bytes = items.reduce((sum, item) => sum + item.bytes, 0)
         const meta = CATEGORY_META[categoryId]
         return (
@@ -934,6 +946,7 @@ function ResultsView(props: {
                   locale={props.locale}
                   item={item}
                   checked={Boolean(props.selected[item.id])}
+                  keepLocked={isLastUnselectedDuplicate(item, props.result.items, props.selected)}
                   onToggle={props.onToggle}
                 />
               ))}
@@ -991,6 +1004,7 @@ function SettingsView(props: {
   onLaunchAtLogin: (enabled: boolean) => void
   onScanReminder: (patch: Partial<ScanReminderSettings>) => void
   onNeverTouchPaths: (paths: string[]) => void
+  onDuplicateFolders: (paths: string[]) => void
   isPro: boolean
   onLicenseChange: (isPro: boolean) => void
   onDonate: () => void
@@ -1133,6 +1147,68 @@ function SettingsView(props: {
           >
             {props.t('settings.largeFilesProCta')}
           </button>
+        )}
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.duplicateFoldersTitle')}</h3>
+        <p className="muted">{props.t('settings.duplicateFoldersHint')}</p>
+        <div className="row">
+          <button
+            className="btn"
+            type="button"
+            disabled={!props.isPro}
+            onClick={() => {
+              void window.diskheadroom.pickFolders().then((picked) => {
+                if (!picked.length) return
+                const merged = Array.from(new Set([...props.settings.duplicateFolders, ...picked]))
+                props.onDuplicateFolders(merged)
+              })
+            }}
+          >
+            {props.t('settings.duplicateFoldersChoose')}
+          </button>
+        </div>
+        {!props.isPro && (
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() =>
+              void window.diskheadroom.openExternal(proCheckoutUrl(props.settings.locale))
+            }
+          >
+            {props.t('settings.largeFilesProCta')}
+          </button>
+        )}
+        {props.settings.duplicateFolders.length === 0 ? (
+          <p className="muted">{props.t('settings.duplicateFoldersEmpty')}</p>
+        ) : (
+          <ul className="never-touch-list">
+            {props.settings.duplicateFolders.map((path) => (
+              <li key={path}>
+                <code className="path">{path}</code>
+                <div className="row">
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => void window.diskheadroom.revealItem(path)}
+                  >
+                    {props.t('settings.duplicateFoldersReveal')}
+                  </button>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() =>
+                      props.onDuplicateFolders(
+                        props.settings.duplicateFolders.filter((item) => item !== path)
+                      )
+                    }
+                  >
+                    {props.t('settings.duplicateFoldersRemove')}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
       <div className="card">

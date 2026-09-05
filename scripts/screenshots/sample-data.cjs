@@ -42,6 +42,8 @@ const developerLeftovers = [
   ['unavailableSimulators', 'iPhone 12', null, '~/Library/Developer/CoreSimulator/Devices/11111111-2222-3333-4444-555555555555', 3.4 * GB],
   ['outdatedSimulators', 'iPhone 16 Pro (iOS 18.1)', null, '~/Library/Developer/CoreSimulator/Devices/22222222-3333-4444-5555-666666666666', 2.6 * GB],
   ['downloadsReview', 'OldInstaller.dmg', null, '~/Downloads/OldInstaller.dmg', 1.2 * GB],
+  ['duplicateFiles', 'report-copy.pdf', null, '~/Downloads/report-copy.pdf', 48 * MB],
+  ['duplicateFiles', 'report.pdf', null, '~/Documents/archive/report.pdf', 48 * MB],
   ['androidDevCaches', null, 'category.androidDevCaches.gradle', '~/.gradle/caches', 6.2 * GB],
   ['androidDevCaches', null, 'category.androidDevCaches.cocoapods', '~/Library/Caches/CocoaPods', 1.1 * GB]
 ]
@@ -80,7 +82,13 @@ const scanItems = [
     selectedByDefault: false,
     optional: true,
     lastUsedAt: null,
-    daysIdle: null
+    daysIdle: null,
+    ...(categoryId === 'duplicateFiles'
+      ? {
+          duplicateGroupId: 'sample-dup-report',
+          duplicateKeep: name === 'report.pdf'
+        }
+      : {})
   }))
 ]
 
@@ -147,11 +155,13 @@ module.exports = {
       idleUserFolders: true,
       largeFiles: false,
       downloadsReview: false,
+      duplicateFiles: false,
       unusedApps: true
     },
     largeFileMinBytes: 500 * 1024 * 1024,
     downloadsMinDays: 30,
-    downloadsMinBytes: 50 * 1024 * 1024
+    downloadsMinBytes: 50 * 1024 * 1024,
+    duplicateFolders: ['/Users/alex/Downloads']
   },
   scanResult,
   compactScanResult

@@ -164,7 +164,8 @@ describe('settings', () => {
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
       scanReminder: { enabled: false, intervalDays: 7 },
-      neverTouchPaths: []
+      neverTouchPaths: [],
+      duplicateFolders: []
     })
   })
 
@@ -243,7 +244,8 @@ describe('settings', () => {
       lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
       launchAtLogin: false,
       scanReminder: { enabled: false, intervalDays: 7 as const },
-      neverTouchPaths: []
+      neverTouchPaths: [],
+      duplicateFolders: []
     }
     await saveSettings(value)
     const written = JSON.parse(String(mocks.writeFile.mock.calls[0][1])) as {
@@ -281,7 +283,8 @@ describe('settings', () => {
       lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
       launchAtLogin: false,
       scanReminder: { enabled: false, intervalDays: 7 as const },
-      neverTouchPaths: []
+      neverTouchPaths: [],
+      duplicateFolders: []
     }
     await saveSettings(value)
     expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/diskheadroom', { recursive: true })
@@ -322,6 +325,57 @@ describe('cleaner', () => {
       ],
       bytesRequested: 30
     })
+  })
+
+  it('keeps one copy when every duplicate in a group is requested', async () => {
+    mocks.trashItem.mockResolvedValue(undefined)
+    const result = await trashPaths(
+      {
+        paths: ['/Users/test/old.bin', '/Users/test/new.bin']
+      },
+      new Map([
+        ['/Users/test/old.bin', 10],
+        ['/Users/test/new.bin', 10]
+      ]),
+      {
+        lastScanPaths: new Set(['/Users/test/old.bin', '/Users/test/new.bin']),
+        neverTouchPaths: [],
+        lastScanItems: [
+          {
+            id: 'old',
+            categoryId: 'duplicateFiles',
+            name: 'old.bin',
+            path: '/Users/test/old.bin',
+            bytes: 10,
+            selectedByDefault: false,
+            optional: true,
+            lastUsedAt: null,
+            daysIdle: null,
+            duplicateGroupId: 'g1',
+            duplicateKeep: true
+          },
+          {
+            id: 'new',
+            categoryId: 'duplicateFiles',
+            name: 'new.bin',
+            path: '/Users/test/new.bin',
+            bytes: 10,
+            selectedByDefault: false,
+            optional: true,
+            lastUsedAt: null,
+            daysIdle: null,
+            duplicateGroupId: 'g1',
+            duplicateKeep: false
+          }
+        ]
+      }
+    )
+    expect(result.trashed).toEqual(['/Users/test/new.bin'])
+    expect(result.failed).toEqual([
+      { path: '/Users/test/old.bin', error: 'At least one copy in the duplicate group must stay' }
+    ])
+    expect(mocks.trashItem).toHaveBeenCalledTimes(1)
+    expect(mocks.trashItem).toHaveBeenCalledWith('/Users/test/new.bin')
   })
 
   it('does not trash paths that were not in the last scan', async () => {

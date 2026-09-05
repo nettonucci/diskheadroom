@@ -1,10 +1,12 @@
 import { shell } from 'electron'
+import { lastDuplicateCopiesToRefuse } from '../shared/duplicates'
+import type { CleanRequest, CleanResult, ScanItem } from '../shared/types'
 import { isNeverTouchPath, isSafePath } from './scanner'
-import type { CleanRequest, CleanResult } from '../shared/types'
 
 export interface TrashGuard {
   lastScanPaths: ReadonlySet<string>
   neverTouchPaths: string[]
+  lastScanItems?: readonly ScanItem[]
 }
 
 export async function trashPaths(
@@ -15,6 +17,7 @@ export async function trashPaths(
   const trashed: string[] = []
   const failed: { path: string; error: string }[] = []
   let bytesRequested = 0
+  const refuseLastCopy = lastDuplicateCopiesToRefuse(request.paths, guard.lastScanItems ?? [])
 
   for (const path of request.paths) {
     if (!guard.lastScanPaths.has(path)) {
@@ -27,6 +30,10 @@ export async function trashPaths(
     }
     if (isNeverTouchPath(path, guard.neverTouchPaths)) {
       failed.push({ path, error: 'Path is on the never-touch list' })
+      continue
+    }
+    if (refuseLastCopy.has(path)) {
+      failed.push({ path, error: 'At least one copy in the duplicate group must stay' })
       continue
     }
 

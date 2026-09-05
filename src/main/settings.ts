@@ -11,6 +11,7 @@ import {
   DEFAULT_UNUSED_DAYS,
   mergeDownloadsMinBytes,
   mergeDownloadsMinDays,
+  mergeDuplicateFolders,
   mergeLargeFileMinBytes,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
@@ -34,7 +35,8 @@ const defaults = (): AppSettings => ({
   lowDiskAlert: { ...DEFAULT_LOW_DISK_ALERT },
   launchAtLogin: false,
   scanReminder: { ...DEFAULT_SCAN_REMINDER },
-  neverTouchPaths: []
+  neverTouchPaths: [],
+  duplicateFolders: []
 })
 
 function appSettingsBody(next: AppSettings): AppSettings {
@@ -49,7 +51,8 @@ function appSettingsBody(next: AppSettings): AppSettings {
     lowDiskAlert: next.lowDiskAlert,
     launchAtLogin: next.launchAtLogin,
     scanReminder: next.scanReminder,
-    neverTouchPaths: next.neverTouchPaths
+    neverTouchPaths: next.neverTouchPaths,
+    duplicateFolders: next.duplicateFolders
   }
 }
 
@@ -68,7 +71,8 @@ function parseSettings(raw: string): AppSettings {
     lowDiskAlert: mergeLowDiskAlert(data.lowDiskAlert),
     launchAtLogin: mergeLaunchAtLogin(data.launchAtLogin),
     scanReminder: mergeScanReminder(data.scanReminder),
-    neverTouchPaths: mergeNeverTouchPaths(data.neverTouchPaths)
+    neverTouchPaths: mergeNeverTouchPaths(data.neverTouchPaths),
+    duplicateFolders: mergeDuplicateFolders(data.duplicateFolders)
   }
 }
 
