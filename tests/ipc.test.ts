@@ -78,7 +78,7 @@ describe('IPC registration', () => {
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(15)
+    expect(mocks.handlers.size).toBe(16)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
@@ -113,7 +113,8 @@ describe('IPC registration', () => {
         lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
         launchAtLogin: false,
         scanReminder: { enabled: false, intervalDays: 7 },
-        neverTouchPaths: []
+        neverTouchPaths: [],
+        duplicateFolders: []
       })
     )
     expect(mocks.saveSettings).toHaveBeenCalledWith(saved)
@@ -128,6 +129,23 @@ describe('IPC registration', () => {
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
     await expect(call('dialog:pick-folder')).resolves.toBe('/Users/test/Keep')
     await expect(call('dialog:pick-folder')).resolves.toBeNull()
+  })
+
+  it('picks existing folders only, without createDirectory', async () => {
+    mocks.showOpenDialog.mockResolvedValueOnce({
+      canceled: false,
+      filePaths: ['/Users/test/Downloads', '/Users/test/Projects']
+    })
+    mocks.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] })
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    await expect(call('dialog:pick-folders')).resolves.toEqual([
+      '/Users/test/Downloads',
+      '/Users/test/Projects'
+    ])
+    expect(mocks.showOpenDialog).toHaveBeenCalledWith({
+      properties: ['openDirectory', 'multiSelections']
+    })
+    await expect(call('dialog:pick-folders')).resolves.toEqual([])
   })
 
   it('persists launch-at-login and scan-reminder flags and applies the login API', async () => {
@@ -188,6 +206,7 @@ describe('IPC registration', () => {
         largeFileMinBytes: 100 * 1024 * 1024,
         downloadsMinDays: 7,
         downloadsMinBytes: 10 * 1024 * 1024,
+        duplicateFolders: [],
         neverTouchPaths: []
       }),
       expect.any(Function)
@@ -200,16 +219,18 @@ describe('IPC registration', () => {
         ['/Users/test/cache', 42],
         ['/Users/test/unknown', 0]
       ]),
-      {
+      expect.objectContaining({
         lastScanPaths: new Set(['/Users/test/cache']),
-        neverTouchPaths: []
-      }
+        neverTouchPaths: [],
+        lastScanItems: [{ path: '/Users/test/cache', bytes: 42 }]
+      })
     )
   })
 
   it('passes persisted never-touch prefixes into scan and trash', async () => {
     mocks.loadSettings.mockResolvedValue({
-      neverTouchPaths: ['/Users/test/Library/Caches/keep']
+      neverTouchPaths: ['/Users/test/Library/Caches/keep'],
+      duplicateFolders: ['/Users/test/Downloads']
     })
     mocks.runScan.mockResolvedValue({
       items: [{ path: '/Users/test/cache', bytes: 8 }],
@@ -224,7 +245,8 @@ describe('IPC registration', () => {
       expect.objectContaining({
         unusedDays: 90,
         categories: expect.any(Object),
-        neverTouchPaths: ['/Users/test/Library/Caches/keep']
+        neverTouchPaths: ['/Users/test/Library/Caches/keep'],
+        duplicateFolders: ['/Users/test/Downloads']
       }),
       expect.any(Function)
     )
@@ -232,10 +254,10 @@ describe('IPC registration', () => {
     expect(mocks.trashPaths).toHaveBeenCalledWith(
       { paths: ['/Users/test/cache'] },
       new Map([['/Users/test/cache', 8]]),
-      {
+      expect.objectContaining({
         lastScanPaths: new Set(['/Users/test/cache']),
         neverTouchPaths: ['/Users/test/Library/Caches/keep']
-      }
+      })
     )
   })
 
@@ -244,7 +266,7 @@ describe('IPC registration', () => {
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
     const request = {
       unusedDays: 90,
-      categories: { largeFiles: true, downloadsReview: true },
+      categories: { largeFiles: true, downloadsReview: true, duplicateFiles: true },
       largeFileMinBytes: 1024 * 1024 * 1024,
       downloadsMinDays: 14,
       downloadsMinBytes: 100 * 1024 * 1024
@@ -254,7 +276,11 @@ describe('IPC registration', () => {
     expect(mocks.getLicenseStatus).toHaveBeenCalledTimes(1)
     expect(mocks.runScan).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        categories: expect.objectContaining({ largeFiles: false, downloadsReview: false }),
+        categories: expect.objectContaining({
+          largeFiles: false,
+          downloadsReview: false,
+          duplicateFiles: false
+        }),
         downloadsMinDays: 14,
         downloadsMinBytes: 100 * 1024 * 1024
       }),
@@ -265,7 +291,11 @@ describe('IPC registration', () => {
     await call('scan:run', request)
     expect(mocks.runScan).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        categories: expect.objectContaining({ largeFiles: true, downloadsReview: true })
+        categories: expect.objectContaining({
+          largeFiles: true,
+          downloadsReview: true,
+          duplicateFiles: true
+        })
       }),
       expect.any(Function)
     )

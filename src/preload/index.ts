@@ -51,6 +51,7 @@ const api = {
   trashItems: (request: CleanRequest): Promise<CleanResult> =>
     ipcRenderer.invoke('clean:trash', request),
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-folder'),
+  pickFolders: (): Promise<string[]> => ipcRenderer.invoke('dialog:pick-folders'),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
   copyText: (text: string): Promise<void> => ipcRenderer.invoke('shell:copy-text', text),
   revealItem: (path: string): Promise<boolean> => ipcRenderer.invoke('shell:reveal-item', path),

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { PassThrough } from 'node:stream'
 
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
@@ -6,7 +7,8 @@ const mocks = vi.hoisted(() => ({
   readdir: vi.fn(),
   readlink: vi.fn(),
   stat: vi.fn(),
-  getPermissionStatus: vi.fn()
+  getPermissionStatus: vi.fn(),
+  createReadStream: vi.fn()
 }))
 
 vi.mock('node:child_process', () => ({
@@ -26,14 +28,21 @@ vi.mock('node:os', () => ({
   default: { homedir: () => '/Users/test' },
   homedir: () => '/Users/test'
 }))
+vi.mock('node:fs', () => ({
+  default: { createReadStream: mocks.createReadStream },
+  createReadStream: mocks.createReadStream
+}))
 vi.mock('../src/main/permissions', () => ({
   getPermissionStatus: mocks.getPermissionStatus
 }))
 
 import {
+  computeFileSha256,
+  isAllowedDuplicateRoot,
   isNeverTouchPath,
   isSafePath,
   runScan as runScanWithOptions,
+  scanDuplicateFiles,
   scanLargeHomeFiles
 } from '../src/main/scanner'
 import {
@@ -214,13 +223,14 @@ describe('runScan', () => {
       'Never'
     ])
     expect(result.items.every((item) => item.bytes > 0)).toBe(true)
-    expect(progress).toHaveBeenCalledTimes(13)
+    expect(progress).toHaveBeenCalledTimes(14)
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.packageManagers', percent: 44 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.androidDev', percent: 68 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.docker', percent: 72 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.documentsDesktop', percent: 76 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.largeFiles', percent: 80 })
     expect(progress).toHaveBeenCalledWith({ phase: 'progress.downloads', percent: 83 })
+    expect(progress).toHaveBeenCalledWith({ phase: 'progress.duplicates', percent: 84 })
     expect(progress).toHaveBeenLastCalledWith({ phase: 'progress.done', percent: 100 })
   })
 
@@ -281,7 +291,7 @@ describe('runScan', () => {
     expect(mocks.lstat).not.toHaveBeenCalled()
     expect(mocks.execFile).not.toHaveBeenCalled()
     // Every phase is still announced so the progress bar does not look stuck.
-    expect(progress).toHaveBeenCalledTimes(13)
+    expect(progress).toHaveBeenCalledTimes(14)
   })
 
   it('scans Xcode Archives, CoreSimulator caches and unavailable simulators as opt-in', async () => {
@@ -935,6 +945,183 @@ describe('runScan', () => {
       progressPhases.length = 0
       const resOn = await runScan(90, onProgress, { ...DEFAULT_SCAN_CATEGORIES, largeFiles: true }, 500 * 1024 * 1024)
       expect(progressPhases).toContain('progress.largeFiles')
+    })
+  })
+
+  describe('duplicateFiles', () => {
+    const now = 1_700_000_000_000
+    const root = '/Users/test/Dupes'
+
+    function streamOf(text: string): PassThrough {
+      const stream = new PassThrough()
+      queueMicrotask(() => {
+        stream.end(Buffer.from(text))
+      })
+      return stream
+    }
+
+    function streamError(): PassThrough {
+      const stream = new PassThrough()
+      queueMicrotask(() => {
+        stream.destroy(new Error('read failed'))
+      })
+      return stream
+    }
+
+    function mockTree(files: Record<string, { size: number; mtimeMs: number; body: string | 'error' }>): void {
+      mocks.readdir.mockImplementation(async (path: string) => {
+        if (path === root) return Object.keys(files).map((full) => full.slice(root.length + 1).split('/')[0])
+        return []
+      })
+      mocks.lstat.mockImplementation(async (path: string) => {
+        if (path === root) return directory
+        const meta = files[path]
+        if (!meta) return directory
+        return { ...file(meta.size), mtimeMs: meta.mtimeMs }
+      })
+      mocks.createReadStream.mockImplementation((path: string) => {
+        const meta = files[path]
+        if (!meta || meta.body === 'error') return streamError()
+        return streamOf(meta.body)
+      })
+    }
+
+    it('rejects unsafe duplicate roots', () => {
+      expect(isAllowedDuplicateRoot('/')).toBe(false)
+      expect(isAllowedDuplicateRoot('/Users/test')).toBe(false)
+      expect(isAllowedDuplicateRoot('/System/Library')).toBe(false)
+      expect(isAllowedDuplicateRoot('/Users/test/Downloads')).toBe(true)
+    })
+
+    it('groups identical files by size then SHA-256 and keeps the oldest copy', async () => {
+      mockTree({
+        [`${root}/older.bin`]: { size: 10, mtimeMs: now - 10 * 86400000, body: 'same-bytes' },
+        [`${root}/newer.bin`]: { size: 10, mtimeMs: now - 2 * 86400000, body: 'same-bytes' },
+        [`${root}/other.bin`]: { size: 10, mtimeMs: now, body: 'different!' }
+      })
+      const items = await scanDuplicateFiles([root])
+      expect(items).toHaveLength(2)
+      expect(items.every((item) => item.categoryId === 'duplicateFiles')).toBe(true)
+      expect(items.every((item) => item.selectedByDefault === false && item.optional === true)).toBe(true)
+      const keeper = items.find((item) => item.duplicateKeep)
+      const extra = items.find((item) => !item.duplicateKeep)
+      expect(keeper?.name).toBe('older.bin')
+      expect(extra?.name).toBe('newer.bin')
+      expect(keeper?.duplicateGroupId).toBe(extra?.duplicateGroupId)
+    })
+
+    it('skips hash errors, hidden files, empty files and blocked prefixes', async () => {
+      mocks.readdir.mockImplementation(async (path: string) => {
+        if (path === root) return ['ok-a.bin', 'ok-b.bin', 'bad.bin', '.hidden', 'empty.bin', 'System']
+        return []
+      })
+      mocks.lstat.mockImplementation(async (path: string) => {
+        if (path === root) return directory
+        if (path.endsWith('empty.bin')) return { ...file(0), mtimeMs: now }
+        if (path.endsWith('System')) return directory
+        return { ...file(8), mtimeMs: now }
+      })
+      mocks.createReadStream.mockImplementation((path: string) => {
+        if (path.endsWith('bad.bin')) return streamError()
+        return streamOf('payload!')
+      })
+      const items = await scanDuplicateFiles([root, '/System', '/'])
+      expect(items.map((item) => item.name).sort()).toEqual(['ok-a.bin', 'ok-b.bin'])
+    })
+
+    it('returns empty when hashing fails for a same-size pair', async () => {
+      mockTree({
+        [`${root}/a.bin`]: { size: 4, mtimeMs: now, body: 'error' },
+        [`${root}/b.bin`]: { size: 4, mtimeMs: now, body: 'error' }
+      })
+      await expect(scanDuplicateFiles([root])).resolves.toEqual([])
+    })
+
+    it('aborts at file, directory and depth caps', async () => {
+      mocks.createReadStream.mockImplementation(() => streamOf('abc'))
+      mocks.lstat.mockImplementation(async (path: string) => {
+        if (path.endsWith('.bin')) return { ...file(3), mtimeMs: now }
+        return directory
+      })
+
+      mocks.readdir.mockImplementation(async (path: string) => {
+        if (path === root) return ['nested']
+        if (path === `${root}/nested`) return ['a.bin', 'b.bin']
+        return []
+      })
+      const byFiles = await scanDuplicateFiles([root], [], 50, 8, 2000, 1)
+      expect(byFiles).toEqual([])
+
+      const byDirs = await scanDuplicateFiles([root], [], 50, 8, 1, 10000)
+      expect(byDirs).toEqual([])
+
+      mocks.readdir.mockImplementation(async (path: string) => {
+        if (path === root) return ['a.bin', 'b.bin', 'nested']
+        if (path === `${root}/nested`) return ['c.bin']
+        return []
+      })
+      const byDepth = await scanDuplicateFiles([root], [], 50, 0, 2000, 10000)
+      expect(byDepth.map((item) => item.name).sort()).toEqual(['a.bin', 'b.bin'])
+    })
+
+    it('skips never-touch paths and unreadable trees', async () => {
+      mocks.lstat.mockRejectedValueOnce(new Error('gone'))
+      await expect(scanDuplicateFiles([`${root}/missing`])).resolves.toEqual([])
+
+      mocks.lstat.mockResolvedValue(directory)
+      mocks.readdir.mockRejectedValue(new Error('denied'))
+      await expect(scanDuplicateFiles([root])).resolves.toEqual([])
+
+      mockTree({
+        [`${root}/keep/a.bin`]: { size: 5, mtimeMs: now, body: 'hello' },
+        [`${root}/keep/b.bin`]: { size: 5, mtimeMs: now, body: 'hello' }
+      })
+      mocks.readdir.mockImplementation(async (path: string) => {
+        if (path === root) return ['keep']
+        if (path === `${root}/keep`) return ['a.bin', 'b.bin']
+        return []
+      })
+      mocks.lstat.mockImplementation(async (path: string) => {
+        if (path.endsWith('.bin')) return { ...file(5), mtimeMs: now }
+        return directory
+      })
+      await expect(scanDuplicateFiles([root], [`${root}/keep`])).resolves.toEqual([])
+    })
+
+    it('computeFileSha256 returns null when the stream errors', async () => {
+      mocks.createReadStream.mockImplementation(() => streamError())
+      await expect(computeFileSha256('/Users/test/Dupes/x.bin')).resolves.toBeNull()
+    })
+
+    it('computeFileSha256 returns null when createReadStream throws', async () => {
+      mocks.createReadStream.mockImplementation(() => {
+        throw new Error('nope')
+      })
+      await expect(computeFileSha256('/Users/test/Dupes/x.bin')).resolves.toBeNull()
+    })
+
+    it('runs in runScan only when the category is on and folders are set', async () => {
+      const phases: string[] = []
+      mocks.readdir.mockResolvedValue([])
+      mocks.lstat.mockResolvedValue(directory)
+      const off = await runScan(90, (p) => phases.push(p.phase), {
+        ...DEFAULT_SCAN_CATEGORIES,
+        duplicateFiles: true
+      })
+      expect(off.items.some((item) => item.categoryId === 'duplicateFiles')).toBe(false)
+      expect(phases).toContain('progress.duplicates')
+
+      mockTree({
+        [`${root}/a.bin`]: { size: 6, mtimeMs: now, body: 'abcdef' },
+        [`${root}/b.bin`]: { size: 6, mtimeMs: now, body: 'abcdef' }
+      })
+      const on = await runScan(
+        90,
+        vi.fn(),
+        { ...DEFAULT_SCAN_CATEGORIES, duplicateFiles: true },
+        { duplicateFolders: [root] }
+      )
+      expect(on.items.filter((item) => item.categoryId === 'duplicateFiles')).toHaveLength(2)
     })
   })
 })

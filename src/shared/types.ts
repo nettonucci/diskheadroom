@@ -26,6 +26,7 @@ export type ScanCategoryId =
   | 'idleUserFolders'
   | 'largeFiles'
   | 'downloadsReview'
+  | 'duplicateFiles'
   | 'unusedApps'
 
 export interface ScanItem {
@@ -39,6 +40,10 @@ export interface ScanItem {
   optional: boolean
   lastUsedAt: string | null
   daysIdle: number | null
+  /** Hash group for experimental duplicates. Same id means identical content. */
+  duplicateGroupId?: string
+  /** Oldest copy in a duplicate group; stays unselected unless another copy remains. */
+  duplicateKeep?: boolean
 }
 
 export interface ScanProgress {
@@ -59,6 +64,7 @@ export interface ScanOptions {
   largeFileMinBytes?: LargeFileMinBytes
   downloadsMinDays?: DownloadsMinDays
   downloadsMinBytes?: DownloadsMinBytes
+  duplicateFolders?: string[]
 }
 
 export interface DiskInfo {
@@ -96,6 +102,8 @@ export interface AppSettings {
   scanReminder: ScanReminderSettings
   /** Absolute paths/prefixes omitted from scans and refused by trash. */
   neverTouchPaths: string[]
+  /** User-chosen folders walked by the experimental duplicate finder. */
+  duplicateFolders: string[]
 }
 
 /** Development-only snapshot behind the Debug tab. Never registered in a packaged build. */

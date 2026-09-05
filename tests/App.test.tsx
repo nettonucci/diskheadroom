@@ -26,7 +26,8 @@ const settings = {
   lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
   launchAtLogin: false,
   scanReminder: { enabled: false, intervalDays: 7 as const },
-  neverTouchPaths: []
+  neverTouchPaths: [],
+  duplicateFolders: []
 }
 const result = {
   scannedAt: '2025-01-01T00:00:00Z',
@@ -91,6 +92,7 @@ function api(overrides: Partial<Api> = {}): Api {
       bytesRequested: 2048
     }),
     pickFolder: vi.fn().mockResolvedValue(null),
+    pickFolders: vi.fn().mockResolvedValue([]),
     getLicenseStatus: vi.fn().mockResolvedValue({ isPro: false }),
     activateLicense: vi.fn().mockResolvedValue({ isPro: false }),
     openExternal: vi.fn().mockResolvedValue(undefined),
@@ -680,6 +682,8 @@ describe('App', () => {
 
     expect(screen.getByRole('checkbox', { name: /Large files/ })).toBeDisabled()
     expect(screen.getByRole('checkbox', { name: /Downloads/ })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: /Duplicates/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add folders' })).toBeDisabled()
     expect(screen.getByDisplayValue('500 MB')).toBeDisabled()
     expect(screen.getByLabelText('Minimum age')).toBeDisabled()
     expect(screen.getByLabelText('Minimum size')).toBeDisabled()
@@ -693,6 +697,15 @@ describe('App', () => {
     await user.click(await screen.findByRole('button', { name: 'Settings' }))
     expect(screen.getByRole('checkbox', { name: /Large files/ })).toBeEnabled()
     expect(screen.getByRole('checkbox', { name: 'Downloads' })).toBeEnabled()
+    expect(screen.getByRole('checkbox', { name: /Duplicates/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Add folders' })).toBeEnabled()
+    proBridge.pickFolders.mockResolvedValueOnce(['/Users/test/Downloads'])
+    await user.click(screen.getByRole('button', { name: 'Add folders' }))
+    await waitFor(() =>
+      expect(proBridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ duplicateFolders: ['/Users/test/Downloads'] })
+      )
+    )
     fireEvent.change(screen.getByDisplayValue('500 MB'), {
       target: { value: String(1024 * 1024 * 1024) }
     })
@@ -859,6 +872,55 @@ describe('App', () => {
         downloadsMinBytes: 50 * 1024 * 1024
       })
     )
+  })
+
+  it('keeps one duplicate copy locked when selecting the group', async () => {
+    const duplicateResult = {
+      scannedAt: '2025-01-01T00:00:00Z',
+      limited: false,
+      items: [
+        {
+          id: 'old',
+          categoryId: 'duplicateFiles' as const,
+          name: 'old.bin',
+          path: '/Users/test/Dupes/old.bin',
+          bytes: 4096,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: '2024-01-01T00:00:00Z',
+          daysIdle: 10,
+          duplicateGroupId: 'g1',
+          duplicateKeep: true
+        },
+        {
+          id: 'new',
+          categoryId: 'duplicateFiles' as const,
+          name: 'new.bin',
+          path: '/Users/test/Dupes/new.bin',
+          bytes: 4096,
+          selectedByDefault: false,
+          optional: true,
+          lastUsedAt: '2024-06-01T00:00:00Z',
+          daysIdle: 2,
+          duplicateGroupId: 'g1',
+          duplicateKeep: false
+        }
+      ]
+    }
+    const bridge = api({ runScan: vi.fn().mockResolvedValue(duplicateResult) })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+    expect(await screen.findByText('Duplicates (experimental)')).toBeInTheDocument()
+    const keeper = screen.getByRole('checkbox', { name: /old.bin/ })
+    const extra = screen.getByRole('checkbox', { name: /new.bin/ })
+    expect(keeper).toBeEnabled()
+    expect(extra).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Select group' }))
+    expect(keeper).not.toBeChecked()
+    expect(extra).toBeChecked()
+    expect(keeper).toBeDisabled()
   })
 
   it('drives the low disk alert from the development-only Debug tab', async () => {

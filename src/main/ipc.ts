@@ -3,6 +3,7 @@ import { resolve as resolvePath } from 'node:path'
 import {
   mergeDownloadsMinBytes,
   mergeDownloadsMinDays,
+  mergeDuplicateFolders,
   mergeLargeFileMinBytes,
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
@@ -50,6 +51,13 @@ export function registerIpc(options: IpcOptions): void {
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0]
   })
+  ipcMain.handle('dialog:pick-folders', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'multiSelections']
+    })
+    if (result.canceled || result.filePaths.length === 0) return []
+    return result.filePaths
+  })
   ipcMain.handle('license:status', () => getLicenseStatus())
   ipcMain.handle('license:activate', (_event, key: unknown) => activateLicense(key))
   ipcMain.handle('settings:get', () => loadSettings())
@@ -63,7 +71,8 @@ export function registerIpc(options: IpcOptions): void {
       lowDiskAlert: mergeLowDiskAlert(next.lowDiskAlert),
       launchAtLogin: mergeLaunchAtLogin(next.launchAtLogin),
       scanReminder: mergeScanReminder(next.scanReminder),
-      neverTouchPaths: mergeNeverTouchPaths(next.neverTouchPaths)
+      neverTouchPaths: mergeNeverTouchPaths(next.neverTouchPaths),
+      duplicateFolders: mergeDuplicateFolders(next.duplicateFolders)
     }
     await saveSettings(normalized)
     applyLaunchAtLogin(normalized.launchAtLogin)
@@ -88,6 +97,7 @@ export function registerIpc(options: IpcOptions): void {
           largeFileMinBytes: mergeLargeFileMinBytes(input?.largeFileMinBytes),
           downloadsMinDays: mergeDownloadsMinDays(input?.downloadsMinDays),
           downloadsMinBytes: mergeDownloadsMinBytes(input?.downloadsMinBytes),
+          duplicateFolders: mergeDuplicateFolders(settings.duplicateFolders),
           neverTouchPaths: mergeNeverTouchPaths(settings.neverTouchPaths)
         },
         (progress) => {
@@ -107,7 +117,8 @@ export function registerIpc(options: IpcOptions): void {
     }
     return trashPaths(request, sizes, {
       lastScanPaths: new Set(lastItems.keys()),
-      neverTouchPaths: mergeNeverTouchPaths(settings.neverTouchPaths)
+      neverTouchPaths: mergeNeverTouchPaths(settings.neverTouchPaths),
+      lastScanItems: Array.from(lastItems.values())
     })
   })
   ipcMain.handle('shell:copy-text', (_event, text: string) => {

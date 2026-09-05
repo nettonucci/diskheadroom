@@ -7,11 +7,13 @@ import {
   DOWNLOADS_MIN_DAYS_OPTIONS,
   DEFAULT_DOWNLOADS_MIN_BYTES,
   DOWNLOADS_MIN_BYTES_OPTIONS,
+  MAX_DUPLICATE_FOLDERS,
   MAX_NEVER_TOUCH_PATHS,
   UNUSED_DAY_OPTIONS,
   isAllowedExternalUrl,
   mergeDownloadsMinBytes,
   mergeDownloadsMinDays,
+  mergeDuplicateFolders,
   mergeLargeFileMinBytes,
   mergeNeverTouchPaths,
   mergeScanCategories,
@@ -44,27 +46,29 @@ describe('shared helpers', () => {
     expect(LOCALES).toEqual(['en', 'pt-BR', 'es'])
     expect(LOCALE_NAMES['pt-BR']).toContain('Português')
     expect(NAV).toHaveLength(4)
-    expect(Object.keys(CATEGORY_META)).toHaveLength(17)
+    expect(Object.keys(CATEGORY_META)).toHaveLength(18)
     expect(UNUSED_DAY_OPTIONS).toContain(DEFAULT_UNUSED_DAYS)
     expect(LARGE_FILE_MIN_BYTES_OPTIONS).toContain(DEFAULT_LARGE_FILE_MIN_BYTES)
     expect(DOWNLOADS_MIN_DAYS_OPTIONS).toContain(DEFAULT_DOWNLOADS_MIN_DAYS)
     expect(DOWNLOADS_MIN_BYTES_OPTIONS).toContain(DEFAULT_DOWNLOADS_MIN_BYTES)
   })
 
-  it('merges scan categories respecting defaults (largeFiles and downloadsReview off)', () => {
+  it('merges scan categories respecting defaults (paid finders off)', () => {
     expect(mergeScanCategories(undefined).unusedApps).toBe(true)
     expect(mergeScanCategories(undefined).largeFiles).toBe(false)
     expect(mergeScanCategories(undefined).downloadsReview).toBe(false)
+    expect(mergeScanCategories(undefined).duplicateFiles).toBe(false)
     expect(mergeScanCategories(null).unusedApps).toBe(true)
     expect(mergeScanCategories(null).largeFiles).toBe(false)
     expect(mergeScanCategories('all' as never).unusedApps).toBe(true)
     expect(mergeScanCategories({ unusedApps: 'no' } as never).unusedApps).toBe(true)
     expect(
-      mergeScanCategories({ unusedApps: false, largeFiles: true, downloadsReview: true })
+      mergeScanCategories({ unusedApps: false, largeFiles: true, downloadsReview: true, duplicateFiles: true })
     ).toMatchObject({
       unusedApps: false,
       largeFiles: true,
       downloadsReview: true,
+      duplicateFiles: true,
       userCaches: true
     })
   })
@@ -92,6 +96,12 @@ describe('shared helpers', () => {
     expect(mergeNeverTouchPaths(Array.from({ length: 60 }, (_, index) => `/tmp/p${index}`))).toHaveLength(
       MAX_NEVER_TOUCH_PATHS
     )
+    expect(
+      mergeDuplicateFolders(['/', 'relative', '/tmp/dupes/', '/tmp/dupes'])
+    ).toEqual(['/tmp/dupes'])
+    expect(
+      mergeDuplicateFolders(Array.from({ length: 30 }, (_, index) => `/tmp/d${index}`))
+    ).toHaveLength(MAX_DUPLICATE_FOLDERS)
   })
 
   it('allows only HTTPS GitHub and diskheadroom.com hosts', () => {
@@ -117,15 +127,17 @@ describe('shared helpers', () => {
   })
 
   it('turns paid scan walks off unless the signed key is valid', () => {
-    const requested = mergeScanCategories({ largeFiles: true, downloadsReview: true })
+    const requested = mergeScanCategories({ largeFiles: true, downloadsReview: true, duplicateFiles: true })
     expect(gateProScanCategories(requested, false)).toMatchObject({
       largeFiles: false,
       downloadsReview: false,
+      duplicateFiles: false,
       userCaches: true
     })
     expect(gateProScanCategories(requested, true)).toMatchObject({
       largeFiles: true,
-      downloadsReview: true
+      downloadsReview: true,
+      duplicateFiles: true
     })
   })
 })
