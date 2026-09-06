@@ -10,6 +10,7 @@ import { startLowDiskAlertWatcher } from './lowDiskAlert'
 import { startScanReminderWatcher } from './scanReminder'
 import { loadSettings } from './settings'
 import { createTray, type TrayController } from './tray'
+import { startPackagedUpdateCheck } from './updates'
 
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
@@ -135,6 +136,7 @@ app.whenReady().then(async () => {
       void scanReminder.markScanComplete()
     }
   })
+  startPackagedUpdateCheck()
   // import.meta.env.DEV drops the handlers from the production bundle; the
   // isPackaged guard covers a development bundle someone runs from a copy.
   if (import.meta.env.DEV && !app.isPackaged) {

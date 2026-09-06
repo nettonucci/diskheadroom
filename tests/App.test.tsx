@@ -99,6 +99,32 @@ function api(overrides: Partial<Api> = {}): Api {
     openExternal: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
     revealItem: vi.fn().mockResolvedValue(true),
+    getUpdateStatus: vi.fn().mockResolvedValue({
+      phase: 'idle',
+      currentVersion: '1.0.0',
+      availableVersion: null,
+      percent: null,
+      error: null,
+      offline: false
+    }),
+    checkForUpdates: vi.fn().mockResolvedValue({
+      phase: 'not-available',
+      currentVersion: '1.0.0',
+      availableVersion: null,
+      percent: null,
+      error: null,
+      offline: false
+    }),
+    downloadUpdate: vi.fn().mockResolvedValue({
+      phase: 'ready',
+      currentVersion: '1.0.0',
+      availableVersion: '1.1.0',
+      percent: 100,
+      error: null,
+      offline: false
+    }),
+    installUpdate: vi.fn().mockResolvedValue(undefined),
+    onUpdateChanged: vi.fn(() => () => {}),
     debug: {
       lowDiskStatus: vi.fn().mockResolvedValue(debugStatus),
       simulateFreePercent: vi.fn().mockResolvedValue({ ...debugStatus, simulatedFreePercent: 5 }),
@@ -850,6 +876,70 @@ describe('App', () => {
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ locale: 'es' }))
     )
+  })
+
+  it('checks GitHub Releases from Settings without downloading until asked', async () => {
+    const user = userEvent.setup()
+    const bridge = api()
+    window.diskheadroom = bridge
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    expect(await screen.findByText('This version: 1.0.0')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Check for updates' }))
+    expect(bridge.checkForUpdates).toHaveBeenCalled()
+    expect(await screen.findByText('You have the latest version.')).toBeInTheDocument()
+  })
+
+  it('downloads and installs only after the user confirms', async () => {
+    const user = userEvent.setup()
+    const available = {
+      phase: 'available' as const,
+      currentVersion: '1.0.0',
+      availableVersion: '1.1.0',
+      percent: null,
+      error: null,
+      offline: false
+    }
+    const bridge = api({
+      getUpdateStatus: vi.fn().mockResolvedValue(available),
+      downloadUpdate: vi.fn().mockResolvedValue({
+        ...available,
+        phase: 'ready',
+        percent: 100
+      })
+    })
+    window.diskheadroom = bridge
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    expect(await screen.findByText('Version 1.1.0 is ready to download.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Download update' }))
+    expect(bridge.downloadUpdate).toHaveBeenCalled()
+    expect(
+      await screen.findByText(/Version 1.1.0 is downloaded/)
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Restart and install' }))
+    expect(bridge.installUpdate).toHaveBeenCalled()
+  })
+
+  it('shows an offline update failure and stays on Settings', async () => {
+    const user = userEvent.setup()
+    const bridge = api({
+      getUpdateStatus: vi.fn().mockResolvedValue({
+        phase: 'error',
+        currentVersion: '1.0.0',
+        availableVersion: null,
+        percent: null,
+        error: 'ENOTFOUND',
+        offline: true
+      })
+    })
+    window.diskheadroom = bridge
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    expect(
+      await screen.findByText('Could not reach GitHub. Disk Headroom still works offline.')
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Check for updates' })).toBeEnabled()
   })
 
   it('responds to tray scan and donate callbacks', async () => {

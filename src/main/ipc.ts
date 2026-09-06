@@ -27,6 +27,13 @@ import {
 import { isSafePath, runScan } from './scanner'
 import { activateLicense, getLicenseStatus } from './license'
 import { loadSettings, saveSettings } from './settings'
+import {
+  attachUpdateListener,
+  checkForAppUpdates,
+  downloadAppUpdate,
+  getUpdateStatus,
+  installAppUpdate
+} from './updates'
 import { gateProScanCategories } from '../shared/entitlement'
 import type { TrayController } from './tray'
 
@@ -39,6 +46,7 @@ interface IpcOptions {
 
 export function registerIpc(options: IpcOptions): void {
   let lastItems = new Map<string, ScanItem>()
+  attachUpdateListener((next) => options.sendToRenderer('update:changed', next))
 
   ipcMain.handle('disk:info', () => getDiskInfo())
   ipcMain.handle('permissions:status', () => getPermissionStatus())
@@ -145,5 +153,11 @@ export function registerIpc(options: IpcOptions): void {
       return shell.openExternal(url)
     }
     return Promise.resolve()
+  })
+  ipcMain.handle('update:status', () => getUpdateStatus())
+  ipcMain.handle('update:check', () => checkForAppUpdates())
+  ipcMain.handle('update:download', () => downloadAppUpdate())
+  ipcMain.handle('update:install', () => {
+    installAppUpdate()
   })
 }

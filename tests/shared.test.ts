@@ -46,6 +46,10 @@ describe('shared helpers', () => {
     expect(translate('pt-BR', 'settings.days', { days: 30 })).toBe('30 dias')
     expect(translate('en', 'settings.days')).toContain('{days}')
     expect(translator('es')('nav.settings')).toBe('Ajustes')
+    expect(translate('en', 'settings.updateCheck')).toBe('Check for updates')
+    expect(translate('pt-BR', 'settings.updateCheck')).toBe('Procurar atualizações')
+    expect(translate('es', 'settings.updateCheck')).toBe('Buscar actualizaciones')
+    expect(translate('en', 'settings.updateOffline')).toContain('offline')
   })
 
   it('exposes complete locale and navigation metadata', () => {

@@ -10,7 +10,8 @@ import type {
   PermissionStatus,
   ScanOptions,
   ScanProgress,
-  ScanResult
+  ScanResult,
+  AppUpdateStatus
 } from '../shared/types'
 
 export interface DebugApi {
@@ -71,6 +72,17 @@ const api = {
     const listener = (): void => callback()
     ipcRenderer.on('tray:donate', listener)
     return () => ipcRenderer.removeListener('tray:donate', listener)
+  },
+  getUpdateStatus: (): Promise<AppUpdateStatus> => ipcRenderer.invoke('update:status'),
+  checkForUpdates: (): Promise<AppUpdateStatus> => ipcRenderer.invoke('update:check'),
+  downloadUpdate: (): Promise<AppUpdateStatus> => ipcRenderer.invoke('update:download'),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
+  onUpdateChanged: (callback: (status: AppUpdateStatus) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, next: AppUpdateStatus): void => {
+      callback(next)
+    }
+    ipcRenderer.on('update:changed', listener)
+    return () => ipcRenderer.removeListener('update:changed', listener)
   },
   debug
 }

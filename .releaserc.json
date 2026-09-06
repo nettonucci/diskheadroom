@@ -30,7 +30,7 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "npm run build:mac -- --arm64 && codesign --verify --deep --strict --verbose=2 \"dist/mac-arm64/Disk Headroom.app\""
+        "prepareCmd": "npm run build:mac:release -- --arm64 && codesign --verify --deep --strict --verbose=2 \"dist/mac-arm64/Disk Headroom.app\" && xcrun stapler validate \"dist/mac-arm64/Disk Headroom.app\""
       }
     ],
     [
@@ -40,6 +40,16 @@
           {
             "path": "dist/Disk Headroom-*-mac.dmg",
             "label": "Disk Headroom ${nextRelease.version} for macOS (Apple Silicon DMG)"
+          },
+          {
+            "path": "dist/Disk Headroom-*-mac.zip",
+            "label": "Disk Headroom ${nextRelease.version} for macOS (Apple Silicon ZIP)"
+          },
+          {
+            "path": "dist/Disk Headroom-*-mac.*.blockmap"
+          },
+          {
+            "path": "dist/latest-mac.yml"
           }
         ]
       }

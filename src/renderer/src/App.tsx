@@ -39,7 +39,8 @@ import type {
   PermissionStatus,
   ScanItem,
   ScanProgress,
-  ScanResult
+  ScanResult,
+  AppUpdateStatus
 } from '../../shared/types'
 import { CATEGORY_META, CATEGORY_WARNING, NAV, SCAN_CATEGORY_LABELS, type ViewId } from './lib/copy'
 import { formatBytes, formatDate } from './lib/format'
@@ -1003,6 +1004,90 @@ function ResultsView(props: {
   )
 }
 
+function UpdateSettingsCard(props: { t: Translator }): JSX.Element {
+  const [status, setStatus] = useState<AppUpdateStatus | null>(null)
+
+  useEffect(() => {
+    void window.diskheadroom.getUpdateStatus().then(setStatus)
+    return window.diskheadroom.onUpdateChanged(setStatus)
+  }, [])
+
+  async function run(action: () => Promise<AppUpdateStatus>): Promise<void> {
+    setStatus(await action())
+  }
+
+  return (
+    <div className="card">
+      <h3>{props.t('settings.updateTitle')}</h3>
+      <p className="muted">{props.t('settings.updateHint')}</p>
+      {status && (
+        <>
+          <p className="muted">{props.t('settings.updateVersion', { version: status.currentVersion })}</p>
+          {status.phase === 'packaged-only' && (
+            <p className="muted">{props.t('settings.updatePackagedOnly')}</p>
+          )}
+          {status.phase === 'not-available' && <p>{props.t('settings.updateUpToDate')}</p>}
+          {status.phase === 'available' && status.availableVersion && (
+            <p>{props.t('settings.updateAvailable', { version: status.availableVersion })}</p>
+          )}
+          {status.phase === 'downloading' && (
+            <p>
+              {props.t('settings.updateDownloading', {
+                percent: status.percent ?? 0
+              })}
+            </p>
+          )}
+          {status.phase === 'ready' && status.availableVersion && (
+            <p>{props.t('settings.updateReady', { version: status.availableVersion })}</p>
+          )}
+          {status.phase === 'error' && (
+            <p className="notice">
+              {status.offline ? props.t('settings.updateOffline') : props.t('settings.updateError')}
+            </p>
+          )}
+          <div className="row">
+            {(status.phase === 'idle' ||
+              status.phase === 'not-available' ||
+              status.phase === 'error') && (
+              <button
+                className="btn"
+                type="button"
+                onClick={() => void run(() => window.diskheadroom.checkForUpdates())}
+              >
+                {props.t('settings.updateCheck')}
+              </button>
+            )}
+            {status.phase === 'checking' && (
+              <button className="btn busy" type="button" disabled>
+                <Spinner />
+                {props.t('settings.updateChecking')}
+              </button>
+            )}
+            {status.phase === 'available' && (
+              <button
+                className="btn"
+                type="button"
+                onClick={() => void run(() => window.diskheadroom.downloadUpdate())}
+              >
+                {props.t('settings.updateDownload')}
+              </button>
+            )}
+            {status.phase === 'ready' && (
+              <button
+                className="btn"
+                type="button"
+                onClick={() => void window.diskheadroom.installUpdate()}
+              >
+                {props.t('settings.updateInstall')}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function SettingsView(props: {
   t: Translator
   settings: AppSettings
@@ -1464,6 +1549,7 @@ function SettingsView(props: {
           ))}
         </select>
       </div>
+      <UpdateSettingsCard t={props.t} />
       <div className="card">
         <h3>{props.t('settings.permissionsTitle')}</h3>
         <p className="muted">{props.t('settings.permissionsHint')}</p>

@@ -68,9 +68,21 @@ app.whenReady().then(async () => {
   await capture(ready, 'scan')
 
   await show(ready, 'settings')
-  ready.setSize(WIDTH, 2680)
+  ready.setSize(WIDTH, 3600)
   await wait(200)
   await capture(ready, 'settings')
+  ready.setSize(WIDTH, 920)
+  await wait(200)
+  await ready.webContents.executeJavaScript(`
+    const heading = [...document.querySelectorAll('h3')].find((el) => el.textContent === 'Updates')
+    const main = document.querySelector('.main')
+    if (heading && main) {
+      const offset = heading.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop - 16
+      main.scrollTop = offset
+    }
+  `)
+  await wait(250)
+  await capture(ready, 'settings-updates')
   ready.setSize(WIDTH, HEIGHT)
 
   await show(ready, 'donate')
@@ -81,7 +93,7 @@ app.whenReady().then(async () => {
   const light = await openWindow('ready', HEIGHT, 'light')
   await capture(light, 'scan-light')
   await show(light, 'settings')
-  light.setSize(WIDTH, 2680)
+  light.setSize(WIDTH, 3600)
   await wait(200)
   await capture(light, 'settings-light')
   light.destroy()
