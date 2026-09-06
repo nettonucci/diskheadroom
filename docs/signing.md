@@ -19,6 +19,8 @@ Set these on the `diskheadroom` repository under **Settings → Secrets and vari
 
 The workflow writes `APPLE_API_KEY` to a temporary `.p8` path before electron-builder runs. `APPLE_API_KEY` in the builder environment is that path, not the secret name.
 
+`CSC_LINK` is consumed by the workflow's own import step, not by electron-builder. electron-builder 26 passes the `.p12` password to `security set-key-partition-list`, which authenticates against the keychain and fails with `SecKeychainUnlock: The user name or passphrase you entered is not correct` no matter what the password is ([electron-builder#10066](https://github.com/electron-userland/electron-builder/issues/10066)). The workflow imports the certificate into a temporary keychain itself and exports `CSC_KEYCHAIN`, so the builder discovers the identity instead of recreating that keychain. Drop the import step once the upstream fix ships.
+
 ## Apple-side checklist
 
 1. Create a **Developer ID Application** certificate (G2 Sub-CA). Do not use Apple Development, Mac App Store, or Developer ID Installer.
