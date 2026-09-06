@@ -6,10 +6,15 @@ const sample = require('./sample-data.cjs')
 // main.cjs passes the mode through webPreferences.additionalArguments so each
 // window mounts in a known state instead of relying on in-app navigation.
 const mode = process.argv.find((arg) => arg.startsWith('--capture-mode='))?.split('=')[1]
+const theme = process.argv.find((arg) => arg.startsWith('--capture-theme='))?.split('=')[1]
 const firstRun = mode === 'first-run'
 const scanResult = mode === 'overview' ? sample.compactScanResult : sample.scanResult
 
-let settings = { ...sample.settings, setupComplete: !firstRun }
+let settings = {
+  ...sample.settings,
+  setupComplete: !firstRun,
+  appearance: theme === 'light' ? 'light' : 'dark'
+}
 const permissions = firstRun ? sample.permissionsMissing : sample.permissionsGranted
 
 const noop = () => () => {}

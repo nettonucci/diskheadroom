@@ -132,6 +132,7 @@ module.exports = {
     unusedDays: 90,
     setupComplete: true,
     locale: 'en',
+    appearance: 'dark',
     lowDiskAlert: {
       enabled: true,
       kind: 'percent',

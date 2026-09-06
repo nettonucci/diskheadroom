@@ -9,24 +9,25 @@ const outDir = join(root, 'docs', 'screenshots')
 const WIDTH = 1000
 const HEIGHT = 700
 const EXPORT_WIDTH = 1400
+const SCREENSHOT_BACKGROUND = { dark: '#1c1c1e', light: '#f5f5f7' }
 
 // Nav order comes from NAV in src/renderer/src/lib/copy.ts
 const NAV = { dashboard: 0, permissions: 1, settings: 2, donate: 3 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-async function openWindow(mode, height = HEIGHT) {
+async function openWindow(mode, height = HEIGHT, theme = 'dark') {
   const win = new BrowserWindow({
     width: WIDTH,
     height,
     show: false,
     // Vibrancy cannot be captured offscreen, so paint the equivalent flat colour.
-    backgroundColor: '#1c1c1e',
+    backgroundColor: SCREENSHOT_BACKGROUND[theme],
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       sandbox: false,
       contextIsolation: true,
-      additionalArguments: [`--capture-mode=${mode}`]
+      additionalArguments: [`--capture-mode=${mode}`, `--capture-theme=${theme}`]
     }
   })
 
@@ -35,14 +36,14 @@ async function openWindow(mode, height = HEIGHT) {
   return win
 }
 
-async function capture(win, name) {
+async function capture(win, name, destDir = outDir) {
   const image = await win.webContents.capturePage()
   const png = await sharp(image.toPNG())
     .resize({ width: EXPORT_WIDTH, withoutEnlargement: true })
     .png({ compressionLevel: 9 })
     .toBuffer()
-  await writeFile(join(outDir, `${name}.png`), png)
-  console.log(`wrote docs/screenshots/${name}.png`)
+  await writeFile(join(destDir, `${name}.png`), png)
+  console.log(`wrote ${join(destDir, `${name}.png`)}`)
 }
 
 async function show(win, view) {
@@ -67,7 +68,7 @@ app.whenReady().then(async () => {
   await capture(ready, 'scan')
 
   await show(ready, 'settings')
-  ready.setSize(WIDTH, 2480)
+  ready.setSize(WIDTH, 2680)
   await wait(200)
   await capture(ready, 'settings')
   ready.setSize(WIDTH, HEIGHT)
@@ -76,6 +77,14 @@ app.whenReady().then(async () => {
   await capture(ready, 'donate')
 
   ready.destroy()
+
+  const light = await openWindow('ready', HEIGHT, 'light')
+  await capture(light, 'scan-light')
+  await show(light, 'settings')
+  light.setSize(WIDTH, 2680)
+  await wait(200)
+  await capture(light, 'settings-light')
+  light.destroy()
 
   // The overview runs on a short result so the disk panel, one full category and
   // the floating action bar all fit without the bar covering half a row.

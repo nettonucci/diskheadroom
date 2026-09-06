@@ -26,3 +26,4 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-09-05 | Termos e reembolso transparentes para o Pro | [2026-09-05-termos-reembolso](./2026-09-05-termos-reembolso/post.md) |
 | 2026-09-05 | Página de contato no site | [2026-09-05-pagina-contato](./2026-09-05-pagina-contato/post.md) |
 | 2026-09-05 | Finder Pro experimental de duplicatas | [2026-09-05-duplicatas-pro](./2026-09-05-duplicatas-pro/post.md) |
+| 2026-09-06 | Aparência clara e escura no macOS | [2026-09-06-aparencia-sistema](./2026-09-06-aparencia-sistema/post.md) |

@@ -42,7 +42,7 @@ If you need forensic deletion, secure erase, or Windows/Linux, this is not that 
 
 | System access | Settings |
 | --- | --- |
-| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with scan category toggles, never-touch paths, optional low-disk alert, idle app window, and language pickers" width="440"> |
+| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with scan category toggles, appearance, never-touch paths, optional low-disk alert, idle app window, and language pickers" width="440"> |
 
 <p align="center">
   <img src="docs/screenshots/developer.png" alt="Optional developer groups showing simulators on older runtimes and Android, Gradle and CocoaPods caches, all unchecked, with a warning that those simulators still work" width="560">
@@ -73,12 +73,16 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Low disk alert | Optional local Notification Center notice when free space drops below a percent or GB threshold (off by default, with a cooldown so it does not spam) |
 | Never-touch paths | Settings list of folders omitted from the next scan and refused by Trash; paste a path or pick a folder |
 | Languages | English, Português (Brasil), Español |
+| Appearance | Follows the macOS light/dark setting, or lock the window to one under Settings |
 | Donate | In-app page plus this README, both pointing at GitHub Sponsors |
 | Pro (optional) | Paddle checkout + offline license key under Settings; core scan and Trash stay free, while paid finders require a valid key |
 
 The app follows the macOS language on first launch (with English as the fallback).
 You can change it at any time under **Settings → Language**; the window and menu
 bar update immediately, and the choice persists across launches.
+
+The window follows the macOS light and dark setting by default. **Settings →
+Appearance** switches between System, Dark, and Light.
 
 ## Install from DMG
 

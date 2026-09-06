@@ -19,6 +19,7 @@ import {
   mergeScanCategories,
   mergeScanReminder
 } from '../shared/constants'
+import { DEFAULT_APPEARANCE, mergeAppearance } from '../shared/appearance'
 import { resolveLocale } from '../shared/i18n'
 import type { AppSettings } from '../shared/types'
 
@@ -28,6 +29,7 @@ const defaults = (): AppSettings => ({
   unusedDays: DEFAULT_UNUSED_DAYS,
   setupComplete: false,
   locale: resolveLocale(app.getLocale()),
+  appearance: DEFAULT_APPEARANCE,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   largeFileMinBytes: DEFAULT_LARGE_FILE_MIN_BYTES,
   downloadsMinDays: DEFAULT_DOWNLOADS_MIN_DAYS,
@@ -44,6 +46,7 @@ function appSettingsBody(next: AppSettings): AppSettings {
     unusedDays: next.unusedDays,
     setupComplete: next.setupComplete,
     locale: next.locale,
+    appearance: next.appearance,
     scanCategories: next.scanCategories,
     largeFileMinBytes: next.largeFileMinBytes,
     downloadsMinDays: next.downloadsMinDays,
@@ -64,6 +67,7 @@ function parseSettings(raw: string): AppSettings {
     ...defaults(),
     ...data,
     locale: data.locale ? resolveLocale(data.locale) : defaults().locale,
+    appearance: mergeAppearance(data.appearance),
     scanCategories: mergeScanCategories(data.scanCategories),
     largeFileMinBytes: mergeLargeFileMinBytes(data.largeFileMinBytes),
     downloadsMinDays: mergeDownloadsMinDays(data.downloadsMinDays),

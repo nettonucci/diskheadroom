@@ -19,6 +19,7 @@ const settings = {
   unusedDays: 90 as const,
   setupComplete: true,
   locale: 'en' as const,
+  appearance: 'system' as const,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
   largeFileMinBytes: 500 * 1024 * 1024 as const,
   downloadsMinDays: 30 as const,
@@ -838,6 +839,13 @@ describe('App', () => {
     expect(bridge.openExternal).toHaveBeenCalledWith('https://github.com/nettonucci/diskheadroom')
 
     await user.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.change(screen.getByLabelText('Appearance'), { target: { value: 'light' } })
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ appearance: 'light' })
+      )
+    )
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'))
     fireEvent.change(screen.getByDisplayValue('English'), { target: { value: 'es' } })
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ locale: 'es' }))

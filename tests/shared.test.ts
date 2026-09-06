@@ -19,6 +19,12 @@ import {
   mergeScanCategories,
   proCheckoutUrl
 } from '../src/shared/constants'
+import {
+  DEFAULT_APPEARANCE,
+  mergeAppearance,
+  resolveColorScheme,
+  WINDOW_BACKGROUND
+} from '../src/shared/appearance'
 import { gateProScanCategories, isProEntitled } from '../src/shared/entitlement'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
 import { CATEGORY_META, NAV } from '../src/renderer/src/lib/copy'
@@ -51,6 +57,18 @@ describe('shared helpers', () => {
     expect(LARGE_FILE_MIN_BYTES_OPTIONS).toContain(DEFAULT_LARGE_FILE_MIN_BYTES)
     expect(DOWNLOADS_MIN_DAYS_OPTIONS).toContain(DEFAULT_DOWNLOADS_MIN_DAYS)
     expect(DOWNLOADS_MIN_BYTES_OPTIONS).toContain(DEFAULT_DOWNLOADS_MIN_BYTES)
+    expect(WINDOW_BACKGROUND.light).toBe('#f5f5f7cc')
+  })
+
+  it('merges appearance onto system and resolves the color scheme', () => {
+    expect(mergeAppearance(undefined)).toBe(DEFAULT_APPEARANCE)
+    expect(mergeAppearance('nope')).toBe('system')
+    expect(mergeAppearance('light')).toBe('light')
+    expect(mergeAppearance('dark')).toBe('dark')
+    expect(resolveColorScheme('system', true)).toBe('dark')
+    expect(resolveColorScheme('system', false)).toBe('light')
+    expect(resolveColorScheme('light', true)).toBe('light')
+    expect(resolveColorScheme('dark', false)).toBe('dark')
   })
 
   it('merges scan categories respecting defaults (paid finders off)', () => {

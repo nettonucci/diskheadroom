@@ -13,6 +13,7 @@ import {
   isAllowedExternalUrl,
   PRO_SCAN_CATEGORY_IDS
 } from '../shared/constants'
+import { mergeAppearance } from '../shared/appearance'
 import type { AppSettings, CleanRequest, ScanItem, ScanOptions } from '../shared/types'
 import { trashPaths } from './cleaner'
 import { getDiskInfo } from './disk'
@@ -64,6 +65,7 @@ export function registerIpc(options: IpcOptions): void {
   ipcMain.handle('settings:set', async (_event, next: AppSettings) => {
     const normalized: AppSettings = {
       ...next,
+      appearance: mergeAppearance(next.appearance),
       scanCategories: mergeScanCategories(next.scanCategories),
       largeFileMinBytes: mergeLargeFileMinBytes(next.largeFileMinBytes),
       downloadsMinDays: mergeDownloadsMinDays(next.downloadsMinDays),

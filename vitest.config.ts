@@ -18,8 +18,8 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary', 'html'],
       include: [
-        'src/main/{cleaner,disk,ipc,license,permissions,scanner,settings,tray}.ts',
-        'src/shared/{constants,duplicates,entitlement,i18n}.ts',
+        'src/main/{appearance,cleaner,disk,ipc,license,permissions,scanner,settings,tray}.ts',
+        'src/shared/{appearance,constants,duplicates,entitlement,i18n}.ts',
         'src/renderer/src/{App.tsx,lib/*.ts}'
       ],
       thresholds: {

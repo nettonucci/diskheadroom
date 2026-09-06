@@ -114,7 +114,8 @@ describe('IPC registration', () => {
         launchAtLogin: false,
         scanReminder: { enabled: false, intervalDays: 7 },
         neverTouchPaths: [],
-        duplicateFolders: []
+        duplicateFolders: [],
+        appearance: 'system'
       })
     )
     expect(mocks.saveSettings).toHaveBeenCalledWith(saved)
@@ -159,10 +160,12 @@ describe('IPC registration', () => {
       downloadsMinDays: 60,
       downloadsMinBytes: 100 * 1024 * 1024,
       launchAtLogin: true,
-      scanReminder: { enabled: true, intervalDays: 14 }
+      scanReminder: { enabled: true, intervalDays: 14 },
+      appearance: 'light'
     })
     expect(saved).toEqual(
       expect.objectContaining({
+        appearance: 'light',
         largeFileMinBytes: 250 * 1024 * 1024,
         downloadsMinDays: 60,
         downloadsMinBytes: 100 * 1024 * 1024,
