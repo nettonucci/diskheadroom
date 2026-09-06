@@ -18,7 +18,9 @@ publish:
 mac:
   category: public.app-category.utilities
   icon: build/icon.icns
-  artifactName: ${productName}-${version}-mac.${ext}
+  # No space: electron-builder writes the space as "-" in latest-mac.yml while
+  # GitHub uploads it as ".", so electron-updater 404s on its own feed.
+  artifactName: DiskHeadroom-${version}-mac.${ext}
   # Local `npm run build:mac` passes -c.mac.identity=- (ad-hoc). CI omits that
   # override and uses CSC_LINK (Developer ID Application).
   target:
