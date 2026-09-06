@@ -9,18 +9,25 @@ files:
 extraResources:
   - from: resources
     to: resources
+# GitHub Releases feed for electron-updater. Actual upload is semantic-release
+# (`--publish never` on the builder) so the two do not race the same tag.
+publish:
+  provider: github
+  owner: nettonucci
+  repo: diskheadroom
 mac:
   category: public.app-category.utilities
   icon: build/icon.icns
-  # Ad-hoc signature: without one, the modified bundle keeps only Electron's
-  # linker signature and macOS refuses to launch it as damaged. Replace with a
-  # Developer ID once notarized releases start.
-  identity: '-'
+  artifactName: ${productName}-${version}-mac.${ext}
+  # Local `npm run build:mac` passes -c.mac.identity=- (ad-hoc). CI omits that
+  # override and uses CSC_LINK (Developer ID Application).
   target:
     - dmg
     - zip
   hardenedRuntime: true
   gatekeeperAssess: false
+  # Notarizes when APPLE_API_KEY / APPLE_API_KEY_ID / APPLE_API_ISSUER are set (CI).
+  notarize: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -31,6 +38,5 @@ mac:
     NSUserNotificationAlertStyle: alert
     LSApplicationCategoryType: public.app-category.utilities
 dmg:
-  artifactName: ${productName}-${version}-mac.${ext}
   title: Disk Headroom
 npmRebuild: false

@@ -39,5 +39,31 @@ contextBridge.exposeInMainWorld('diskheadroom', {
   revealItem: async () => true,
   onScanProgress: noop,
   onTrayScan: noop,
-  onTrayDonate: noop
+  onTrayDonate: noop,
+  getUpdateStatus: async () => ({
+    phase: 'idle',
+    currentVersion: '1.20.0',
+    availableVersion: null,
+    percent: null,
+    error: null,
+    offline: false
+  }),
+  checkForUpdates: async () => ({
+    phase: 'not-available',
+    currentVersion: '1.20.0',
+    availableVersion: null,
+    percent: null,
+    error: null,
+    offline: false
+  }),
+  downloadUpdate: async () => ({
+    phase: 'idle',
+    currentVersion: '1.20.0',
+    availableVersion: null,
+    percent: null,
+    error: null,
+    offline: false
+  }),
+  installUpdate: async () => {},
+  onUpdateChanged: noop
 })

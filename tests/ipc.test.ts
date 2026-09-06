@@ -17,14 +17,19 @@ const mocks = vi.hoisted(() => ({
   applyLaunchAtLogin: vi.fn(),
   showOpenDialog: vi.fn(),
   getLicenseStatus: vi.fn(),
-  activateLicense: vi.fn()
+  activateLicense: vi.fn(),
+  getUpdateStatus: vi.fn(),
+  checkForAppUpdates: vi.fn(),
+  downloadAppUpdate: vi.fn(),
+  installAppUpdate: vi.fn(),
+  attachUpdateListener: vi.fn()
 }))
 
 vi.mock('electron', () => {
   const module = {
     clipboard: { writeText: mocks.writeText },
     dialog: { showOpenDialog: mocks.showOpenDialog },
-    ipcMain: {
+  ipcMain: {
     handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
       mocks.handlers.set(channel, handler)
     }
@@ -54,6 +59,13 @@ vi.mock('../src/main/license', () => ({
   getLicenseStatus: mocks.getLicenseStatus,
   activateLicense: mocks.activateLicense
 }))
+vi.mock('../src/main/updates', () => ({
+  attachUpdateListener: mocks.attachUpdateListener,
+  getUpdateStatus: mocks.getUpdateStatus,
+  checkForAppUpdates: mocks.checkForAppUpdates,
+  downloadAppUpdate: mocks.downloadAppUpdate,
+  installAppUpdate: mocks.installAppUpdate
+}))
 
 import { registerIpc } from '../src/main/ipc'
 
@@ -78,7 +90,7 @@ describe('IPC registration', () => {
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(16)
+    expect(mocks.handlers.size).toBe(20)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
@@ -375,5 +387,31 @@ describe('IPC registration', () => {
     await expect(call('license:activate', 'dh1.fixture')).resolves.toEqual({ isPro: true })
     expect(mocks.activateLicense).toHaveBeenCalledWith('dh1.fixture')
     expect(mocks.getLicenseStatus).toHaveBeenCalled()
+  })
+
+  it('forwards update check, download and install without silently installing', async () => {
+    const snapshot = {
+      phase: 'idle',
+      currentVersion: '1.0.0',
+      availableVersion: null,
+      percent: null,
+      error: null,
+      offline: false
+    }
+    mocks.getUpdateStatus.mockReturnValue(snapshot)
+    mocks.checkForAppUpdates.mockResolvedValue({ ...snapshot, phase: 'not-available' })
+    mocks.downloadAppUpdate.mockResolvedValue({ ...snapshot, phase: 'ready', availableVersion: '1.1.0' })
+    const sendToRenderer = vi.fn()
+    registerIpc({ sendToRenderer, getTrayController: () => null })
+    expect(mocks.attachUpdateListener).toHaveBeenCalled()
+    mocks.attachUpdateListener.mock.calls[0][0]({ ...snapshot, phase: 'checking' })
+    expect(sendToRenderer).toHaveBeenCalledWith('update:changed', expect.objectContaining({ phase: 'checking' }))
+    expect(call('update:status')).toEqual(snapshot)
+    await expect(call('update:check')).resolves.toEqual({ ...snapshot, phase: 'not-available' })
+    await expect(call('update:download')).resolves.toEqual(
+      expect.objectContaining({ phase: 'ready', availableVersion: '1.1.0' })
+    )
+    call('update:install')
+    expect(mocks.installAppUpdate).toHaveBeenCalled()
   })
 })

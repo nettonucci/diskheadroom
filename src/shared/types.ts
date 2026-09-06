@@ -134,3 +134,22 @@ export interface CleanResult {
 export interface LicenseStatus {
   isPro: boolean
 }
+
+export type UpdatePhase =
+  | 'idle'
+  | 'packaged-only'
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'ready'
+  | 'error'
+
+export interface AppUpdateStatus {
+  phase: UpdatePhase
+  currentVersion: string
+  availableVersion: string | null
+  percent: number | null
+  error: string | null
+  offline: boolean
+}

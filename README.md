@@ -25,8 +25,9 @@ It is not a “one-click miracle cleaner.” You review every group, optional de
 - Lives in the **menu bar** so you can open it, scan, or quit without hunting the Dock
 - Can show a **local** Notification Center alert when free space is low (off by default)
 - Speaks English, Brazilian Portuguese, and Spanish
+- Can check GitHub Releases for updates from Settings (download is opt-in)
 
-All work stays on your Mac. There is no account, no telemetry, and no cloud.
+All work stays on your Mac. There is no account, no telemetry, and no cloud. Update metadata is fetched only from GitHub over HTTPS.
 
 ## Who it is for
 
@@ -74,6 +75,7 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Never-touch paths | Settings list of folders omitted from the next scan and refused by Trash; paste a path or pick a folder |
 | Languages | English, Português (Brasil), Español |
 | Appearance | Follows the macOS light/dark setting, or lock the window to one under Settings |
+| Updates | Settings can check GitHub Releases; download and install wait for you |
 | Donate | In-app page plus this README, both pointing at GitHub Sponsors |
 | Pro (optional) | Paddle checkout + offline license key under Settings; core scan and Trash stay free, while paid finders require a valid key |
 
@@ -89,9 +91,13 @@ Appearance** switches between System, Dark, and Light.
 1. Download the latest `Disk Headroom-*-mac.dmg` from [Releases](https://github.com/nettonucci/diskheadroom/releases).
 2. Open the disk image and drag **Disk Headroom** into Applications.
 3. Launch it from Applications (or Spotlight).
-4. Grant **Full Disk Access** when asked (see below). Unsigned or ad-hoc builds may require **System Settings → Privacy & Security → Open Anyway**.
+4. Grant **Full Disk Access** when asked (see below).
 
-Until the project is notarized with an Apple Developer ID, Gatekeeper may warn on first open. That is expected for a community build.
+Published builds are signed with a Developer ID and notarized. Gatekeeper should not require **Open Anyway**. The first launch still needs Full Disk Access. If you previously granted access to an ad-hoc (unsigned) build, add the notarized app once more — macOS ties that permission to the signing identity.
+
+Later versions can be installed from **Settings → Updates**, which only talks to GitHub Releases over HTTPS. Nothing downloads until you choose, and a failed check leaves the rest of the app working offline.
+
+Signing secrets and the Apple-side checklist are in [docs/signing.md](docs/signing.md).
 
 ## macOS permissions
 
@@ -187,7 +193,8 @@ Useful scripts:
 | `npm run test:watch` | Run unit tests interactively while developing |
 | `npm run test:coverage` | Run tests and enforce 90% global coverage |
 | `npm run build` | Compile main, preload, and renderer |
-| `npm run build:mac` | Compile and package a DMG |
+| `npm run build:mac` | Compile and package an ad-hoc DMG for local testing |
+| `npm run build:mac:release` | Same pack without the ad-hoc identity override (used by CI with Developer ID secrets) |
 | `npm run icons` | Rasterize `assets/brand` into `build/icon.icns` and the menu bar templates |
 | `npm run screenshots` | Rebuild and capture `docs/screenshots` from the UI using sample data |
 | `npm run screenshots:notification` | Render the low disk alert banner for release notes (`-- --locale=pt-BR --percent=5`) |
@@ -206,6 +213,7 @@ Useful scripts:
 - Settings live in the app’s user-data folder as local JSON.
 - A signed Pro license (when one exists) is verified **offline** in the main process. The public key ships in source; the private signing key does not. The renderer only sees `isPro`.
 - Donate opens [GitHub Sponsors](https://github.com/sponsors/nettonucci) in your browser. Nothing else is sent.
+- Update checks fetch `latest-mac.yml` from GitHub Releases over HTTPS. There is no analytics endpoint. Download and install wait for an explicit action in Settings.
 
 ## Pro (optional)
 
@@ -221,7 +229,7 @@ Treat this like any disk utility: do not select folders you do not recognize. Cl
 
 The unit suite uses [Vitest](https://vitest.dev/) and Testing Library. It covers
 the scanner, cleaning safeguards, permissions, settings, menu bar controller,
-translations, formatting, and renderer workflows with Electron and macOS APIs
+translations, formatting, update checks, and renderer workflows with Electron and macOS APIs
 mocked at their boundaries.
 
 Coverage is enforced globally at **90%** for statements, branches, functions,
@@ -235,8 +243,10 @@ There are exactly two GitHub Actions workflows:
   check in the `main` branch protection rule. The `.githooks/pre-push` hook runs
   the same commitlint check locally.
 - **Release** repeats typecheck and coverage after a merge to `main`, lets
-  semantic-release calculate the next version, builds the signed-ad-hoc arm64
-  DMG, verifies its code signature, and attaches it to the GitHub Release.
+  semantic-release calculate the next version, signs the arm64 app with Developer
+  ID, notarizes it, verifies the staple, and attaches the DMG, ZIP, and
+  `latest-mac.yml` updater feed to the GitHub Release. Required secrets are
+  listed in [docs/signing.md](docs/signing.md).
 
 ## Donate
 
@@ -255,6 +265,7 @@ src/renderer/      React UI
 src/shared/        Types, constants, translations
 assets/brand/      Source SVGs for every icon and logo
 build/             Entitlements and generated app icon
+docs/              Signing secrets checklist and README screenshots
 resources/         Generated menu bar template images
 release-notes/     Per-feature Markdown + images for Instagram posts
 ```
@@ -310,16 +321,17 @@ npm run release:dry
 
 The first Conventional Commit that warrants a release on `main` becomes **v1.0.0**.
 
-## Releasing (optional)
+## Releasing
 
-Notarization is not part of the default build. When you are ready for a signed public DMG:
+On each release-worthy push to `main`, GitHub Actions signs with Developer ID, notarizes, staples, and publishes the Apple Silicon DMG plus the ZIP/`latest-mac.yml` files electron-updater needs.
 
-1. Join the Apple Developer Program.
-2. Sign with a Developer ID Application certificate.
-3. Notarize and staple the app or disk image.
-4. Attach the DMG to a GitHub Release.
+Local packaging stays ad-hoc:
 
-Until then, document Gatekeeper’s Open Anyway path for testers.
+```bash
+npm run build:mac -- --arm64
+```
+
+CI uses `npm run build:mac:release` with repository secrets (never commit the `.p12` or `.p8`). See [docs/signing.md](docs/signing.md).
 
 ## License
 

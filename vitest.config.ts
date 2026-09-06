@@ -18,7 +18,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary', 'html'],
       include: [
-        'src/main/{appearance,cleaner,disk,ipc,license,permissions,scanner,settings,tray}.ts',
+        'src/main/{appearance,cleaner,disk,ipc,license,permissions,scanner,settings,tray,updates}.ts',
         'src/shared/{appearance,constants,duplicates,entitlement,i18n}.ts',
         'src/renderer/src/{App.tsx,lib/*.ts}'
       ],
