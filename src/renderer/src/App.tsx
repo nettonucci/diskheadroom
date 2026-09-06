@@ -21,6 +21,8 @@ import {
   type ScanReminderSettings,
   type UnusedDays
 } from '../../shared/constants'
+import { APPEARANCE_OPTIONS, type Appearance } from '../../shared/appearance'
+import { applyDocumentTheme } from './lib/theme'
 import {
   LOCALES,
   LOCALE_NAMES,
@@ -151,6 +153,11 @@ function AppShell(): JSX.Element {
   const bootstrapped = useRef(false)
   const locale = settings?.locale ?? 'en'
   const t = translator(locale)
+
+  useEffect(() => {
+    if (!settings) return
+    return applyDocumentTheme(settings.appearance)
+  }, [settings?.appearance])
 
   const refresh = useCallback(async () => {
     const [nextSettings, nextDisk, nextPerms, nextTarget, license] = await Promise.all([
@@ -289,6 +296,10 @@ function AppShell(): JSX.Element {
 
   async function updateLocale(nextLocale: Locale): Promise<void> {
     await updateSettings(() => ({ locale: nextLocale }))
+  }
+
+  async function updateAppearance(appearance: Appearance): Promise<void> {
+    await updateSettings(() => ({ appearance }))
   }
 
   async function updateScanCategory(id: ScanCategoryFlag, enabled: boolean): Promise<void> {
@@ -467,6 +478,7 @@ function AppShell(): JSX.Element {
             onDownloadsMinDays={(value) => void updateDownloadsMinDays(value)}
             onDownloadsMinBytes={(value) => void updateDownloadsMinBytes(value)}
             onLocale={(value) => void updateLocale(value)}
+            onAppearance={(value) => void updateAppearance(value)}
             onScanCategory={(id, enabled) => void updateScanCategory(id, enabled)}
             onLowDiskAlert={(patch) => void updateLowDiskAlert(patch)}
             onLaunchAtLogin={(enabled) => void updateLaunchAtLogin(enabled)}
@@ -999,6 +1011,7 @@ function SettingsView(props: {
   onDownloadsMinDays: (value: DownloadsMinDays) => void
   onDownloadsMinBytes: (value: DownloadsMinBytes) => void
   onLocale: (value: Locale) => void
+  onAppearance: (value: Appearance) => void
   onScanCategory: (id: ScanCategoryFlag, enabled: boolean) => void
   onLowDiskAlert: (patch: Partial<LowDiskAlertSettings>) => void
   onLaunchAtLogin: (enabled: boolean) => void
@@ -1418,6 +1431,21 @@ function SettingsView(props: {
                 preset.kind === 'percent' ? 'settings.lowDisk.percent' : 'settings.lowDisk.gigabytes',
                 { value: preset.value }
               )}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="card">
+        <h3>{props.t('settings.appearanceTitle')}</h3>
+        <p className="muted">{props.t('settings.appearanceHint')}</p>
+        <select
+          aria-label={props.t('settings.appearanceTitle')}
+          value={props.settings.appearance}
+          onChange={(event) => props.onAppearance(event.target.value as Appearance)}
+        >
+          {APPEARANCE_OPTIONS.map((appearance) => (
+            <option key={appearance} value={appearance}>
+              {props.t(`settings.appearance.${appearance}`)}
             </option>
           ))}
         </select>

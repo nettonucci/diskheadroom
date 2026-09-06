@@ -7,6 +7,7 @@ import type {
   ScanReminderSettings,
   UnusedDays
 } from './constants'
+import type { Appearance } from './appearance'
 import type { Locale, TranslationKey } from './i18n'
 
 export type ScanCategoryId =
@@ -93,6 +94,7 @@ export interface AppSettings {
   unusedDays: UnusedDays
   setupComplete: boolean
   locale: Locale
+  appearance: Appearance
   scanCategories: ScanCategoryFlags
   largeFileMinBytes: LargeFileMinBytes
   downloadsMinDays: DownloadsMinDays

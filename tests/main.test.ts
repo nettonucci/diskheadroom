@@ -157,6 +157,7 @@ describe('settings', () => {
       unusedDays: 90,
       setupComplete: false,
       locale: 'pt-BR',
+      appearance: 'system',
       scanCategories: DEFAULT_SCAN_CATEGORIES,
       largeFileMinBytes: DEFAULT_LARGE_FILE_MIN_BYTES,
       downloadsMinDays: 30,
@@ -201,6 +202,7 @@ describe('settings', () => {
     await expect(loadSettings()).resolves.toMatchObject({
       downloadsMinDays: 30,
       downloadsMinBytes: 52428800,
+      appearance: 'system',
       lowDiskAlert: { enabled: false, kind: 'percent', value: 10 },
       launchAtLogin: false,
       scanReminder: { enabled: false, intervalDays: 7 }
@@ -240,6 +242,7 @@ describe('settings', () => {
       unusedDays: 30 as const,
       setupComplete: true,
       locale: 'en' as const,
+      appearance: 'system' as const,
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
       lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
       launchAtLogin: false,
@@ -279,6 +282,7 @@ describe('settings', () => {
       unusedDays: 30 as const,
       setupComplete: true,
       locale: 'en' as const,
+      appearance: 'dark' as const,
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
       lowDiskAlert: { enabled: false, kind: 'percent' as const, value: 10 },
       launchAtLogin: false,

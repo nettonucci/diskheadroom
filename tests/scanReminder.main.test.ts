@@ -45,6 +45,7 @@ const enabled: AppSettings = {
   unusedDays: 90,
   setupComplete: true,
   locale: 'en',
+  appearance: 'system',
   scanCategories: DEFAULT_SCAN_CATEGORIES,
   largeFileMinBytes: 500 * 1024 * 1024,
   downloadsMinDays: 30,

@@ -1,6 +1,8 @@
-import { BrowserWindow, Menu, nativeImage, shell, app } from 'electron'
+import { BrowserWindow, Menu, nativeImage, nativeTheme, shell, app } from 'electron'
 import { join } from 'node:path'
+import { applyNativeAppearance } from './appearance'
 import { APP_NAME } from '../shared/constants'
+import { DEFAULT_APPEARANCE, resolveColorScheme, WINDOW_BACKGROUND, type Appearance } from '../shared/appearance'
 import { registerIpc } from './ipc'
 import { registerDebugIpc } from './debug'
 import { applyLaunchAtLogin, shouldShowWindowOnLaunch } from './loginItem'
@@ -12,12 +14,15 @@ import { createTray, type TrayController } from './tray'
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
 let trayController: TrayController | null = null
+let currentAppearance: Appearance = DEFAULT_APPEARANCE
 
 // A development run inherits Electron's bundle name, which then shows up in the
 // menu bar, the About panel and the user-data folder. Must run before ready.
 app.setName(APP_NAME)
 
 function createWindow(showOnReady: boolean): void {
+  nativeTheme.themeSource = currentAppearance
+  const scheme = resolveColorScheme(currentAppearance, nativeTheme.shouldUseDarkColors)
   mainWindow = new BrowserWindow({
     width: 980,
     height: 680,
@@ -29,7 +34,7 @@ function createWindow(showOnReady: boolean): void {
     trafficLightPosition: { x: 16, y: 18 },
     vibrancy: 'under-window',
     visualEffectState: 'active',
-    backgroundColor: '#1c1c1ecc',
+    backgroundColor: WINDOW_BACKGROUND[scheme],
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -113,6 +118,7 @@ app.whenReady().then(async () => {
   applyDevDockIcon()
   applyAppMenu()
   const settings = await loadSettings()
+  currentAppearance = settings.appearance
   applyLaunchAtLogin(settings.launchAtLogin)
   const lowDiskAlert = startLowDiskAlertWatcher({ showWindow })
   const scanReminder = startScanReminderWatcher({ showWindow })
@@ -120,6 +126,8 @@ app.whenReady().then(async () => {
     sendToRenderer,
     getTrayController: () => trayController,
     onSettingsChanged: (next) => {
+      currentAppearance = next.appearance
+      applyNativeAppearance(next.appearance, mainWindow)
       lowDiskAlert.setSettings(next)
       scanReminder.setSettings(next)
     },
@@ -133,6 +141,10 @@ app.whenReady().then(async () => {
     registerDebugIpc(lowDiskAlert)
   }
   createWindow(shouldShowWindowOnLaunch())
+  applyNativeAppearance(currentAppearance, mainWindow)
+  nativeTheme.on('updated', () => {
+    applyNativeAppearance(currentAppearance, mainWindow)
+  })
   lowDiskAlert.setSettings(settings)
   scanReminder.setSettings(settings)
   trayController = createTray(
