@@ -1,7 +1,7 @@
 # Assinatura Apple e atualizações pelo GitHub
 
 - **Data:** 2026-09-06
-- **Commit / PR:** local
+- **Commit / PR:** #67
 - **Tipo:** feat
 - **Público:** quem instala o DMG e quer atualizar sem baixar na mão
 - **Formato sugerido no Instagram:** único (card de Atualizações em Ajustes)
