@@ -38,15 +38,15 @@
       {
         "assets": [
           {
-            "path": "dist/Disk Headroom-*-mac.dmg",
+            "path": "dist/DiskHeadroom-*-mac.dmg",
             "label": "Disk Headroom ${nextRelease.version} for macOS (Apple Silicon DMG)"
           },
           {
-            "path": "dist/Disk Headroom-*-mac.zip",
+            "path": "dist/DiskHeadroom-*-mac.zip",
             "label": "Disk Headroom ${nextRelease.version} for macOS (Apple Silicon ZIP)"
           },
           {
-            "path": "dist/Disk Headroom-*-mac.*.blockmap"
+            "path": "dist/DiskHeadroom-*-mac.*.blockmap"
           },
           {
             "path": "dist/latest-mac.yml"

@@ -88,7 +88,7 @@ Appearance** switches between System, Dark, and Light.
 
 ## Install from DMG
 
-1. Download the latest `Disk Headroom-*-mac.dmg` from [Releases](https://github.com/nettonucci/diskheadroom/releases).
+1. Download the latest `DiskHeadroom-*-mac.dmg` from [Releases](https://github.com/nettonucci/diskheadroom/releases).
 2. Open the disk image and drag **Disk Headroom** into Applications.
 3. Launch it from Applications (or Spotlight).
 4. Grant **Full Disk Access** when asked (see below).
