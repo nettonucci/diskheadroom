@@ -33,3 +33,4 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-09-06 | Abas dentro de Ajustes | [2026-09-06-ajustes-abas](./2026-09-06-ajustes-abas/post.md) |
 | 2026-09-06 | Aba Doar em Ajustes | [2026-09-06-aba-doar](./2026-09-06-aba-doar/post.md) |
 | 2026-09-06 | Aba Atualizações em Ajustes | [2026-09-06-aba-updates](./2026-09-06-aba-updates/post.md) |
+| 2026-09-07 | Scan mais rápido, sem travar a janela | [2026-09-07-scan-mais-rapido](./2026-09-07-scan-mais-rapido/post.md) |

@@ -31,6 +31,35 @@ const BLOCKED_PREFIXES = ['/System', '/usr/sbin', '/bin', '/sbin', '/private/var
 const IDLE_USER_MIN_BYTES = 100 * 1024 * 1024
 const IDLE_USER_LIMIT = 24
 
+/**
+ * Every awaited filesystem call costs a full event loop turn, and in the
+ * Electron main process a turn is milliseconds instead of microseconds. Walking
+ * one entry at a time made a 21k-file app take 200s, so the walks keep a batch
+ * of calls in flight and share a single turn between them.
+ */
+const WALK_BATCH = 64
+const WALK_MAX_DEPTH = 28
+/** Sibling trees measured at once, so their walks share turns too. */
+const CHILD_SIZE_BATCH = 8
+
+/** Bounded-concurrency map that keeps the input order of the results. */
+async function mapWithLimit<T, R>(
+  items: T[],
+  limit: number,
+  work: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let cursor = 0
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++
+      results[index] = await work(items[index])
+    }
+  })
+  await Promise.all(runners)
+  return results
+}
+
 const LARGE_FILES_MAX_DEPTH = 6
 const LARGE_FILES_MAX_DIRS = 2000
 const LARGE_FILES_LIMIT = 50
@@ -184,13 +213,18 @@ async function scanChildren(
     return []
   }
 
+  const candidates = names
+    .slice(0, limit)
+    .filter((name) => !USER_CACHE_SKIP.has(name) && isSafePath(join(root, name)))
+  const sizes = await mapWithLimit(candidates, CHILD_SIZE_BATCH, (name) =>
+    directorySize(join(root, name))
+  )
+
   const items: ScanItem[] = []
-  for (const name of names.slice(0, limit)) {
-    if (USER_CACHE_SKIP.has(name)) continue
-    const path = join(root, name)
-    if (!isSafePath(path)) continue
-    const bytes = await directorySize(path)
+  for (const [index, name] of candidates.entries()) {
+    const bytes = sizes[index]
     if (bytes <= 0) continue
+    const path = join(root, name)
     items.push({
       id: idFor(path),
       categoryId,
@@ -495,32 +529,40 @@ async function scanIdleUserFolders(home: string, unusedDays: UnusedDays): Promis
       continue
     }
 
-    for (const name of names) {
-      const path = join(root, name)
-      if (!isSafePath(path)) continue
+    const safe = names.filter((name) => isSafePath(join(root, name)))
+    const infos = await mapWithLimit(safe, WALK_BATCH, (name) =>
+      lstat(join(root, name)).catch(() => null)
+    )
 
-      let info
-      try {
-        info = await lstat(path)
-      } catch {
-        continue
-      }
-      if (info.isSymbolicLink()) continue
-      if (!Number.isFinite(info.mtimeMs) || now - info.mtimeMs < thresholdMs) continue
+    const idle = safe
+      .map((name, index) => ({ name, info: infos[index] }))
+      .filter(
+        (entry) =>
+          entry.info !== null &&
+          !entry.info.isSymbolicLink() &&
+          Number.isFinite(entry.info.mtimeMs) &&
+          now - entry.info.mtimeMs >= thresholdMs
+      )
+    const sizes = await mapWithLimit(idle, CHILD_SIZE_BATCH, (entry) =>
+      directorySize(join(root, entry.name))
+    )
 
-      const bytes = await directorySize(path)
+    for (const [index, entry] of idle.entries()) {
+      const bytes = sizes[index]
       if (bytes < IDLE_USER_MIN_BYTES) continue
+      const path = join(root, entry.name)
+      const mtimeMs = entry.info!.mtimeMs
 
       items.push({
         id: idFor(path),
         categoryId: 'idleUserFolders',
-        name,
+        name: entry.name,
         path,
         bytes,
         selectedByDefault: false,
         optional: true,
-        lastUsedAt: new Date(info.mtimeMs).toISOString(),
-        daysIdle: Math.floor((now - info.mtimeMs) / (24 * 60 * 60 * 1000))
+        lastUsedAt: new Date(mtimeMs).toISOString(),
+        daysIdle: Math.floor((now - mtimeMs) / (24 * 60 * 60 * 1000))
       })
     }
   }
@@ -617,23 +659,23 @@ export async function scanLargeHomeFiles(
       return
     }
 
-    for (const name of entries) {
+    const kept = entries.filter((name) => {
+      if (name === '.Trash' || name === '.git') return false
+      const fullPath = join(dir, name)
+      return !BLOCKED_PREFIXES.some(
+        (prefix) => fullPath === prefix || fullPath.startsWith(`${prefix}/`)
+      )
+    })
+    const infos = await mapWithLimit(kept, WALK_BATCH, (name) =>
+      lstat(join(dir, name)).catch(() => null)
+    )
+
+    for (const [index, name] of kept.entries()) {
       if (visitedDirs >= maxDirs) break
-      if (name === '.Trash' || name === '.git') continue
 
       const fullPath = join(dir, name)
-      if (
-        BLOCKED_PREFIXES.some((prefix) => fullPath === prefix || fullPath.startsWith(`${prefix}/`))
-      ) {
-        continue
-      }
-
-      let info
-      try {
-        info = await lstat(fullPath)
-      } catch {
-        continue
-      }
+      const info = infos[index]
+      if (!info) continue
 
       if (info.isSymbolicLink()) {
         continue
@@ -688,40 +730,52 @@ async function scanUnusedApps(unusedDays: UnusedDays): Promise<ScanItem[]> {
       continue
     }
 
-    for (const entry of entries) {
-      if (!entry.endsWith('.app')) continue
-      const path = join(root, entry)
-      if (!isSafePath(path)) continue
-      if (entry === 'Disk Headroom.app') continue
+    const apps = entries.filter(
+      (entry) =>
+        entry.endsWith('.app') && entry !== 'Disk Headroom.app' && isSafePath(join(root, entry))
+    )
 
-      const bundleId = await readPlistValue(path, 'CFBundleIdentifier')
-      if (bundleId.startsWith('com.apple.')) continue
+    // Each app needs two subprocesses and a full tree walk; running a few side
+    // by side keeps those awaits from serialising into one turn each.
+    const idle = (
+      await mapWithLimit(apps, CHILD_SIZE_BATCH, async (entry) => {
+        const path = join(root, entry)
+        const bundleId = await readPlistValue(path, 'CFBundleIdentifier')
+        if (bundleId.startsWith('com.apple.')) return null
 
-      const lastUsed = await lastUsedDate(path)
-      const daysIdle =
-        lastUsed === null ? unusedDays + 1 : Math.floor((now - lastUsed.getTime()) / (24 * 60 * 60 * 1000))
+        const lastUsed = await lastUsedDate(path)
+        const daysIdle =
+          lastUsed === null
+            ? unusedDays + 1
+            : Math.floor((now - lastUsed.getTime()) / (24 * 60 * 60 * 1000))
 
-      if (lastUsed !== null && now - lastUsed.getTime() < thresholdMs) continue
-      if (lastUsed === null) {
-        // Spotlight has no last-used date — treat as idle only past the threshold from mtime
-        const st = await stat(path).catch(() => null)
-        if (st && now - st.mtimeMs < thresholdMs) continue
-      }
+        if (lastUsed !== null && now - lastUsed.getTime() < thresholdMs) return null
+        if (lastUsed === null) {
+          // Spotlight has no last-used date — treat as idle only past the threshold from mtime
+          const st = await stat(path).catch(() => null)
+          if (st && now - st.mtimeMs < thresholdMs) return null
+        }
 
-      const bytes = await directorySize(path)
+        return { entry, path, lastUsed, daysIdle }
+      })
+    ).filter((app): app is NonNullable<typeof app> => app !== null)
+
+    const sizes = await mapWithLimit(idle, CHILD_SIZE_BATCH, (app) => directorySize(app.path))
+
+    for (const [index, app] of idle.entries()) {
+      const bytes = sizes[index]
       if (bytes <= 0) continue
 
-      const display = entry.replace(/\.app$/i, '')
       items.push({
-        id: idFor(path),
+        id: idFor(app.path),
         categoryId: 'unusedApps',
-        name: display,
-        path,
+        name: app.entry.replace(/\.app$/i, ''),
+        path: app.path,
         bytes,
         selectedByDefault: false,
         optional: true,
-        lastUsedAt: lastUsed ? lastUsed.toISOString() : null,
-        daysIdle
+        lastUsedAt: app.lastUsed ? app.lastUsed.toISOString() : null,
+        daysIdle: app.daysIdle
       })
     }
   }
@@ -963,47 +1017,49 @@ export function isNeverTouchPath(target: string, prefixes: string[]): boolean {
 
 async function directorySize(path: string): Promise<number> {
   const seen = new Set<string>()
-  return walkSize(path, seen, 0)
+  return walkSize(path, seen)
 }
 
-async function walkSize(path: string, seen: Set<string>, depth: number): Promise<number> {
-  if (depth > 28) return 0
-  let real = path
-  try {
-    const lst = await lstat(path)
-    if (lst.isSymbolicLink()) {
-      const link = await readlink(path).catch(() => path)
-      real = isAbsolute(link) ? link : resolvePath(dirname(path), link)
-    }
-  } catch {
-    return 0
-  }
-
-  if (seen.has(real)) return 0
-  seen.add(real)
-
-  let info
-  try {
-    info = await lstat(path)
-  } catch {
-    return 0
-  }
-
-  if (info.isSymbolicLink()) return 0
-  if (info.isFile()) return info.size
-  if (!info.isDirectory()) return 0
-
+/** Sums a tree one depth level at a time so each level shares an event loop turn. */
+async function walkSize(root: string, seen: Set<string>): Promise<number> {
   let total = 0
-  let children: string[] = []
-  try {
-    children = await readdir(path)
-  } catch {
-    return 0
+  let level = [root]
+
+  for (let depth = 0; depth <= WALK_MAX_DEPTH && level.length > 0; depth++) {
+    const infos = await mapWithLimit(level, WALK_BATCH, (path) => lstat(path).catch(() => null))
+
+    const links = level.filter((_, index) => infos[index]?.isSymbolicLink())
+    const targets = await mapWithLimit(links, WALK_BATCH, (path) =>
+      readlink(path).catch(() => path)
+    )
+    const linkTargets = new Map(links.map((path, index) => [path, targets[index]]))
+
+    const dirs: string[] = []
+    for (const [index, info] of infos.entries()) {
+      if (!info) continue
+      const path = level[index]
+
+      // A symlink still claims its target so the same bytes are not counted
+      // again when the walk reaches the real path.
+      let real = path
+      if (info.isSymbolicLink()) {
+        const link = linkTargets.get(path) ?? path
+        real = isAbsolute(link) ? link : resolvePath(dirname(path), link)
+      }
+      if (seen.has(real)) continue
+      seen.add(real)
+
+      if (info.isSymbolicLink()) continue
+      if (info.isFile()) total += info.size
+      else if (info.isDirectory()) dirs.push(path)
+    }
+
+    const children = await mapWithLimit(dirs, WALK_BATCH, (path) =>
+      readdir(path).catch(() => [] as string[])
+    )
+    level = dirs.flatMap((path, index) => children[index].map((child) => join(path, child)))
   }
 
-  for (const child of children) {
-    total += await walkSize(join(path, child), seen, depth + 1)
-  }
   return total
 }
 
