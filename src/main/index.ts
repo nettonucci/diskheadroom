@@ -86,11 +86,29 @@ function applyAppMenu(): void {
   })
 
   // A packaged build ships without the View menu, so the DevTools shortcut only
-  // exists while developing.
+  // exists while developing. Reload is moved off Command-R so the renderer can
+  // use that chord to start a scan, matching the packaged app (no View menu).
   const template: Electron.MenuItemConstructorOptions[] = [
     { role: 'appMenu' },
     { role: 'editMenu' },
-    ...(app.isPackaged ? [] : [{ role: 'viewMenu' as const }]),
+    ...(app.isPackaged
+      ? []
+      : [
+          {
+            label: 'View',
+            submenu: [
+              { role: 'reload', accelerator: 'Alt+Command+R' },
+              { role: 'forceReload', accelerator: 'Alt+Shift+Command+R' },
+              { role: 'toggleDevTools' },
+              { type: 'separator' },
+              { role: 'resetZoom' },
+              { role: 'zoomIn' },
+              { role: 'zoomOut' },
+              { type: 'separator' },
+              { role: 'togglefullscreen' }
+            ]
+          } satisfies Electron.MenuItemConstructorOptions
+        ]),
     { role: 'windowMenu' }
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))

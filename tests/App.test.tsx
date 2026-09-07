@@ -296,6 +296,37 @@ describe('App', () => {
     expect(screen.queryByText('Old App')).not.toBeInTheDocument()
   })
 
+  it('lists shortcuts in Settings and focuses the results filter with Command-F', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    expect(await screen.findByText('⌘R')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Scan this Mac' }))
+    expect(await screen.findByText('Review before cleaning')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'General' }))
+    expect(await screen.findByRole('heading', { name: 'Keyboard shortcuts' })).toBeInTheDocument()
+    expect(screen.getByText('Start or repeat a scan')).toBeInTheDocument()
+    expect(screen.getByText('Focus the results filter')).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'f', metaKey: true })
+    expect(await screen.findByRole('searchbox', { name: 'Filter by name or path' })).toHaveFocus()
+  })
+
+  it('does not start a scan from Command-R while the confirm dialog is open', async () => {
+    const bridge = api()
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+    await user.click(await screen.findByRole('button', { name: 'Move to Trash' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'r', metaKey: true })
+    expect(bridge.runScan).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
   it('shows Docker Desktop leftovers unchecked with a warning before trash', async () => {
     const dockerResult = {
       ...result,
@@ -706,6 +737,7 @@ describe('App', () => {
     const user = userEvent.setup()
     const { unmount } = render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'Scan' }))
 
     expect(screen.getByRole('checkbox', { name: /Large files/ })).toBeDisabled()
     expect(screen.getByRole('checkbox', { name: /Downloads/ })).toBeDisabled()
@@ -722,6 +754,7 @@ describe('App', () => {
     window.diskheadroom = proBridge
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'Scan' }))
     expect(screen.getByRole('checkbox', { name: /Large files/ })).toBeEnabled()
     expect(screen.getByRole('checkbox', { name: 'Downloads' })).toBeEnabled()
     expect(screen.getByRole('checkbox', { name: /Duplicates/ })).toBeEnabled()
@@ -765,10 +798,15 @@ describe('App', () => {
     await screen.findByText('Reclaim storage')
 
     await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('tab', { name: 'Donate' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'Sponsor on GitHub' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Scan' }))
     fireEvent.change(screen.getByDisplayValue('90 days'), { target: { value: '180' } })
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ unusedDays: 180 }))
     )
+    await user.click(screen.getByRole('tab', { name: 'General' }))
     await user.click(screen.getByRole('checkbox', { name: 'Start Disk Headroom at login' }))
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ launchAtLogin: true }))
@@ -807,6 +845,7 @@ describe('App', () => {
         })
       )
     )
+    await user.click(screen.getByRole('tab', { name: 'Scan' }))
     await user.click(screen.getByRole('checkbox', { name: 'Idle applications' }))
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(
@@ -841,10 +880,17 @@ describe('App', () => {
         })
       )
     )
-    await user.click(screen.getByRole('button', { name: 'Open permissions' }))
+    await user.click(screen.getByRole('tab', { name: 'Permissions' }))
     expect(await screen.findByText('System access')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open System Settings' })).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('navigation')).queryByRole('button', { name: /^Permissions$/ })
+    ).not.toBeInTheDocument()
+    expect(
+      within(screen.getByRole('navigation')).queryByRole('button', { name: /^Donate$/ })
+    ).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'Pro' }))
     expect(await screen.findByText('Pro is not active.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('License key'), { target: { value: 'dh1.bad' } })
     await user.click(screen.getByRole('button', { name: 'Activate' }))
@@ -857,14 +903,12 @@ describe('App', () => {
     expect(bridge.openExternal).toHaveBeenCalledWith('https://www.diskheadroom.com/en/pro')
     await user.click(screen.getByRole('button', { name: 'Donate instead' }))
     expect(await screen.findByRole('button', { name: 'Sponsor on GitHub' })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Donate' }))
-    await user.click(await screen.findByRole('button', { name: 'Sponsor on GitHub' }))
+    await user.click(screen.getByRole('button', { name: 'Sponsor on GitHub' }))
     expect(bridge.openExternal).toHaveBeenCalledWith('https://github.com/sponsors/nettonucci')
     await user.click(screen.getByRole('button', { name: /github.com/ }))
     expect(bridge.openExternal).toHaveBeenCalledWith('https://github.com/nettonucci/diskheadroom')
 
-    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'General' }))
     fireEvent.change(screen.getByLabelText('Appearance'), { target: { value: 'light' } })
     await waitFor(() =>
       expect(bridge.setSettings).toHaveBeenCalledWith(
@@ -884,6 +928,7 @@ describe('App', () => {
     window.diskheadroom = bridge
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'Updates' }))
     expect(await screen.findByText('This version: 1.0.0')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Check for updates' }))
     expect(bridge.checkForUpdates).toHaveBeenCalled()
@@ -911,6 +956,7 @@ describe('App', () => {
     window.diskheadroom = bridge
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'Updates' }))
     expect(await screen.findByText('Version 1.1.0 is ready to download.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Download update' }))
     expect(bridge.downloadUpdate).toHaveBeenCalled()
@@ -936,6 +982,7 @@ describe('App', () => {
     window.diskheadroom = bridge
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'Updates' }))
     expect(
       await screen.findByText('Could not reach GitHub. Disk Headroom still works offline.')
     ).toBeInTheDocument()
@@ -1054,6 +1101,7 @@ describe('App', () => {
     await screen.findByText('Reclaim storage')
 
     await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'Scan' }))
     expect(await screen.findByRole('checkbox', { name: 'Large files' })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: 'Debug' }))
@@ -1065,6 +1113,7 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Remove Pro license' })).toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'Scan' }))
     expect(await screen.findByRole('checkbox', { name: /Large files/ })).toBeDisabled()
   })
 

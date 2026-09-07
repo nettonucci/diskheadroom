@@ -42,7 +42,18 @@ import type {
   ScanResult,
   AppUpdateStatus
 } from '../../shared/types'
-import { CATEGORY_META, CATEGORY_WARNING, NAV, SCAN_CATEGORY_LABELS, type ViewId } from './lib/copy'
+import {
+  CATEGORY_META,
+  CATEGORY_WARNING,
+  NAV,
+  SETTINGS_TABS,
+  SCAN_CATEGORY_LABELS,
+  tabForSection,
+  type SettingsSection,
+  type SettingsTab,
+  type ViewId
+} from './lib/copy'
+import { APP_SHORTCUTS, matchAppShortcut } from './lib/shortcuts'
 import { formatBytes, formatDate } from './lib/format'
 import { isProEntitled } from '../../shared/entitlement'
 import {
@@ -136,7 +147,11 @@ export function App(): JSX.Element {
 }
 
 function AppShell(): JSX.Element {
-  const [view, setView] = useState<ViewId>('permissions')
+  const [view, setView] = useState<ViewId>('dashboard')
+  const [settingsSection, setSettingsSection] = useState<{
+    id: SettingsSection
+    nonce: number
+  } | null>(null)
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [disk, setDisk] = useState<DiskInfo | null>(null)
   const [perms, setPerms] = useState<PermissionStatus | null>(null)
@@ -150,6 +165,7 @@ function AppShell(): JSX.Element {
   const [scanFailed, setScanFailed] = useState(false)
   const [busyClean, setBusyClean] = useState(false)
   const [confirmCleanOpen, setConfirmCleanOpen] = useState(false)
+  const [filterFocusNonce, setFilterFocusNonce] = useState(0)
   const [isPro, setIsPro] = useState(false)
   const bootstrapped = useRef(false)
   const locale = settings?.locale ?? 'en'
@@ -178,8 +194,8 @@ function AppShell(): JSX.Element {
     // Only the first load decides the landing view. Later refreshes come from
     // Recheck or a finished cleanup, and pulling the user out of the screen they
     // opened makes those buttons feel broken.
-    if (nextSettings.setupComplete && !bootstrapped.current) {
-      setView((current) => (current === 'permissions' ? 'dashboard' : current))
+    if (!bootstrapped.current && !nextSettings.setupComplete) {
+      setView('settings')
     }
     bootstrapped.current = true
   }, [])
@@ -250,7 +266,10 @@ function AppShell(): JSX.Element {
       setView('dashboard')
       void startScan()
     })
-    const stopDonate = window.diskheadroom.onTrayDonate(() => setView('donate'))
+    const stopDonate = window.diskheadroom.onTrayDonate(() => {
+      setView('settings')
+      setSettingsSection((current) => ({ id: 'donate', nonce: (current?.nonce ?? 0) + 1 }))
+    })
     return () => {
       stopProgress()
       stopScan()
@@ -331,6 +350,25 @@ function AppShell(): JSX.Element {
 
   const cancelCleanConfirm = useCallback(() => setConfirmCleanOpen(false), [])
 
+  useEffect(() => {
+    function onKey(event: KeyboardEvent): void {
+      const action = matchAppShortcut(event)
+      if (!action) return
+      if (confirmCleanOpen) return
+      if (action === 'scan') {
+        event.preventDefault()
+        void startScan()
+        return
+      }
+      if (!result || result.items.length === 0) return
+      event.preventDefault()
+      setView('results')
+      setFilterFocusNonce((current) => current + 1)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [confirmCleanOpen, result, startScan])
+
   function requestClean(): void {
     if (selectedItems.length === 0) return
     setConfirmCleanOpen(true)
@@ -389,7 +427,9 @@ function AppShell(): JSX.Element {
           {NAV.map((item) => (
             <button
               key={item.id}
-              className={view === item.id || (item.id === 'dashboard' && view === 'results') ? 'active' : ''}
+              className={
+                view === item.id || (item.id === 'dashboard' && view === 'results') ? 'active' : ''
+              }
               onClick={() => setView(item.id)}
               type="button"
             >
@@ -408,17 +448,6 @@ function AppShell(): JSX.Element {
         </nav>
       </aside>
       <main className="main">
-        {view === 'permissions' && (
-          <PermissionsView
-            t={t}
-            perms={perms}
-            grantTarget={grantTarget}
-            onOpenSettings={() => window.diskheadroom.openFullDiskAccess()}
-            onReveal={() => void window.diskheadroom.revealGrantTarget()}
-            onRecheck={refresh}
-            onContinue={() => void markSetupDone()}
-          />
-        )}
         {view === 'dashboard' && (
           <DashboardView
             t={t}
@@ -455,6 +484,7 @@ function AppShell(): JSX.Element {
             }}
             onClean={requestClean}
             onRescan={() => void startScan()}
+            filterFocusNonce={filterFocusNonce}
           />
         )}
         {view === 'results' && !result && (
@@ -488,11 +518,15 @@ function AppShell(): JSX.Element {
             onDuplicateFolders={(paths) => void updateDuplicateFolders(paths)}
             isPro={isPro}
             onLicenseChange={setIsPro}
-            onDonate={() => setView('donate')}
-            onPermissions={() => setView('permissions')}
+            perms={perms}
+            grantTarget={grantTarget}
+            onOpenFullDiskAccess={() => window.diskheadroom.openFullDiskAccess()}
+            onRevealGrantTarget={() => void window.diskheadroom.revealGrantTarget()}
+            onRecheck={refresh}
+            onContinue={() => void markSetupDone()}
+            focusSection={settingsSection}
           />
         )}
-        {view === 'donate' && <DonateView t={t} />}
         {import.meta.env.DEV && view === 'debug' && (
           <DebugView isPro={isPro} onLicenseChange={setIsPro} />
         )}
@@ -519,6 +553,7 @@ function PermissionsView(props: {
   t: Translator
   perms: PermissionStatus | null
   grantTarget: GrantTarget | null
+  setupComplete: boolean
   onOpenSettings: () => Promise<void>
   onReveal: () => void
   onRecheck: () => Promise<void>
@@ -539,11 +574,11 @@ function PermissionsView(props: {
   }
 
   return (
-    <section>
+    <div id="settings-permissions">
       <div className="hero">
         <div>
-          <h2>{props.t('permissions.title')}</h2>
-          <p>{props.t('permissions.description')}</p>
+          <h3>{props.t('permissions.title')}</h3>
+          <p className="muted">{props.t('permissions.description')}</p>
         </div>
       </div>
       {devTarget && !granted && (
@@ -609,11 +644,13 @@ function PermissionsView(props: {
           {rechecking && <Spinner />}
           {rechecking ? props.t('permissions.rechecking') : props.t('permissions.recheck')}
         </button>
-        <button className="btn" type="button" onClick={props.onContinue}>
-          {props.t('permissions.continueLimited')}
-        </button>
+        {!props.setupComplete && (
+          <button className="btn" type="button" onClick={props.onContinue}>
+            {props.t('permissions.continueLimited')}
+          </button>
+        )}
       </div>
-    </section>
+    </div>
   )
 }
 
@@ -751,11 +788,15 @@ function DashboardView(props: {
           className={`btn primary${props.scanning ? ' busy' : ''}`}
           type="button"
           disabled={props.scanning}
+          aria-keyshortcuts={APP_SHORTCUTS.scan.aria}
           onClick={props.onScan}
         >
           {props.scanning && <Spinner />}
           {props.scanning ? props.t('dashboard.scanning') : props.t('dashboard.scan')}
         </button>
+        <span className="shortcut-hint">
+          <kbd aria-hidden="true">{APP_SHORTCUTS.scan.chord}</kbd>
+        </span>
       </div>
       {props.scanning && props.progress && (
         <div className="progress">
@@ -861,8 +902,15 @@ function ResultsView(props: {
   onToggleCategory: (ids: string[], value: boolean) => void
   onClean: () => void
   onRescan: () => void
+  filterFocusNonce: number
 }): JSX.Element {
   const [query, setQuery] = useState('')
+  const filterRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (props.filterFocusNonce === 0) return
+    filterRef.current?.focus()
+    filterRef.current?.select()
+  }, [props.filterFocusNonce])
   const grouped = new Map<ScanItem['categoryId'], ScanItem[]>()
   for (const item of props.result.items) {
     if (!itemMatchesFilter(item, query, props.t)) continue
@@ -917,12 +965,15 @@ function ResultsView(props: {
       {props.result.items.length > 0 && (
         <div className="results-filter">
           <input
+            ref={filterRef}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={props.t('results.filterPlaceholder')}
             aria-label={props.t('results.filterPlaceholder')}
+            aria-keyshortcuts={APP_SHORTCUTS.focusResultsFilter.aria}
           />
+          <kbd aria-hidden="true">{APP_SHORTCUTS.focusResultsFilter.chord}</kbd>
         </div>
       )}
       {Array.from(grouped.entries()).map(([categoryId, items]) => {
@@ -1105,8 +1156,13 @@ function SettingsView(props: {
   onDuplicateFolders: (paths: string[]) => void
   isPro: boolean
   onLicenseChange: (isPro: boolean) => void
-  onDonate: () => void
-  onPermissions: () => void
+  perms: PermissionStatus | null
+  grantTarget: GrantTarget | null
+  onOpenFullDiskAccess: () => Promise<void>
+  onRevealGrantTarget: () => void
+  onRecheck: () => Promise<void>
+  onContinue: () => void
+  focusSection: { id: SettingsSection; nonce: number } | null
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
   const reminder = props.settings.scanReminder
@@ -1114,6 +1170,9 @@ function SettingsView(props: {
   const [licenseDraft, setLicenseDraft] = useState('')
   const [licenseInvalid, setLicenseInvalid] = useState(false)
   const [activating, setActivating] = useState(false)
+  const [tab, setTab] = useState<SettingsTab>(
+    props.settings.setupComplete ? 'donate' : 'permissions'
+  )
   const presets = LOW_DISK_ALERT_PRESETS.some(
     (preset) => preset.kind === alert.kind && preset.value === alert.value
   )
@@ -1144,6 +1203,24 @@ function SettingsView(props: {
     }
   }
 
+  useEffect(() => {
+    if (!props.focusSection) return
+    setTab(tabForSection(props.focusSection.id))
+  }, [props.focusSection])
+
+  const permissions = (
+    <PermissionsView
+      t={props.t}
+      perms={props.perms}
+      grantTarget={props.grantTarget}
+      setupComplete={props.settings.setupComplete}
+      onOpenSettings={props.onOpenFullDiskAccess}
+      onReveal={props.onRevealGrantTarget}
+      onRecheck={props.onRecheck}
+      onContinue={props.onContinue}
+    />
+  )
+
   return (
     <section>
       <div className="hero">
@@ -1152,6 +1229,27 @@ function SettingsView(props: {
           <p>{props.t('settings.description')}</p>
         </div>
       </div>
+      <div className="settings-tabs" role="tablist" aria-label={props.t('settings.title')}>
+        {SETTINGS_TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            id={`settings-tab-${item.id}`}
+            aria-controls={`settings-panel-${item.id}`}
+            aria-selected={tab === item.id}
+            onClick={() => setTab(item.id)}
+          >
+            {props.t(item.label)}
+          </button>
+        ))}
+      </div>
+      <div
+        role="tabpanel"
+        id="settings-panel-scan"
+        aria-labelledby="settings-tab-scan"
+        hidden={tab !== 'scan'}
+      >
       <div className="card">
         <h3>{props.t('settings.scanTitle')}</h3>
         <p className="muted">{props.t('settings.scanHint')}</p>
@@ -1381,6 +1479,35 @@ function SettingsView(props: {
         )}
       </div>
       <div className="card">
+        <h3>{props.t('settings.idleTitle')}</h3>
+        <p className="muted">{props.t('settings.idleHint')}</p>
+        <select
+          value={props.settings.unusedDays}
+          onChange={(event) => props.onUnusedDays(Number(event.target.value) as UnusedDays)}
+        >
+          {UNUSED_DAY_OPTIONS.map((days) => (
+            <option key={days} value={days}>
+              {props.t('settings.days', { days })}
+            </option>
+          ))}
+        </select>
+      </div>
+      </div>
+      <div
+        role="tabpanel"
+        id="settings-panel-permissions"
+        aria-labelledby="settings-tab-permissions"
+        hidden={tab !== 'permissions'}
+      >
+        {permissions}
+      </div>
+      <div
+        role="tabpanel"
+        id="settings-panel-pro"
+        aria-labelledby="settings-tab-pro"
+        hidden={tab !== 'pro'}
+      >
+      <div className="card">
         <h3>{props.t('settings.proTitle')}</h3>
         <p className="muted">{props.t('settings.proHint')}</p>
         <p className={props.isPro ? 'pro-status on' : 'pro-status'}>
@@ -1424,26 +1551,27 @@ function SettingsView(props: {
             >
               {props.t('settings.proBuy')}
             </button>
-            <button className="btn" type="button" onClick={props.onDonate}>
+            <button className="btn" type="button" onClick={() => setTab('donate')}>
               {props.t('settings.proDonate')}
             </button>
           </div>
         </form>
       </div>
-      <div className="card">
-        <h3>{props.t('settings.idleTitle')}</h3>
-        <p className="muted">{props.t('settings.idleHint')}</p>
-        <select
-          value={props.settings.unusedDays}
-          onChange={(event) => props.onUnusedDays(Number(event.target.value) as UnusedDays)}
-        >
-          {UNUSED_DAY_OPTIONS.map((days) => (
-            <option key={days} value={days}>
-              {props.t('settings.days', { days })}
-            </option>
-          ))}
-        </select>
       </div>
+      <div
+        role="tabpanel"
+        id="settings-panel-donate"
+        aria-labelledby="settings-tab-donate"
+        hidden={tab !== 'donate'}
+      >
+      <DonateView t={props.t} />
+      </div>
+      <div
+        role="tabpanel"
+        id="settings-panel-general"
+        aria-labelledby="settings-tab-general"
+        hidden={tab !== 'general'}
+      >
       <div className="card">
         <h3>{props.t('settings.launchAtLoginTitle')}</h3>
         <p className="muted">{props.t('settings.launchAtLoginHint')}</p>
@@ -1536,6 +1664,24 @@ function SettingsView(props: {
         </select>
       </div>
       <div className="card">
+        <h3>{props.t('settings.shortcutsTitle')}</h3>
+        <p className="muted">{props.t('settings.shortcutsHint')}</p>
+        <dl className="shortcut-list">
+          <div>
+            <dt>
+              <kbd>{APP_SHORTCUTS.scan.chord}</kbd>
+            </dt>
+            <dd>{props.t('settings.shortcuts.scan')}</dd>
+          </div>
+          <div>
+            <dt>
+              <kbd>{APP_SHORTCUTS.focusResultsFilter.chord}</kbd>
+            </dt>
+            <dd>{props.t('settings.shortcuts.filter')}</dd>
+          </div>
+        </dl>
+      </div>
+      <div className="card">
         <h3>{props.t('settings.languageTitle')}</h3>
         <p className="muted">{props.t('settings.languageHint')}</p>
         <select
@@ -1549,13 +1695,14 @@ function SettingsView(props: {
           ))}
         </select>
       </div>
-      <UpdateSettingsCard t={props.t} />
-      <div className="card">
-        <h3>{props.t('settings.permissionsTitle')}</h3>
-        <p className="muted">{props.t('settings.permissionsHint')}</p>
-        <button className="btn" type="button" onClick={props.onPermissions}>
-          {props.t('settings.openPermissions')}
-        </button>
+      </div>
+      <div
+        role="tabpanel"
+        id="settings-panel-updates"
+        aria-labelledby="settings-tab-updates"
+        hidden={tab !== 'updates'}
+      >
+        <UpdateSettingsCard t={props.t} />
       </div>
     </section>
   )
@@ -1750,31 +1897,25 @@ function DonateView(props: { t: Translator }): JSX.Element {
   )
 
   return (
-    <section className="donate-panel">
-      <div className="hero">
-        <div>
-          <h2>{props.t('donate.title')}</h2>
-          <p>{props.t('donate.description')}</p>
-        </div>
-      </div>
-      <div className="card">
-        <p className="muted">{props.t('donate.body')}</p>
-        <button
-          className={`btn primary${opening ? ' busy' : ''}`}
-          type="button"
-          disabled={opening}
-          onClick={openSponsors}
-        >
-          {opening && <Spinner />}
-          {props.t('donate.button')}
-        </button>
-      </div>
+    <div className="card" id="settings-donate">
+      <h3>{props.t('donate.title')}</h3>
+      <p className="muted">{props.t('donate.description')}</p>
+      <p className="muted">{props.t('donate.body')}</p>
+      <button
+        className={`btn primary${opening ? ' busy' : ''}`}
+        type="button"
+        disabled={opening}
+        onClick={openSponsors}
+      >
+        {opening && <Spinner />}
+        {props.t('donate.button')}
+      </button>
       <p className="muted">
         {props.t('donate.source')}{' '}
         <button className="btn" type="button" onClick={() => void window.diskheadroom.openExternal(REPO_URL)}>
           github.com/nettonucci/diskheadroom
         </button>
       </p>
-    </section>
+    </div>
   )
 }

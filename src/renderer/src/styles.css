@@ -175,6 +175,35 @@ input {
   color: var(--text);
 }
 
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 24px;
+  padding: 4px;
+  width: fit-content;
+  max-width: 100%;
+  background: var(--fill);
+  border-radius: 10px;
+}
+
+.settings-tabs button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-tabs button[aria-selected='true'] {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
 .main {
   overflow: auto;
   padding: 72px 36px 36px;
@@ -447,6 +476,44 @@ input {
   color: var(--muted);
 }
 
+kbd {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+  color: var(--text);
+}
+
+.shortcut-hint {
+  display: inline-flex;
+  align-items: center;
+}
+
+.shortcut-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+
+.shortcut-list > div {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.shortcut-list dt,
+.shortcut-list dd {
+  margin: 0;
+}
+
+.shortcut-list dd {
+  font-size: 14px;
+}
+
 .status {
   display: inline-flex;
   align-items: center;
@@ -480,6 +547,7 @@ input {
 }
 
 .results-filter {
+  position: relative;
   margin: 0 0 16px;
 }
 
@@ -489,7 +557,15 @@ input {
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 10px 52px 10px 12px;
+}
+
+.results-filter kbd {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .results-filter input::placeholder {
@@ -678,11 +754,7 @@ select {
   background: var(--accent-strong);
 }
 
-.donate-panel {
-  max-width: 560px;
-}
-
-.donate-panel .btn.primary {
+#settings-donate .btn.primary {
   margin-top: 8px;
 }
 

@@ -27,7 +27,7 @@ import {
 } from '../src/shared/appearance'
 import { gateProScanCategories, isProEntitled } from '../src/shared/entitlement'
 import { LOCALES, LOCALE_NAMES, resolveLocale, translate, translator } from '../src/shared/i18n'
-import { CATEGORY_META, NAV } from '../src/renderer/src/lib/copy'
+import { CATEGORY_META, NAV, SETTINGS_TABS, tabForSection } from '../src/renderer/src/lib/copy'
 import { formatBytes, formatDate } from '../src/renderer/src/lib/format'
 
 describe('shared helpers', () => {
@@ -47,15 +47,25 @@ describe('shared helpers', () => {
     expect(translate('en', 'settings.days')).toContain('{days}')
     expect(translator('es')('nav.settings')).toBe('Ajustes')
     expect(translate('en', 'settings.updateCheck')).toBe('Check for updates')
+    expect(translate('pt-BR', 'settings.tab.updates')).toBe('Atualizações')
+    expect(translate('es', 'settings.tab.updates')).toBe('Actualizaciones')
     expect(translate('pt-BR', 'settings.updateCheck')).toBe('Procurar atualizações')
     expect(translate('es', 'settings.updateCheck')).toBe('Buscar actualizaciones')
     expect(translate('en', 'settings.updateOffline')).toContain('offline')
+    expect(translate('en', 'settings.shortcuts.scan')).toContain('scan')
+    expect(translate('pt-BR', 'settings.shortcutsTitle')).toBe('Atalhos de teclado')
+    expect(translate('es', 'settings.shortcuts.filter')).toContain('filtro')
   })
 
   it('exposes complete locale and navigation metadata', () => {
     expect(LOCALES).toEqual(['en', 'pt-BR', 'es'])
     expect(LOCALE_NAMES['pt-BR']).toContain('Português')
-    expect(NAV).toHaveLength(4)
+    expect(NAV).toHaveLength(2)
+    expect(SETTINGS_TABS).toHaveLength(6)
+    expect(SETTINGS_TABS[0]?.id).toBe('donate')
+    expect(SETTINGS_TABS.map((item) => item.id)).toContain('updates')
+    expect(tabForSection('donate')).toBe('donate')
+    expect(tabForSection('permissions')).toBe('permissions')
     expect(Object.keys(CATEGORY_META)).toHaveLength(18)
     expect(UNUSED_DAY_OPTIONS).toContain(DEFAULT_UNUSED_DAYS)
     expect(LARGE_FILE_MIN_BYTES_OPTIONS).toContain(DEFAULT_LARGE_FILE_MIN_BYTES)

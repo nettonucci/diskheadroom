@@ -109,10 +109,24 @@ export const CATEGORY_WARNING: Partial<Record<ScanCategoryId, TranslationKey>> =
 
 export const NAV: { id: ViewId; label: TranslationKey }[] = [
   { id: 'dashboard', label: 'nav.scan' },
-  { id: 'permissions', label: 'nav.permissions' },
-  { id: 'settings', label: 'nav.settings' },
-  { id: 'donate', label: 'nav.donate' }
+  { id: 'settings', label: 'nav.settings' }
 ]
 
+export const SETTINGS_TABS = [
+  { id: 'donate', label: 'settings.tab.donate' },
+  { id: 'scan', label: 'settings.tab.scan' },
+  { id: 'permissions', label: 'settings.tab.permissions' },
+  { id: 'pro', label: 'settings.tab.pro' },
+  { id: 'general', label: 'settings.tab.general' },
+  { id: 'updates', label: 'settings.tab.updates' }
+] as const
+
+export type SettingsTab = (typeof SETTINGS_TABS)[number]['id']
+export type SettingsSection = 'permissions' | 'donate'
+
+export function tabForSection(section: SettingsSection): SettingsTab {
+  return section
+}
+
 // 'debug' is reachable only from the development-only nav button in App.tsx.
-export type ViewId = 'dashboard' | 'permissions' | 'settings' | 'donate' | 'results' | 'debug'
+export type ViewId = 'dashboard' | 'settings' | 'results' | 'debug'
