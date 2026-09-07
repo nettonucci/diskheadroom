@@ -41,16 +41,16 @@ If you need forensic deletion, secure erase, or Windows/Linux, this is not that 
 | --- | --- |
 | <img src="docs/screenshots/scan.png" alt="Scan screen showing free space on the startup disk" width="440"> | <img src="docs/screenshots/results.png" alt="Scan results with a name-or-path filter, grouped checkboxes, and a floating bar with the total selected and the Move to Trash button" width="440"> |
 
-| System access | Settings |
+| Settings | Donate (in Settings) |
 | --- | --- |
-| <img src="docs/screenshots/permissions.png" alt="Permissions screen listing Full Disk Access, user library caches, and Applications folder" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings screen with scan category toggles, appearance, never-touch paths, optional low-disk alert, idle app window, and language pickers" width="440"> |
+| <img src="docs/screenshots/settings.png" alt="Settings with Donate first, then Scan, Permissions, Pro, General, and Updates; Scan tab shows category toggles" width="440"> | <img src="docs/screenshots/donate.png" alt="Donate tab in Settings with GitHub Sponsors" width="440"> |
 
 <p align="center">
-  <img src="docs/screenshots/developer.png" alt="Optional developer groups showing simulators on older runtimes and Android, Gradle and CocoaPods caches, all unchecked, with a warning that those simulators still work" width="560">
+  <img src="docs/screenshots/permissions.png" alt="First-run Settings view listing Full Disk Access, user library caches, and Applications folder" width="560">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/donate.png" alt="Donate screen linking to GitHub Sponsors" width="560">
+  <img src="docs/screenshots/developer.png" alt="Optional developer groups showing simulators on older runtimes and Android, Gradle and CocoaPods caches, all unchecked, with a warning that those simulators still work" width="560">
 </p>
 
 The captures come from `npm run screenshots`, which renders the real UI against sample data — so no local paths or installed apps leak into this repository.
@@ -75,8 +75,9 @@ The captures come from `npm run screenshots`, which renders the real UI against 
 | Never-touch paths | Settings list of folders omitted from the next scan and refused by Trash; paste a path or pick a folder |
 | Languages | English, Português (Brasil), Español |
 | Appearance | Follows the macOS light/dark setting, or lock the window to one under Settings |
-| Updates | Settings can check GitHub Releases; download and install wait for you |
-| Donate | In-app page plus this README, both pointing at GitHub Sponsors |
+| Keyboard shortcuts | **⌘R** starts or repeats a scan; **⌘F** focuses the results filter. Listed under Settings |
+| Updates | Own tab under Settings can check GitHub Releases; download and install wait for you |
+| Donate | Own tab under Settings plus this README, both pointing at GitHub Sponsors |
 | Pro (optional) | Paddle checkout + offline license key under Settings; core scan and Trash stay free, while paid finders require a valid key |
 
 The app follows the macOS language on first launch (with English as the fallback).
@@ -85,6 +86,12 @@ bar update immediately, and the choice persists across launches.
 
 The window follows the macOS light and dark setting by default. **Settings →
 Appearance** switches between System, Dark, and Light.
+
+**⌘R** starts or repeats a scan. **⌘F** focuses the results filter when a scan
+has items to review. Both are listed under **Settings → Keyboard shortcuts**.
+They do not replace macOS chords such as copy, paste, hide, or quit. In a
+development run, reload is **⌥⌘R** so **⌘R** can scan (packaged builds have no
+View menu).
 
 ## Install from DMG
 
@@ -103,7 +110,7 @@ Signing secrets and the Apple-side checklist are in [docs/signing.md](docs/signi
 
 Disk Headroom cannot invent Full Disk Access. Apple requires you to turn it on:
 
-1. Open Disk Headroom → **Permissions**.
+1. Open Disk Headroom → **Settings**.
 2. Choose **Open System Settings**.
 3. **Privacy & Security → Full Disk Access**.
 4. Press **+**, then pick **Disk Headroom** in Applications.
@@ -119,7 +126,7 @@ After toggling access, macOS may ask to quit and reopen the app before the chang
 
 macOS assigns each process a *responsible app*, and Full Disk Access is evaluated against that app rather than the binary you see running. When `npm run dev` is started from a terminal or IDE, the responsible app is that terminal — so authorizing `Electron.app` changes nothing while your terminal is unchecked.
 
-The Permissions screen shows this guidance only in development builds, naming the bundle to authorize and the app that launched it.
+The Settings screen shows this guidance only in development builds, naming the bundle to authorize and the app that launched it.
 
 Pick whichever fits:
 
@@ -150,7 +157,7 @@ Look for the small disk mark on the right side of the menu bar (the extra menuba
 
 - **Open Disk Headroom** — show the window
 - **Scan now** — jump to a scan
-- **Donate** — in-app sponsor page
+- **Donate** — jump to the Donate tab in Settings
 - **Quit Disk Headroom** — leave the menu bar as well
 
 ## Build from source
@@ -254,7 +261,7 @@ Disk Headroom is free. If it bought your SSD a little more time:
 
 **[github.com/sponsors/nettonucci](https://github.com/sponsors/nettonucci)**
 
-The same link is on the in-app **Donate** screen. Sponsorships help with signing, spare hours, and keeping the scanner conservative.
+The same link is on the **Donate** tab under Settings. Sponsorships help with signing, spare hours, and keeping the scanner conservative.
 
 ## Project layout
 

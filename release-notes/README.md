@@ -28,3 +28,8 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-09-05 | Finder Pro experimental de duplicatas | [2026-09-05-duplicatas-pro](./2026-09-05-duplicatas-pro/post.md) |
 | 2026-09-06 | Aparência clara e escura no macOS | [2026-09-06-aparencia-sistema](./2026-09-06-aparencia-sistema/post.md) |
 | 2026-09-06 | Assinatura Apple e atualizações pelo GitHub | [2026-09-06-assinatura-atualizacoes](./2026-09-06-assinatura-atualizacoes/post.md) |
+| 2026-09-06 | Atalhos de teclado no scan e no filtro | [2026-09-06-atalhos-teclado](./2026-09-06-atalhos-teclado/post.md) |
+| 2026-09-06 | Navegação só com Scan e Ajustes | [2026-09-06-nav-duas-secoes](./2026-09-06-nav-duas-secoes/post.md) |
+| 2026-09-06 | Abas dentro de Ajustes | [2026-09-06-ajustes-abas](./2026-09-06-ajustes-abas/post.md) |
+| 2026-09-06 | Aba Doar em Ajustes | [2026-09-06-aba-doar](./2026-09-06-aba-doar/post.md) |
+| 2026-09-06 | Aba Atualizações em Ajustes | [2026-09-06-aba-updates](./2026-09-06-aba-updates/post.md) |

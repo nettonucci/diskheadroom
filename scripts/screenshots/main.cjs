@@ -12,7 +12,7 @@ const EXPORT_WIDTH = 1400
 const SCREENSHOT_BACKGROUND = { dark: '#1c1c1e', light: '#f5f5f7' }
 
 // Nav order comes from NAV in src/renderer/src/lib/copy.ts
-const NAV = { dashboard: 0, permissions: 1, settings: 2, donate: 3 }
+const NAV = { dashboard: 0, settings: 1 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -53,6 +53,13 @@ async function show(win, view) {
   await wait(220)
 }
 
+async function showSettingsTab(win, name) {
+  await win.webContents.executeJavaScript(
+    `;[...document.querySelectorAll('[role="tab"]')].find((el) => el.textContent === ${JSON.stringify(name)})?.click()`
+  )
+  await wait(220)
+}
+
 // Windows are closed one at a time between captures, so the default
 // "quit when no windows are left" behaviour would end the run early.
 app.on('window-all-closed', () => {})
@@ -68,32 +75,51 @@ app.whenReady().then(async () => {
   await capture(ready, 'scan')
 
   await show(ready, 'settings')
-  ready.setSize(WIDTH, 3600)
+  await showSettingsTab(ready, 'Scan')
+  ready.setSize(WIDTH, 1800)
   await wait(200)
   await capture(ready, 'settings')
-  ready.setSize(WIDTH, 920)
+  ready.destroy()
+
+  const shortcuts = await openWindow('ready')
+  await show(shortcuts, 'settings')
+  await showSettingsTab(shortcuts, 'General')
+  shortcuts.setSize(WIDTH, 1400)
   await wait(200)
-  await ready.webContents.executeJavaScript(`
-    const heading = [...document.querySelectorAll('h3')].find((el) => el.textContent === 'Updates')
+  await shortcuts.webContents.executeJavaScript(`
+    const heading = [...document.querySelectorAll('h3')].find((el) => el.textContent === 'Keyboard shortcuts')
     const main = document.querySelector('.main')
     if (heading && main) {
       const offset = heading.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop - 16
       main.scrollTop = offset
     }
   `)
+  shortcuts.setSize(WIDTH, 920)
   await wait(250)
-  await capture(ready, 'settings-updates')
-  ready.setSize(WIDTH, HEIGHT)
+  await capture(shortcuts, 'settings-shortcuts')
+  shortcuts.destroy()
 
-  await show(ready, 'donate')
-  await capture(ready, 'donate')
+  const updates = await openWindow('ready')
+  await show(updates, 'settings')
+  await showSettingsTab(updates, 'Updates')
+  updates.setSize(WIDTH, 900)
+  await wait(200)
+  await capture(updates, 'settings-updates')
+  updates.destroy()
 
-  ready.destroy()
+  const donate = await openWindow('ready')
+  await show(donate, 'settings')
+  await showSettingsTab(donate, 'Donate')
+  donate.setSize(WIDTH, 900)
+  await wait(200)
+  await capture(donate, 'donate')
+  donate.destroy()
 
   const light = await openWindow('ready', HEIGHT, 'light')
   await capture(light, 'scan-light')
   await show(light, 'settings')
-  light.setSize(WIDTH, 3600)
+  await showSettingsTab(light, 'Scan')
+  light.setSize(WIDTH, 1800)
   await wait(200)
   await capture(light, 'settings-light')
   light.destroy()
