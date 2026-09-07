@@ -17,7 +17,7 @@ import { WINDOW_BACKGROUND } from '../src/shared/appearance'
 describe('native appearance', () => {
   it('sets themeSource and the window background for a locked light look', () => {
     nativeTheme.shouldUseDarkColors = true
-    const win = { setBackgroundColor: vi.fn() }
+    const win = { setBackgroundColor: vi.fn(), isDestroyed: () => false }
     applyNativeAppearance('light', win as never)
     expect(nativeTheme.themeSource).toBe('light')
     expect(win.setBackgroundColor).toHaveBeenCalledWith(WINDOW_BACKGROUND.light)
@@ -25,10 +25,16 @@ describe('native appearance', () => {
 
   it('follows the system when appearance is system', () => {
     nativeTheme.shouldUseDarkColors = false
-    const win = { setBackgroundColor: vi.fn() }
+    const win = { setBackgroundColor: vi.fn(), isDestroyed: () => false }
     applyNativeAppearance('system', win as never)
     expect(nativeTheme.themeSource).toBe('system')
     expect(win.setBackgroundColor).toHaveBeenCalledWith(WINDOW_BACKGROUND.light)
+  })
+
+  it('skips a window that was already destroyed while quitting', () => {
+    const win = { setBackgroundColor: vi.fn(), isDestroyed: () => true }
+    expect(() => applyNativeAppearance('dark', win as never)).not.toThrow()
+    expect(win.setBackgroundColor).not.toHaveBeenCalled()
   })
 })
 
