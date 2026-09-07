@@ -11,5 +11,8 @@ export function applyNativeAppearance(
 ): void {
   nativeTheme.themeSource = appearance
   const scheme = resolveColorScheme(appearance, nativeTheme.shouldUseDarkColors)
-  win?.setBackgroundColor(WINDOW_BACKGROUND[scheme])
+  // Quitting destroys the window while the nativeTheme listener is still
+  // attached, and a destroyed window throws on any call.
+  if (!win || win.isDestroyed()) return
+  win.setBackgroundColor(WINDOW_BACKGROUND[scheme])
 }

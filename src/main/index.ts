@@ -54,6 +54,10 @@ function createWindow(showOnReady: boolean): void {
     }
   })
 
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url)
     return { action: 'deny' }
@@ -125,7 +129,8 @@ function showWindow(): void {
 }
 
 function sendToRenderer(channel: string, payload?: unknown): void {
-  mainWindow?.webContents.send(channel, payload)
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send(channel, payload)
 }
 
 app.whenReady().then(async () => {
