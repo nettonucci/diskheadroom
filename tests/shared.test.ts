@@ -55,6 +55,15 @@ describe('shared helpers', () => {
     expect(translate('en', 'settings.shortcuts.scan')).toContain('scan')
     expect(translate('pt-BR', 'settings.shortcutsTitle')).toBe('Atalhos de teclado')
     expect(translate('es', 'settings.shortcuts.filter')).toContain('filtro')
+    expect(translate('en', 'forecast.title')).toBe('Headroom forecast')
+    expect(translate('pt-BR', 'forecast.days', { days: 12 })).toContain('12')
+    expect(translate('es', 'forecast.cta')).toContain('Pro')
+  })
+
+  it('keeps the same translation keys in every locale', async () => {
+    const catalog = (await import('../src/shared/languages.json')).default
+    expect(Object.keys(catalog['pt-BR']).sort()).toEqual(Object.keys(catalog.en).sort())
+    expect(Object.keys(catalog.es).sort()).toEqual(Object.keys(catalog.en).sort())
   })
 
   it('exposes complete locale and navigation metadata', () => {

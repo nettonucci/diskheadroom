@@ -14,7 +14,7 @@ import {
   PRO_SCAN_CATEGORY_IDS
 } from '../shared/constants'
 import { mergeAppearance } from '../shared/appearance'
-import type { AppSettings, CleanRequest, ScanItem, ScanOptions } from '../shared/types'
+import type { AppSettings, CleanRequest, ScanItem, ScanOptions, ScanResult } from '../shared/types'
 import { trashPaths } from './cleaner'
 import { getDiskInfo } from './disk'
 import { applyLaunchAtLogin } from './loginItem'
@@ -35,13 +35,14 @@ import {
   installAppUpdate
 } from './updates'
 import { gateProScanCategories } from '../shared/entitlement'
+import { getForecastStatus } from './headroomForecast'
 import type { TrayController } from './tray'
 
 interface IpcOptions {
   sendToRenderer: (channel: string, payload?: unknown) => void
   getTrayController: () => TrayController | null
   onSettingsChanged?: (settings: AppSettings) => void
-  onScanCompleted?: () => void
+  onScanCompleted?: (result: ScanResult) => void
 }
 
 export function registerIpc(options: IpcOptions): void {
@@ -115,10 +116,11 @@ export function registerIpc(options: IpcOptions): void {
         }
       )
       lastItems = new Map(result.items.map((item) => [item.path, item]))
-      options.onScanCompleted?.()
+      options.onScanCompleted?.(result)
       return result
     }
   )
+  ipcMain.handle('forecast:status', () => getForecastStatus())
   ipcMain.handle('clean:trash', async (_event, request: CleanRequest) => {
     const settings = await loadSettings()
     const sizes = new Map<string, number>()

@@ -217,6 +217,12 @@ export const DEFAULT_SCAN_REMINDER: ScanReminderSettings = {
 export const DAY_MS = 24 * 60 * 60 * 1000
 export const SCAN_REMINDER_CHECK_INTERVAL_MS = 15 * 60 * 1000
 
+/** Local Pro forecast: cap the JSON file and the on-screen horizon. */
+export const HEADROOM_MAX_SAMPLES = 90
+export const HEADROOM_MAX_AGE_MS = 90 * DAY_MS
+export const HEADROOM_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000
+export const HEADROOM_DISPLAY_MAX_DAYS = 90
+
 export function mergeScanReminder(input: unknown): ScanReminderSettings {
   const next = { ...DEFAULT_SCAN_REMINDER }
   if (!input || typeof input !== 'object') return next

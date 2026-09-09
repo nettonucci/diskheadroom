@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { HeadroomForecastStatus } from '../shared/headroomForecast'
 import type {
   AppSettings,
   CleanRequest,
@@ -45,6 +46,7 @@ const api = {
   getLicenseStatus: (): Promise<LicenseStatus> => ipcRenderer.invoke('license:status'),
   activateLicense: (key: string): Promise<LicenseStatus> =>
     ipcRenderer.invoke('license:activate', key),
+  getForecastStatus: (): Promise<HeadroomForecastStatus> => ipcRenderer.invoke('forecast:status'),
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
   setSettings: (settings: AppSettings): Promise<AppSettings> =>
     ipcRenderer.invoke('settings:set', settings),

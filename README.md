@@ -228,6 +228,8 @@ Core scan, review, and Trash stay free. Paid finders such as **Large files** req
 
 **Buy Pro** opens `https://www.diskheadroom.com/<language>/pro` in your browser, where Paddle.js runs the overlay checkout ([site repository](https://github.com/nettonucci/diskheadroom-web)). Payment stays on the web: no Paddle token, product id, or API secret exists in this repository, and the app only ever verifies a signed key. Generate keys with `node scripts/sign-license.mjs` and upload them to Paddle fulfillment, or let Paddle issue keys that match this format.
 
+Pro also estimates **days until your low-disk threshold** from local samples of startup-disk free space and last-scan category totals (counts and bytes, never file paths). The series stays in the app’s user-data folder. Nothing is uploaded. Without a key, the forecast card shows a checkout CTA instead.
+
 People who only want to support the free app can still use **Donate** / GitHub Sponsors.
 
 Treat this like any disk utility: do not select folders you do not recognize. Clearing caches is usually harmless; removing an application you still need is not.

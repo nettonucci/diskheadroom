@@ -238,6 +238,28 @@ input {
   padding: 20px 22px 18px;
 }
 
+.forecast-card {
+  margin-top: 12px;
+}
+
+.forecast-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.forecast-card .forecast-head h3 {
+  margin: 0;
+}
+
+.forecast-headline {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 18px;
+  font-weight: 620;
+}
+
 .disk-head {
   display: flex;
   justify-content: space-between;
