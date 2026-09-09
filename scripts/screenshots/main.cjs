@@ -16,7 +16,9 @@ const NAV = { dashboard: 0, settings: 1 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-async function openWindow(mode, height = HEIGHT, theme = 'dark') {
+async function openWindow(mode, height = HEIGHT, theme = 'dark', pro = false) {
+  const extra = [`--capture-mode=${mode}`, `--capture-theme=${theme}`]
+  if (pro) extra.push('--capture-pro')
   const win = new BrowserWindow({
     width: WIDTH,
     height,
@@ -27,7 +29,7 @@ async function openWindow(mode, height = HEIGHT, theme = 'dark') {
       preload: join(__dirname, 'preload.cjs'),
       sandbox: false,
       contextIsolation: true,
-      additionalArguments: [`--capture-mode=${mode}`, `--capture-theme=${theme}`]
+      additionalArguments: extra
     }
   })
 
@@ -80,6 +82,10 @@ app.whenReady().then(async () => {
   await wait(200)
   await capture(ready, 'settings')
   ready.destroy()
+
+  const forecast = await openWindow('ready', 860, 'dark', true)
+  await capture(forecast, 'scan-forecast')
+  forecast.destroy()
 
   const shortcuts = await openWindow('ready')
   await show(shortcuts, 'settings')

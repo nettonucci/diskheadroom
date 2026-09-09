@@ -6,6 +6,7 @@ import { DEFAULT_APPEARANCE, resolveColorScheme, WINDOW_BACKGROUND, type Appeara
 import { registerIpc } from './ipc'
 import { registerDebugIpc } from './debug'
 import { applyLaunchAtLogin, shouldShowWindowOnLaunch } from './loginItem'
+import { recordDiskSample, recordScanSample } from './headroomForecast'
 import { startLowDiskAlertWatcher } from './lowDiskAlert'
 import { startScanReminderWatcher } from './scanReminder'
 import { loadSettings } from './settings'
@@ -155,10 +156,12 @@ app.whenReady().then(async () => {
       lowDiskAlert.setSettings(next)
       scanReminder.setSettings(next)
     },
-    onScanCompleted: () => {
+    onScanCompleted: (result) => {
       void scanReminder.markScanComplete()
+      void recordScanSample(result.items)
     }
   })
+  void recordDiskSample()
   startPackagedUpdateCheck()
   // import.meta.env.DEV drops the handlers from the production bundle; the
   // isPackaged guard covers a development bundle someone runs from a copy.

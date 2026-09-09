@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   showOpenDialog: vi.fn(),
   getLicenseStatus: vi.fn(),
   activateLicense: vi.fn(),
+  getForecastStatus: vi.fn(),
   getUpdateStatus: vi.fn(),
   checkForAppUpdates: vi.fn(),
   downloadAppUpdate: vi.fn(),
@@ -59,6 +60,9 @@ vi.mock('../src/main/license', () => ({
   getLicenseStatus: mocks.getLicenseStatus,
   activateLicense: mocks.activateLicense
 }))
+vi.mock('../src/main/headroomForecast', () => ({
+  getForecastStatus: mocks.getForecastStatus
+}))
 vi.mock('../src/main/updates', () => ({
   attachUpdateListener: mocks.attachUpdateListener,
   getUpdateStatus: mocks.getUpdateStatus,
@@ -90,7 +94,7 @@ describe('IPC registration', () => {
     mocks.loadSettings.mockResolvedValue({ locale: 'en' })
 
     registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
-    expect(mocks.handlers.size).toBe(20)
+    expect(mocks.handlers.size).toBe(21)
     await expect(call('disk:info')).resolves.toEqual({ mount: '/' })
     await expect(call('permissions:status')).resolves.toEqual({ fullDiskAccess: true })
     expect(call('permissions:open-fda')).toBeUndefined()
@@ -210,6 +214,11 @@ describe('IPC registration', () => {
       downloadsMinBytes: 10 * 1024 * 1024
     })
     expect(onScanCompleted).toHaveBeenCalledTimes(1)
+    expect(onScanCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: [{ path: '/Users/test/cache', bytes: 42 }]
+      })
+    )
     expect(sendToRenderer).toHaveBeenCalledWith('scan:progress', {
       phase: 'progress.done',
       percent: 100
@@ -387,6 +396,22 @@ describe('IPC registration', () => {
     await expect(call('license:activate', 'dh1.fixture')).resolves.toEqual({ isPro: true })
     expect(mocks.activateLicense).toHaveBeenCalledWith('dh1.fixture')
     expect(mocks.getLicenseStatus).toHaveBeenCalled()
+  })
+
+  it('returns forecast status from main and never records through IPC', async () => {
+    const snapshot = {
+      entitled: true,
+      kind: 'collecting',
+      sampleCount: 1,
+      daysUntilThreshold: null,
+      daysCapped: false,
+      predictedAt: null,
+      lastScan: null
+    }
+    mocks.getForecastStatus.mockResolvedValue(snapshot)
+    registerIpc({ sendToRenderer: vi.fn(), getTrayController: () => null })
+    await expect(call('forecast:status')).resolves.toEqual(snapshot)
+    expect(mocks.handlers.has('forecast:record')).toBe(false)
   })
 
   it('forwards update check, download and install without silently installing', async () => {

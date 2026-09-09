@@ -96,6 +96,15 @@ function api(overrides: Partial<Api> = {}): Api {
     pickFolders: vi.fn().mockResolvedValue([]),
     getLicenseStatus: vi.fn().mockResolvedValue({ isPro: false }),
     activateLicense: vi.fn().mockResolvedValue({ isPro: false }),
+    getForecastStatus: vi.fn().mockResolvedValue({
+      entitled: false,
+      kind: 'gated',
+      sampleCount: 0,
+      daysUntilThreshold: null,
+      daysCapped: false,
+      predictedAt: null,
+      lastScan: null
+    }),
     openExternal: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
     revealItem: vi.fn().mockResolvedValue(true),
@@ -788,6 +797,37 @@ describe('App', () => {
         expect.objectContaining({ downloadsMinBytes: 100 * 1024 * 1024 })
       )
     )
+  })
+
+  it('shows a forecast CTA for free users and days remaining for Pro', async () => {
+    const freeBridge = api()
+    window.diskheadroom = freeBridge
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+    expect(await screen.findByText('Headroom forecast')).toBeInTheDocument()
+    expect(screen.getByText(/when free space may hit/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Buy Pro' }))
+    expect(freeBridge.openExternal).toHaveBeenCalledWith('https://www.diskheadroom.com/en/pro')
+    expect(screen.queryByText(/About 12 days/)).not.toBeInTheDocument()
+
+    unmount()
+    const proBridge = api({
+      getLicenseStatus: vi.fn().mockResolvedValue({ isPro: true }),
+      getForecastStatus: vi.fn().mockResolvedValue({
+        entitled: true,
+        kind: 'ready',
+        sampleCount: 8,
+        daysUntilThreshold: 12,
+        daysCapped: false,
+        predictedAt: '2026-09-21T00:00:00.000Z',
+        lastScan: { bytes: 2048, groups: 2 }
+      })
+    })
+    window.diskheadroom = proBridge
+    render(<App />)
+    expect(await screen.findByText(/About 12 days until the low-disk threshold/)).toBeInTheDocument()
+    expect(screen.getByText(/Last scan totals/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Buy Pro' })).not.toBeInTheDocument()
   })
 
   it('updates settings, opens permissions, and opens external links', async () => {

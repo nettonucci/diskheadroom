@@ -7,6 +7,7 @@ const sample = require('./sample-data.cjs')
 // window mounts in a known state instead of relying on in-app navigation.
 const mode = process.argv.find((arg) => arg.startsWith('--capture-mode='))?.split('=')[1]
 const theme = process.argv.find((arg) => arg.startsWith('--capture-theme='))?.split('=')[1]
+const capturePro = process.argv.includes('--capture-pro')
 const firstRun = mode === 'first-run'
 const scanResult = mode === 'overview' ? sample.compactScanResult : sample.scanResult
 
@@ -26,8 +27,28 @@ contextBridge.exposeInMainWorld('diskheadroom', {
   getGrantTarget: async () => sample.grantTarget,
   revealGrantTarget: async () => {},
   getSettings: async () => settings,
-  getLicenseStatus: async () => ({ isPro: false }),
-  activateLicense: async () => ({ isPro: false }),
+  getLicenseStatus: async () => ({ isPro: capturePro }),
+  activateLicense: async () => ({ isPro: capturePro }),
+  getForecastStatus: async () =>
+    capturePro
+      ? {
+          entitled: true,
+          kind: 'ready',
+          sampleCount: 8,
+          daysUntilThreshold: 12,
+          daysCapped: false,
+          predictedAt: '2026-09-21T00:00:00.000Z',
+          lastScan: { bytes: 8.4 * 1024 * 1024 * 1024, groups: 6 }
+        }
+      : {
+          entitled: false,
+          kind: 'gated',
+          sampleCount: 0,
+          daysUntilThreshold: null,
+          daysCapped: false,
+          predictedAt: null,
+          lastScan: null
+        },
   setSettings: async (next) => {
     settings = { ...next }
     return settings

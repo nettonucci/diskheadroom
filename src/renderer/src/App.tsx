@@ -10,6 +10,8 @@ import {
   LARGE_FILE_MIN_BYTES_OPTIONS,
   DOWNLOADS_MIN_DAYS_OPTIONS,
   DOWNLOADS_MIN_BYTES_OPTIONS,
+  HEADROOM_DISPLAY_MAX_DAYS,
+  DEFAULT_LOW_DISK_ALERT,
   isProScanCategory,
   lowDiskAlertPresetKey,
   parseLowDiskAlertPreset,
@@ -56,6 +58,7 @@ import {
 import { APP_SHORTCUTS, matchAppShortcut } from './lib/shortcuts'
 import { formatBytes, formatDate } from './lib/format'
 import { isProEntitled } from '../../shared/entitlement'
+import { gatedForecastStatus, type HeadroomForecastStatus } from '../../shared/headroomForecast'
 import {
   categoryExtrasSelected,
   isLastUnselectedDuplicate,
@@ -167,6 +170,7 @@ function AppShell(): JSX.Element {
   const [confirmCleanOpen, setConfirmCleanOpen] = useState(false)
   const [filterFocusNonce, setFilterFocusNonce] = useState(0)
   const [isPro, setIsPro] = useState(false)
+  const [forecast, setForecast] = useState<HeadroomForecastStatus>(gatedForecastStatus)
   const bootstrapped = useRef(false)
   const locale = settings?.locale ?? 'en'
   const t = translator(locale)
@@ -177,20 +181,22 @@ function AppShell(): JSX.Element {
   }, [settings?.appearance])
 
   const refresh = useCallback(async () => {
-    const [nextSettings, nextDisk, nextPerms, nextTarget, license] = await Promise.all([
+    const [nextSettings, nextDisk, nextPerms, nextTarget, license, nextForecast] = await Promise.all([
       window.diskheadroom.getSettings(),
       // A failed capacity reading must not take the rest of the UI down with it:
       // the panel can be missing, the app still scans and cleans.
       window.diskheadroom.getDiskInfo().catch(() => null),
       window.diskheadroom.getPermissions(),
       window.diskheadroom.getGrantTarget(),
-      window.diskheadroom.getLicenseStatus()
+      window.diskheadroom.getLicenseStatus(),
+      window.diskheadroom.getForecastStatus().catch(() => gatedForecastStatus())
     ])
     setSettings(nextSettings)
     setDisk(nextDisk)
     setPerms(nextPerms)
     setGrantTarget(nextTarget)
     setIsPro(isProEntitled(license.isPro))
+    setForecast(isProEntitled(license.isPro) ? nextForecast : gatedForecastStatus())
     // Only the first load decides the landing view. Later refreshes come from
     // Recheck or a finished cleanup, and pulling the user out of the screen they
     // opened makes those buttons feel broken.
@@ -257,8 +263,10 @@ function AppShell(): JSX.Element {
       setScanFailed(true)
     } finally {
       setScanning(false)
+      const nextForecast = await window.diskheadroom.getForecastStatus().catch(() => gatedForecastStatus())
+      setForecast(isPro ? nextForecast : gatedForecastStatus())
     }
-  }, [settings, scanning])
+  }, [settings, scanning, isPro])
 
   useEffect(() => {
     const stopProgress = window.diskheadroom.onScanProgress(setProgress)
@@ -451,6 +459,7 @@ function AppShell(): JSX.Element {
         {view === 'dashboard' && (
           <DashboardView
             t={t}
+            locale={locale}
             disk={disk}
             usedPct={usedPct}
             scanning={scanning}
@@ -458,6 +467,9 @@ function AppShell(): JSX.Element {
             unusedDays={settings?.unusedDays ?? 90}
             limited={Boolean(perms && !perms.fullDiskAccess)}
             scanFailed={scanFailed}
+            isPro={isPro}
+            forecast={forecast}
+            alert={settings?.lowDiskAlert ?? DEFAULT_LOW_DISK_ALERT}
             onScan={() => void startScan()}
           />
         )}
@@ -490,6 +502,7 @@ function AppShell(): JSX.Element {
         {view === 'results' && !result && (
           <DashboardView
             t={t}
+            locale={locale}
             disk={disk}
             usedPct={usedPct}
             scanning={scanning}
@@ -497,6 +510,9 @@ function AppShell(): JSX.Element {
             unusedDays={settings?.unusedDays ?? 90}
             limited={Boolean(perms && !perms.fullDiskAccess)}
             scanFailed={scanFailed}
+            isPro={isPro}
+            forecast={forecast}
+            alert={settings?.lowDiskAlert ?? DEFAULT_LOW_DISK_ALERT}
             onScan={() => void startScan()}
           />
         )}
@@ -517,7 +533,13 @@ function AppShell(): JSX.Element {
             onNeverTouchPaths={(paths) => void updateNeverTouchPaths(paths)}
             onDuplicateFolders={(paths) => void updateDuplicateFolders(paths)}
             isPro={isPro}
-            onLicenseChange={setIsPro}
+            onLicenseChange={(next) => {
+              setIsPro(next)
+              void window.diskheadroom
+                .getForecastStatus()
+                .then((status) => setForecast(next ? status : gatedForecastStatus()))
+                .catch(() => setForecast(gatedForecastStatus()))
+            }}
             perms={perms}
             grantTarget={grantTarget}
             onOpenFullDiskAccess={() => window.diskheadroom.openFullDiskAccess()}
@@ -755,8 +777,75 @@ function DiskStat(props: {
   )
 }
 
+function ForecastCard(props: {
+  t: Translator
+  locale: Locale
+  isPro: boolean
+  forecast: HeadroomForecastStatus
+  alert: LowDiskAlertSettings
+}): JSX.Element {
+  const threshold =
+    props.alert.kind === 'percent'
+      ? props.t('forecast.threshold.percent', { value: props.alert.value })
+      : props.t('forecast.threshold.gigabytes', { value: props.alert.value })
+  const entitled = isProEntitled(props.isPro)
+
+  return (
+    <div className="card forecast-card">
+      <div className="forecast-head">
+        <h3>{props.t('forecast.title')}</h3>
+        <small className="pro-badge">{props.t('settings.proBadge')}</small>
+      </div>
+      <p className="muted">{props.t('forecast.hint')}</p>
+      {!entitled && (
+        <>
+          <p>{props.t('forecast.cta')}</p>
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() => void window.diskheadroom.openExternal(proCheckoutUrl(props.locale))}
+          >
+            {props.t('settings.proBuy')}
+          </button>
+        </>
+      )}
+      {entitled && props.forecast.kind === 'collecting' && (
+        <p>{props.t('forecast.collecting')}</p>
+      )}
+      {entitled && props.forecast.kind === 'stable' && <p>{props.t('forecast.stable')}</p>}
+      {entitled && props.forecast.kind === 'below' && <p>{props.t('forecast.below')}</p>}
+      {entitled && props.forecast.kind === 'ready' && (
+        <>
+          <strong className="forecast-headline">
+            {props.forecast.daysCapped
+              ? props.t('forecast.daysCapped', { days: HEADROOM_DISPLAY_MAX_DAYS })
+              : props.t('forecast.days', { days: props.forecast.daysUntilThreshold ?? 0 })}
+          </strong>
+          {props.forecast.predictedAt && (
+            <p className="muted">
+              {props.t('forecast.predicted', {
+                date: formatDate(props.forecast.predictedAt, props.locale)
+              })}
+            </p>
+          )}
+        </>
+      )}
+      {entitled && props.forecast.lastScan && (
+        <p className="muted">
+          {props.t('forecast.lastScan', {
+            size: formatBytes(props.forecast.lastScan.bytes),
+            groups: props.forecast.lastScan.groups
+          })}
+        </p>
+      )}
+      <p className="muted">{props.t('forecast.thresholdHint', { threshold })}</p>
+    </div>
+  )
+}
+
 function DashboardView(props: {
   t: Translator
+  locale: Locale
   disk: DiskInfo | null
   usedPct: number
   scanning: boolean
@@ -764,6 +853,9 @@ function DashboardView(props: {
   unusedDays: number
   limited: boolean
   scanFailed: boolean
+  isPro: boolean
+  forecast: HeadroomForecastStatus
+  alert: LowDiskAlertSettings
   onScan: () => void
 }): JSX.Element {
   return (
@@ -775,6 +867,13 @@ function DashboardView(props: {
         </div>
       </div>
       <DiskPanel t={props.t} disk={props.disk} usedPct={props.usedPct} />
+      <ForecastCard
+        t={props.t}
+        locale={props.locale}
+        isPro={props.isPro}
+        forecast={props.forecast}
+        alert={props.alert}
+      />
       {props.limited && (
         <div className="notice">{props.t('dashboard.limited')}</div>
       )}
