@@ -347,7 +347,7 @@ describe('IPC registration', () => {
     call('shell:copy-text', 'hello')
     expect(mocks.writeText).toHaveBeenCalledWith('hello')
 
-    await call('shell:open-external', 'https://github.com/sponsors/nettonucci')
+    await call('shell:open-external', 'https://github.com/sponsors/nettonucci?frequency=one-time')
     await call('shell:open-external', 'https://github.com/nettonucci/diskheadroom')
     await call('shell:open-external', 'https://www.diskheadroom.com/en/pro')
     await call('shell:open-external', 'https://example.com')

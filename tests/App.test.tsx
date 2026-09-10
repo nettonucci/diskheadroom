@@ -943,7 +943,9 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Get Pro' }))
     expect(bridge.openExternal).toHaveBeenCalledWith('https://www.diskheadroom.com/en/pro')
     await user.click(screen.getByRole('button', { name: 'Open GitHub Sponsors' }))
-    expect(bridge.openExternal).toHaveBeenCalledWith('https://github.com/sponsors/nettonucci')
+    expect(bridge.openExternal).toHaveBeenCalledWith(
+      'https://github.com/sponsors/nettonucci?frequency=one-time',
+    )
     await user.click(screen.getByRole('button', { name: /github.com/ }))
     expect(bridge.openExternal).toHaveBeenCalledWith('https://github.com/nettonucci/diskheadroom')
 

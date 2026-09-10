@@ -1,6 +1,7 @@
 import type { Locale } from './i18n'
 
-export const SPONSORS_URL = 'https://github.com/sponsors/nettonucci'
+export const SPONSORS_URL =
+  'https://github.com/sponsors/nettonucci?frequency=one-time'
 export const REPO_URL = 'https://github.com/nettonucci/diskheadroom'
 export const SITE_URL = 'https://www.diskheadroom.com'
 export const APP_NAME = 'Disk Headroom'

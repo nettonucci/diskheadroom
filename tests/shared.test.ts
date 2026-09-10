@@ -146,7 +146,9 @@ describe('shared helpers', () => {
   })
 
   it('allows only HTTPS GitHub and diskheadroom.com hosts', () => {
-    expect(isAllowedExternalUrl('https://github.com/sponsors/nettonucci')).toBe(true)
+    expect(
+      isAllowedExternalUrl('https://github.com/sponsors/nettonucci?frequency=one-time'),
+    ).toBe(true)
     expect(isAllowedExternalUrl('https://www.diskheadroom.com/en/pro')).toBe(true)
     expect(isAllowedExternalUrl('https://diskheadroom.com/pt-BR/pro')).toBe(true)
     expect(isAllowedExternalUrl('http://www.diskheadroom.com/en/pro')).toBe(false)
