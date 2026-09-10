@@ -121,7 +121,6 @@ function ConfirmDialog(props: {
     </div>
   )
 }
-
 // Keeps a button visibly working until its IPC round trip settles.
 function useBusyAction(action: () => Promise<void>): [boolean, () => void] {
   const [busy, setBusy] = useState(false)
@@ -570,7 +569,6 @@ function AppShell(): JSX.Element {
     </div>
   )
 }
-
 function PermissionsView(props: {
   t: Translator
   perms: PermissionStatus | null
@@ -1270,7 +1268,7 @@ function SettingsView(props: {
   const [licenseInvalid, setLicenseInvalid] = useState(false)
   const [activating, setActivating] = useState(false)
   const [tab, setTab] = useState<SettingsTab>(
-    props.settings.setupComplete ? 'donate' : 'permissions'
+    props.settings.setupComplete ? 'pro' : 'permissions'
   )
   const presets = LOW_DISK_ALERT_PRESETS.some(
     (preset) => preset.kind === alert.kind && preset.value === alert.value
@@ -1650,20 +1648,30 @@ function SettingsView(props: {
             >
               {props.t('settings.proBuy')}
             </button>
-            <button className="btn" type="button" onClick={() => setTab('donate')}>
-              {props.t('settings.proDonate')}
-            </button>
           </div>
         </form>
+        <div className="support-actions">
+          <p className="muted">{props.t('donate.description')}</p>
+          <p className="muted">{props.t('donate.body')}</p>
+          <button
+            className="btn"
+            type="button"
+            onClick={() => void window.diskheadroom.openExternal(SPONSORS_URL)}
+          >
+            {props.t('donate.button')}
+          </button>
+          <p className="muted">
+            {props.t('donate.source')}{' '}
+            <button
+              className="btn"
+              type="button"
+              onClick={() => void window.diskheadroom.openExternal(REPO_URL)}
+            >
+              github.com/nettonucci/diskheadroom
+            </button>
+          </p>
+        </div>
       </div>
-      </div>
-      <div
-        role="tabpanel"
-        id="settings-panel-donate"
-        aria-labelledby="settings-tab-donate"
-        hidden={tab !== 'donate'}
-      >
-      <DonateView t={props.t} />
       </div>
       <div
         role="tabpanel"
@@ -1987,34 +1995,5 @@ function DebugView(props: {
         </div>
       </div>
     </section>
-  )
-}
-
-function DonateView(props: { t: Translator }): JSX.Element {
-  const [opening, openSponsors] = useBusyAction(() =>
-    window.diskheadroom.openExternal(SPONSORS_URL)
-  )
-
-  return (
-    <div className="card" id="settings-donate">
-      <h3>{props.t('donate.title')}</h3>
-      <p className="muted">{props.t('donate.description')}</p>
-      <p className="muted">{props.t('donate.body')}</p>
-      <button
-        className={`btn primary${opening ? ' busy' : ''}`}
-        type="button"
-        disabled={opening}
-        onClick={openSponsors}
-      >
-        {opening && <Spinner />}
-        {props.t('donate.button')}
-      </button>
-      <p className="muted">
-        {props.t('donate.source')}{' '}
-        <button className="btn" type="button" onClick={() => void window.diskheadroom.openExternal(REPO_URL)}>
-          github.com/nettonucci/diskheadroom
-        </button>
-      </p>
-    </div>
   )
 }

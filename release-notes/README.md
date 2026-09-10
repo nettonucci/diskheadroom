@@ -35,3 +35,4 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-09-06 | Aba Atualizações em Ajustes | [2026-09-06-aba-updates](./2026-09-06-aba-updates/post.md) |
 | 2026-09-07 | Scan mais rápido, sem travar a janela | [2026-09-07-scan-mais-rapido](./2026-09-07-scan-mais-rapido/post.md) |
 | 2026-09-09 | Pro: previsão local de espaço | [2026-09-09-previsao-headroom-pro](./2026-09-09-previsao-headroom-pro/post.md) |
+| 2026-09-10 | Pro e apoio via GitHub Sponsors | [2026-09-10-pro-github-sponsors](./2026-09-10-pro-github-sponsors/post.md) |

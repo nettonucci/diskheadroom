@@ -8,9 +8,9 @@ export const APP_NAME = 'Disk Headroom'
 const SITE_HOSTS = new Set(['diskheadroom.com', 'www.diskheadroom.com'])
 
 /**
- * Pro checkout lives on the site, where Paddle.js opens the overlay. The app
- * only ever verifies the signed key offline, so no Paddle token, product id, or
- * API secret needs to exist in this repository.
+ * The site handles the GitHub Sponsors purchase and license claim. The app only
+ * ever verifies the signed key offline, so no OAuth token or signing secret
+ * exists in this repository.
  */
 export function proCheckoutUrl(locale: Locale): string {
   return `${SITE_URL}/${locale}/pro`
