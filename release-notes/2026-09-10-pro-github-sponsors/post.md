@@ -1,7 +1,7 @@
 # Pro e apoio em um só lugar
 
 - **Data:** 2026-09-10
-- **Commit / PR:** a definir
+- **Commit / PR:** #77
 - **Tipo:** melhoria de UI
 - **Público:** quem quer apoiar o Disk Headroom ou ativar os recursos Pro
 - **Formato sugerido no Instagram:** carrossel
