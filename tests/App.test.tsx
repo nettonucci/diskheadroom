@@ -806,7 +806,7 @@ describe('App', () => {
     const { unmount } = render(<App />)
     expect(await screen.findByText('Headroom forecast')).toBeInTheDocument()
     expect(screen.getByText(/when free space may hit/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Buy Pro' }))
+    await user.click(screen.getByRole('button', { name: 'Get Pro' }))
     expect(freeBridge.openExternal).toHaveBeenCalledWith('https://www.diskheadroom.com/en/pro')
     expect(screen.queryByText(/About 12 days/)).not.toBeInTheDocument()
 
@@ -827,7 +827,7 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByText(/About 12 days until the low-disk threshold/)).toBeInTheDocument()
     expect(screen.getByText(/Last scan totals/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Buy Pro' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Get Pro' })).not.toBeInTheDocument()
   })
 
   it('updates settings, opens permissions, and opens external links', async () => {
@@ -838,8 +838,9 @@ describe('App', () => {
     await screen.findByText('Reclaim storage')
 
     await user.click(screen.getByRole('button', { name: 'Settings' }))
-    expect(screen.getByRole('tab', { name: 'Donate' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('button', { name: 'Sponsor on GitHub' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Pro' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tab', { name: 'Donate' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open GitHub Sponsors' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: 'Scan' }))
     fireEvent.change(screen.getByDisplayValue('90 days'), { target: { value: '180' } })
@@ -939,11 +940,9 @@ describe('App', () => {
     bridge.activateLicense.mockResolvedValueOnce({ isPro: true })
     await user.click(screen.getByRole('button', { name: 'Activate' }))
     expect(await screen.findByText('Pro is active on this Mac.')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Buy Pro' }))
+    await user.click(screen.getByRole('button', { name: 'Get Pro' }))
     expect(bridge.openExternal).toHaveBeenCalledWith('https://www.diskheadroom.com/en/pro')
-    await user.click(screen.getByRole('button', { name: 'Donate instead' }))
-    expect(await screen.findByRole('button', { name: 'Sponsor on GitHub' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Sponsor on GitHub' }))
+    await user.click(screen.getByRole('button', { name: 'Open GitHub Sponsors' }))
     expect(bridge.openExternal).toHaveBeenCalledWith('https://github.com/sponsors/nettonucci')
     await user.click(screen.getByRole('button', { name: /github.com/ }))
     expect(bridge.openExternal).toHaveBeenCalledWith('https://github.com/nettonucci/diskheadroom')
@@ -1046,7 +1045,8 @@ describe('App', () => {
     render(<App />)
     await screen.findByText('Reclaim storage')
     act(() => donate?.())
-    expect(await screen.findByText('Keep the lights on')).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Pro' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'Open GitHub Sponsors' })).toBeInTheDocument()
     act(() => scan?.())
     await waitFor(() =>
       expect(bridge.runScan).toHaveBeenCalledWith({

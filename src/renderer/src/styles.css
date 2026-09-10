@@ -832,3 +832,9 @@ select {
 .license-add {
   margin-top: 4px;
 }
+
+.support-actions {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}

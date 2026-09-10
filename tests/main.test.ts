@@ -479,6 +479,9 @@ describe('tray', () => {
     controller.setLocale('pt-BR')
     const menu = mocks.buildFromTemplate.mock.calls.at(-1)?.[0]
     expect(menu[0].label).toBe('Abrir Disk Headroom')
+    expect(menu[3].label).toBe('Pro')
+    menu[3].click()
+    expect(actions.openDonate).toHaveBeenCalled()
     menu[5].click()
     expect(mocks.quit).toHaveBeenCalled()
   })

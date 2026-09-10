@@ -113,10 +113,9 @@ export const NAV: { id: ViewId; label: TranslationKey }[] = [
 ]
 
 export const SETTINGS_TABS = [
-  { id: 'donate', label: 'settings.tab.donate' },
+  { id: 'pro', label: 'settings.tab.pro' },
   { id: 'scan', label: 'settings.tab.scan' },
   { id: 'permissions', label: 'settings.tab.permissions' },
-  { id: 'pro', label: 'settings.tab.pro' },
   { id: 'general', label: 'settings.tab.general' },
   { id: 'updates', label: 'settings.tab.updates' }
 ] as const
@@ -125,7 +124,7 @@ export type SettingsTab = (typeof SETTINGS_TABS)[number]['id']
 export type SettingsSection = 'permissions' | 'donate'
 
 export function tabForSection(section: SettingsSection): SettingsTab {
-  return section
+  return section === 'donate' ? 'pro' : section
 }
 
 // 'debug' is reachable only from the development-only nav button in App.tsx.
