@@ -73,6 +73,10 @@ app.whenReady().then(async () => {
   await capture(firstRun, 'permissions')
   firstRun.destroy()
 
+  const firstRunLight = await openWindow('first-run', HEIGHT, 'light')
+  await capture(firstRunLight, 'permissions-light')
+  firstRunLight.destroy()
+
   const ready = await openWindow('ready')
   await capture(ready, 'scan')
 
@@ -121,6 +125,13 @@ app.whenReady().then(async () => {
   await capture(pro, 'pro')
   pro.destroy()
 
+  const proLight = await openWindow('ready', 900, 'light')
+  await show(proLight, 'settings')
+  await showSettingsTab(proLight, 'Pro')
+  await wait(200)
+  await capture(proLight, 'pro-light')
+  proLight.destroy()
+
   const light = await openWindow('ready', HEIGHT, 'light')
   await capture(light, 'scan-light')
   await show(light, 'settings')
@@ -140,6 +151,14 @@ app.whenReady().then(async () => {
   await capture(results, 'results')
   results.destroy()
 
+  const resultsLight = await openWindow('overview', 900, 'light')
+  await resultsLight.webContents.executeJavaScript(
+    "document.querySelector('.main .row button.btn.primary').click()"
+  )
+  await wait(700)
+  await capture(resultsLight, 'results-light')
+  resultsLight.destroy()
+
   // The opt-in developer groups sit at the bottom of the list. A shorter window
   // scrolled to the end frames them without cutting through a neighbouring card.
   const developer = await openWindow('ready', 700)
@@ -153,6 +172,18 @@ app.whenReady().then(async () => {
   await wait(400)
   await capture(developer, 'developer')
   developer.destroy()
+
+  const developerLight = await openWindow('ready', 700, 'light')
+  await developerLight.webContents.executeJavaScript(
+    "document.querySelector('.main .row button.btn.primary').click()"
+  )
+  await wait(700)
+  await developerLight.webContents.executeJavaScript(
+    "const main = document.querySelector('.main'); main.scrollTop = main.scrollHeight"
+  )
+  await wait(400)
+  await capture(developerLight, 'developer-light')
+  developerLight.destroy()
 
   app.quit()
 })
