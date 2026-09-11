@@ -1944,11 +1944,6 @@ function SettingsView(props: {
     setTab(tabForSection(props.focusSection.id))
   }, [props.focusSection])
 
-  useEffect(() => {
-    if (!props.tourTab) return
-    setTab(props.tourTab)
-  }, [props.tourTab])
-
   const permissions = (
     <PermissionsView
       t={props.t}

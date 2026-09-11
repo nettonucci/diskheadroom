@@ -313,6 +313,56 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
+  it('walks every Settings tab and returns to Settings when the intro tour ends', { timeout: 20_000 }, async () => {
+    window.diskheadroom = api()
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('tab', { name: 'General' }))
+    await user.click(screen.getByRole('button', { name: 'View tour again' }))
+    expect(await screen.findByRole('dialog', { name: 'Find your way around' })).toBeInTheDocument()
+
+    for (let step = 0; step < 5; step += 1) {
+      await user.keyboard('{ArrowRight}')
+    }
+    expect(await screen.findByRole('dialog', { name: 'Five Settings tabs' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Pro' })).toHaveAttribute('aria-selected', 'true')
+
+    // Stepping back out of Settings returns to the dashboard target.
+    await user.keyboard('{ArrowLeft}')
+    expect(await screen.findByRole('dialog', { name: 'Make Disk Headroom yours' })).toBeInTheDocument()
+    await user.keyboard('{ArrowRight}')
+    expect(await screen.findByRole('dialog', { name: 'Five Settings tabs' })).toBeInTheDocument()
+
+    await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}')
+    expect(await screen.findByRole('dialog', { name: 'Choose what to scan' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Scan' })).toHaveAttribute('aria-selected', 'true')
+
+    for (let step = 0; step < 6; step += 1) {
+      await user.keyboard('{ArrowRight}')
+    }
+    expect(await screen.findByRole('dialog', { name: 'System access' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Permissions' })).toHaveAttribute('aria-selected', 'true')
+
+    for (let step = 0; step < 7; step += 1) {
+      await user.keyboard('{ArrowRight}')
+    }
+    expect(await screen.findByRole('dialog', { name: 'Language' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true')
+
+    await user.keyboard('{ArrowRight}')
+    expect(await screen.findByRole('dialog', { name: 'Updates' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Updates' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('Step 23 of 23')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true')
+    )
+  })
+
   it('starts a results tour after the first scan with findings', async () => {
     const bridge = api({
       getSettings: vi.fn().mockResolvedValue({ ...settings, resultsTourComplete: false })
@@ -346,6 +396,57 @@ describe('App', () => {
     )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByText('Review before cleaning')).toBeInTheDocument()
+  })
+
+  it('walks the results tour with the keyboard and finishes on the last step', async () => {
+    const bridge = api({
+      getSettings: vi.fn().mockResolvedValue({ ...settings, resultsTourComplete: false })
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+    expect(
+      await screen.findByRole('dialog', { name: 'Review before anything moves' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus()
+
+    // Tab wraps inside the tooltip so focus never escapes the tour.
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Skip tour' })).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus()
+
+    await user.keyboard('{ArrowRight}')
+    expect(
+      await screen.findByRole('dialog', { name: 'See found and selected space' })
+    ).toBeInTheDocument()
+    await user.keyboard('{ArrowLeft}')
+    expect(
+      await screen.findByRole('dialog', { name: 'Review before anything moves' })
+    ).toBeInTheDocument()
+    // ArrowLeft on the first step has nowhere to go and keeps the tour open.
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.getByText('Step 1 of 6')).toBeInTheDocument()
+
+    // A resized window re-measures the highlighted target.
+    fireEvent(window, new Event('resize'))
+    expect(screen.getByText('Step 1 of 6')).toBeInTheDocument()
+
+    for (let step = 0; step < 5; step += 1) {
+      await user.keyboard('{ArrowRight}')
+    }
+    expect(await screen.findByRole('dialog', { name: 'Confirm before Trash' })).toBeInTheDocument()
+    expect(screen.getByText('Step 6 of 6')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ resultsTourComplete: true })
+      )
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('marks the results tour complete without showing it when the first scan is empty', async () => {
