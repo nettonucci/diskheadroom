@@ -734,6 +734,42 @@ code {
   justify-content: flex-end;
 }
 
+.dialog-backdrop.welcome {
+  z-index: 30;
+}
+
+.dialog.welcome {
+  width: min(480px, 100%);
+}
+
+.dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.dialog-field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dialog-field select {
+  width: 100%;
+}
+
+.dialog-steps {
+  margin: 0 0 18px;
+  padding-left: 1.2em;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.dialog-steps li + li {
+  margin-top: 8px;
+}
+
 .footer-bar {
   position: sticky;
   bottom: 8px;

@@ -37,6 +37,7 @@ import { getForecastStatus, recordDiskSample, recordScanSample } from '../src/ma
 const settings: AppSettings = {
   unusedDays: 90,
   setupComplete: true,
+  preferencesSetupComplete: true,
   locale: 'en',
   appearance: 'system',
   scanCategories: DEFAULT_SCAN_CATEGORIES,

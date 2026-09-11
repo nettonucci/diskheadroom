@@ -242,6 +242,10 @@ export function mergeLaunchAtLogin(input: unknown): boolean {
   return input === true
 }
 
+export function mergePreferencesSetupComplete(input: unknown): boolean {
+  return input === true
+}
+
 export const DEFAULT_NEVER_TOUCH_PATHS: string[] = []
 export const MAX_NEVER_TOUCH_PATHS = 50
 export const DEFAULT_DUPLICATE_FOLDERS: string[] = []

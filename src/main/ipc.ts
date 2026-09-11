@@ -8,6 +8,7 @@ import {
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeNeverTouchPaths,
+  mergePreferencesSetupComplete,
   mergeScanCategories,
   mergeScanReminder,
   isAllowedExternalUrl,
@@ -75,6 +76,7 @@ export function registerIpc(options: IpcOptions): void {
     const normalized: AppSettings = {
       ...next,
       appearance: mergeAppearance(next.appearance),
+      preferencesSetupComplete: mergePreferencesSetupComplete(next.preferencesSetupComplete),
       scanCategories: mergeScanCategories(next.scanCategories),
       largeFileMinBytes: mergeLargeFileMinBytes(next.largeFileMinBytes),
       downloadsMinDays: mergeDownloadsMinDays(next.downloadsMinDays),

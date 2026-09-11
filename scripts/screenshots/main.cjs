@@ -77,6 +77,19 @@ app.whenReady().then(async () => {
   await capture(firstRunLight, 'permissions-light')
   firstRunLight.destroy()
 
+  const welcome = await openWindow('welcome-preferences')
+  await capture(welcome, 'welcome-preferences')
+  await welcome.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.dialog.welcome button')].find((el) => el.textContent === 'Continue')?.click()`
+  )
+  await wait(250)
+  await capture(welcome, 'welcome-preferences-howto')
+  welcome.destroy()
+
+  const welcomeLight = await openWindow('welcome-preferences', HEIGHT, 'light')
+  await capture(welcomeLight, 'welcome-preferences-light')
+  welcomeLight.destroy()
+
   const ready = await openWindow('ready')
   await capture(ready, 'scan')
 
