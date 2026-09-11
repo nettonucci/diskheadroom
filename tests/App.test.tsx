@@ -19,6 +19,7 @@ const settings = {
   unusedDays: 90 as const,
   setupComplete: true,
   preferencesSetupComplete: true,
+  resultsTourComplete: true,
   locale: 'en' as const,
   appearance: 'system' as const,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
@@ -204,7 +205,7 @@ describe('App', () => {
     expect(await screen.findByText('Reclaim storage')).toBeInTheDocument()
   })
 
-  it('asks for appearance and language until the choice is saved', async () => {
+  it('asks for appearance and language until the choice is saved', { timeout: 15_000 }, async () => {
     const bridge = api({
       getSettings: vi.fn().mockResolvedValue({ ...settings, preferencesSetupComplete: false })
     })
@@ -227,9 +228,143 @@ describe('App', () => {
     expect(bridge.setSettings).toHaveBeenCalledWith(
       expect.objectContaining({ preferencesSetupComplete: true })
     )
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Encontre o que precisa' })).toBeInTheDocument()
+    expect(screen.getByText('Etapa 1 de 23')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Veja o espaço disponível' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Antecipe a falta de espaço' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Voltar' }))
+    expect(await screen.findByRole('dialog', { name: 'Veja o espaço disponível' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Inicie uma verificação segura' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Ajuste o Disk Headroom' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Cinco abas em Ajustes' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Pro' })).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Ative o Pro aqui' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Apoie se quiser' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Escolha o que verificar' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Categorias' })).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Arquivos grandes (Pro)' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Acesso do sistema' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Permissões' })).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    expect(await screen.findByRole('dialog', { name: 'Abrir ao iniciar sessão' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Geral' })).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('button', { name: 'Pular tour' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('returns to first-run permissions after skipping and reopens the tour from Settings', async () => {
+    window.diskheadroom = api({
+      getSettings: vi.fn().mockResolvedValue({
+        ...settings,
+        setupComplete: false,
+        preferencesSetupComplete: false
+      })
     })
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Continue' })
+    )
+    await user.click(screen.getByRole('button', { name: 'Got it' }))
+    expect(await screen.findByRole('dialog', { name: 'Find your way around' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Skip tour' }))
+    expect(await screen.findByText('System access')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'General' }))
+    await user.click(screen.getByRole('button', { name: 'View tour again' }))
+    expect(await screen.findByRole('dialog', { name: 'Find your way around' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true')
+    )
+  })
+
+  it('skips a tour target when disk capacity is unavailable', async () => {
+    window.diskheadroom = api({
+      getDiskInfo: vi.fn().mockRejectedValue(new Error('df unavailable')),
+      getSettings: vi.fn().mockResolvedValue({ ...settings, preferencesSetupComplete: false })
+    })
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Continue' }))
+    await user.click(screen.getByRole('button', { name: 'Got it' }))
+    await user.click(await screen.findByRole('button', { name: 'Next' }))
+    expect(
+      await screen.findByRole('dialog', { name: 'Anticipate low disk space' })
+    ).toBeInTheDocument()
+  })
+
+  it('starts a results tour after the first scan with findings', async () => {
+    const bridge = api({
+      getSettings: vi.fn().mockResolvedValue({ ...settings, resultsTourComplete: false })
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+    expect(
+      await screen.findByRole('dialog', { name: 'Review before anything moves' })
+    ).toBeInTheDocument()
+    expect(screen.getByText('Step 1 of 6')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(
+      await screen.findByRole('dialog', { name: 'See found and selected space' })
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(
+      await screen.findByRole('dialog', { name: 'Filter by name or path' })
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(
+      await screen.findByRole('dialog', { name: 'See found and selected space' })
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Skip tour' }))
+    expect(bridge.setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ resultsTourComplete: true })
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('Review before cleaning')).toBeInTheDocument()
+  })
+
+  it('marks the results tour complete without showing it when the first scan is empty', async () => {
+    const bridge = api({
+      getSettings: vi.fn().mockResolvedValue({ ...settings, resultsTourComplete: false }),
+      runScan: vi.fn().mockResolvedValue({ ...result, items: [] })
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Scan this Mac' }))
+    expect(await screen.findByText('Nothing obvious turned up')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(bridge.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ resultsTourComplete: true })
+      )
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('scans, selects groups, rescans and cleans selected items', async () => {

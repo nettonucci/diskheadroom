@@ -15,6 +15,7 @@ let settings = {
   ...sample.settings,
   setupComplete: !firstRun,
   preferencesSetupComplete: mode !== 'welcome-preferences',
+  resultsTourComplete: mode !== 'results-tour',
   appearance: theme === 'light' ? 'light' : 'dark'
 }
 const permissions = firstRun ? sample.permissionsMissing : sample.permissionsGranted

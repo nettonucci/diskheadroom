@@ -157,6 +157,7 @@ describe('settings', () => {
       unusedDays: 90,
       setupComplete: false,
       preferencesSetupComplete: false,
+      resultsTourComplete: false,
       locale: 'pt-BR',
       appearance: 'system',
       scanCategories: DEFAULT_SCAN_CATEGORIES,
@@ -230,7 +231,8 @@ describe('settings', () => {
     mocks.readFile.mockResolvedValue(JSON.stringify({ setupComplete: true, locale: 'en' }))
     await expect(loadSettings()).resolves.toMatchObject({
       setupComplete: true,
-      preferencesSetupComplete: false
+      preferencesSetupComplete: false,
+      resultsTourComplete: false
     })
   })
 
@@ -251,6 +253,7 @@ describe('settings', () => {
       unusedDays: 30 as const,
       setupComplete: true,
       preferencesSetupComplete: true,
+      resultsTourComplete: true,
       locale: 'en' as const,
       appearance: 'system' as const,
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
@@ -292,6 +295,7 @@ describe('settings', () => {
       unusedDays: 30 as const,
       setupComplete: true,
       preferencesSetupComplete: true,
+      resultsTourComplete: true,
       locale: 'en' as const,
       appearance: 'dark' as const,
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },

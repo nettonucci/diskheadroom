@@ -38,3 +38,5 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-09-10 | Pro e apoio via GitHub Sponsors | [2026-09-10-pro-github-sponsors](./2026-09-10-pro-github-sponsors/post.md) |
 | 2026-09-10 | Redesign completo do site | [2026-09-10-redesign-site-positivus](./2026-09-10-redesign-site-positivus/post.md) |
 | 2026-09-11 | Primeira abertura: tema e idioma | [2026-09-11-welcome-tema-idioma](./2026-09-11-welcome-tema-idioma/post.md) |
+| 2026-09-11 | Product tour na primeira abertura | [2026-09-11-product-tour](./2026-09-11-product-tour/post.md) |
+| 2026-09-11 | Tour dos resultados no primeiro scan | [2026-09-11-tour-resultados](./2026-09-11-tour-resultados/post.md) |

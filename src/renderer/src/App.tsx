@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type JSX
+} from 'react'
 import {
   UNUSED_DAY_OPTIONS,
   SCAN_CATEGORY_IDS,
@@ -212,6 +221,459 @@ function WelcomePreferencesDialog(props: {
     </div>
   )
 }
+
+type TourStep = {
+  selector: string
+  title: TranslationKey
+  body: TranslationKey
+  placement: 'right' | 'vertical'
+  view?: ViewId
+  settingsTab?: SettingsTab
+}
+
+const PRODUCT_TOUR_STEPS: TourStep[] = [
+  {
+    selector: '[data-tour="navigation"]',
+    title: 'tour.navigation.title',
+    body: 'tour.navigation.body',
+    placement: 'right',
+    view: 'dashboard'
+  },
+  {
+    selector: '[data-tour="disk"]',
+    title: 'tour.disk.title',
+    body: 'tour.disk.body',
+    placement: 'vertical',
+    view: 'dashboard'
+  },
+  {
+    selector: '[data-tour="forecast"]',
+    title: 'tour.forecast.title',
+    body: 'tour.forecast.body',
+    placement: 'vertical',
+    view: 'dashboard'
+  },
+  {
+    selector: '[data-tour="scan"]',
+    title: 'tour.scan.title',
+    body: 'tour.scan.body',
+    placement: 'vertical',
+    view: 'dashboard'
+  },
+  {
+    selector: '[data-tour="settings"]',
+    title: 'tour.settings.title',
+    body: 'tour.settings.body',
+    placement: 'right',
+    view: 'dashboard'
+  },
+  {
+    selector: '[data-tour="settings-tabs"]',
+    title: 'tour.settings.tabs.title',
+    body: 'tour.settings.tabs.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'pro'
+  },
+  {
+    selector: '[data-tour="settings-pro"]',
+    title: 'tour.settings.pro.title',
+    body: 'tour.settings.pro.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'pro'
+  },
+  {
+    selector: '[data-tour="settings-donate"]',
+    title: 'tour.settings.donate.title',
+    body: 'tour.settings.donate.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'pro'
+  },
+  {
+    selector: '[data-tour="settings-scan-categories"]',
+    title: 'tour.settings.scanCategories.title',
+    body: 'tour.settings.scanCategories.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'scan'
+  },
+  {
+    selector: '[data-tour="settings-large-files"]',
+    title: 'tour.settings.largeFiles.title',
+    body: 'tour.settings.largeFiles.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'scan'
+  },
+  {
+    selector: '[data-tour="settings-downloads"]',
+    title: 'tour.settings.downloads.title',
+    body: 'tour.settings.downloads.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'scan'
+  },
+  {
+    selector: '[data-tour="settings-duplicates"]',
+    title: 'tour.settings.duplicates.title',
+    body: 'tour.settings.duplicates.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'scan'
+  },
+  {
+    selector: '[data-tour="settings-never-touch"]',
+    title: 'tour.settings.neverTouch.title',
+    body: 'tour.settings.neverTouch.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'scan'
+  },
+  {
+    selector: '[data-tour="settings-idle"]',
+    title: 'tour.settings.idle.title',
+    body: 'tour.settings.idle.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'scan'
+  },
+  {
+    selector: '[data-tour="settings-permissions"]',
+    title: 'tour.settings.permissions.title',
+    body: 'tour.settings.permissions.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'permissions'
+  },
+  {
+    selector: '[data-tour="settings-launch-at-login"]',
+    title: 'tour.settings.launchAtLogin.title',
+    body: 'tour.settings.launchAtLogin.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'general'
+  },
+  {
+    selector: '[data-tour="settings-scan-reminder"]',
+    title: 'tour.settings.scanReminder.title',
+    body: 'tour.settings.scanReminder.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'general'
+  },
+  {
+    selector: '[data-tour="settings-low-disk"]',
+    title: 'tour.settings.lowDisk.title',
+    body: 'tour.settings.lowDisk.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'general'
+  },
+  {
+    selector: '[data-tour="settings-appearance"]',
+    title: 'tour.settings.appearance.title',
+    body: 'tour.settings.appearance.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'general'
+  },
+  {
+    selector: '[data-tour="settings-shortcuts"]',
+    title: 'tour.settings.shortcuts.title',
+    body: 'tour.settings.shortcuts.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'general'
+  },
+  {
+    selector: '[data-tour="settings-replay"]',
+    title: 'tour.settings.replay.title',
+    body: 'tour.settings.replay.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'general'
+  },
+  {
+    selector: '[data-tour="settings-language"]',
+    title: 'tour.settings.language.title',
+    body: 'tour.settings.language.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'general'
+  },
+  {
+    selector: '[data-tour="settings-updates"]',
+    title: 'tour.settings.updates.title',
+    body: 'tour.settings.updates.body',
+    placement: 'vertical',
+    view: 'settings',
+    settingsTab: 'updates'
+  }
+]
+
+const RESULTS_TOUR_STEPS: TourStep[] = [
+  {
+    selector: '[data-tour="results-overview"]',
+    title: 'tour.results.overview.title',
+    body: 'tour.results.overview.body',
+    placement: 'vertical'
+  },
+  {
+    selector: '[data-tour="results-summary"]',
+    title: 'tour.results.summary.title',
+    body: 'tour.results.summary.body',
+    placement: 'vertical'
+  },
+  {
+    selector: '[data-tour="results-filter"]',
+    title: 'tour.results.filter.title',
+    body: 'tour.results.filter.body',
+    placement: 'vertical'
+  },
+  {
+    selector: '[data-tour="results-group"]',
+    title: 'tour.results.group.title',
+    body: 'tour.results.group.body',
+    placement: 'vertical'
+  },
+  {
+    selector: '[data-tour="results-item"]',
+    title: 'tour.results.item.title',
+    body: 'tour.results.item.body',
+    placement: 'vertical'
+  },
+  {
+    selector: '[data-tour="results-actions"]',
+    title: 'tour.results.actions.title',
+    body: 'tour.results.actions.body',
+    placement: 'vertical'
+  }
+]
+
+type TourRect = Pick<DOMRect, 'top' | 'right' | 'bottom' | 'left' | 'width' | 'height'>
+
+function visibleTourTarget(selector: string): Element | null {
+  const matches = document.querySelectorAll(selector)
+  for (const element of matches) {
+    if (element.closest('[hidden]')) continue
+    return element
+  }
+  return null
+}
+
+function ProductTour(props: {
+  t: Translator
+  steps: TourStep[]
+  onClose: () => void
+  onPrepareStep?: (step: TourStep) => void
+  layoutKey?: string
+}): JSX.Element {
+  const [stepIndex, setStepIndex] = useState(0)
+  const [targetRect, setTargetRect] = useState<TourRect | null>(null)
+  const actionRef = useRef<HTMLButtonElement>(null)
+  const onCloseRef = useRef(props.onClose)
+  onCloseRef.current = props.onClose
+  const steps = props.steps
+  const step = steps[Math.min(stepIndex, Math.max(0, steps.length - 1))]
+
+  useEffect(() => {
+    if (stepIndex >= steps.length) onCloseRef.current()
+  }, [stepIndex, steps.length])
+
+  const move = useCallback((direction: 1 | -1) => {
+    setStepIndex((current) => {
+      const next = current + direction
+      if (next < 0) return current
+      if (next >= steps.length) {
+        onCloseRef.current()
+        return current
+      }
+      return next
+    })
+  }, [steps.length])
+
+  useLayoutEffect(() => {
+    props.onPrepareStep?.(step)
+  }, [props.onPrepareStep, step])
+
+  useLayoutEffect(() => {
+    let attempts = 0
+    let retry: number | undefined
+    let cancelled = false
+    let didScroll = false
+    function sameRect(current: TourRect | null, rect: DOMRect): boolean {
+      return Boolean(
+        current &&
+          current.top === rect.top &&
+          current.left === rect.left &&
+          current.width === rect.width &&
+          current.height === rect.height
+      )
+    }
+    function measure(scrollToTarget: boolean): void {
+      if (cancelled) return
+      const element = visibleTourTarget(step.selector)
+      if (!element) {
+        attempts += 1
+        if (attempts < 24) {
+          if (retry !== undefined) window.clearTimeout(retry)
+          retry = window.setTimeout(() => measure(true), 16)
+          return
+        }
+        setStepIndex((current) => {
+          if (current >= steps.length - 1) {
+            onCloseRef.current()
+            return current
+          }
+          return current + 1
+        })
+        return
+      }
+      if (scrollToTarget && !didScroll) {
+        didScroll = true
+        element.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+      }
+      const rect = element.getBoundingClientRect()
+      setTargetRect((current) =>
+        sameRect(current, rect)
+          ? current
+          : {
+              top: rect.top,
+              right: rect.right,
+              bottom: rect.bottom,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height
+            }
+      )
+    }
+    measure(true)
+    const onRelayout = () => measure(false)
+    window.addEventListener('resize', onRelayout)
+    document.querySelector('.main')?.addEventListener('scroll', onRelayout)
+    return () => {
+      cancelled = true
+      if (retry !== undefined) window.clearTimeout(retry)
+      window.removeEventListener('resize', onRelayout)
+      document.querySelector('.main')?.removeEventListener('scroll', onRelayout)
+    }
+  }, [props.layoutKey, step.selector, stepIndex, steps.length])
+
+  useEffect(() => {
+    actionRef.current?.focus()
+  }, [stepIndex])
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent): void {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        props.onClose()
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        move(1)
+      } else if (event.key === 'ArrowLeft' && stepIndex > 0) {
+        event.preventDefault()
+        move(-1)
+      } else if (event.key === 'Tab') {
+        const buttons = Array.from(
+          document.querySelectorAll<HTMLButtonElement>('.tour-tooltip button:not(:disabled)')
+        )
+        const current = buttons.indexOf(document.activeElement as HTMLButtonElement)
+        if (buttons.length > 0 && event.shiftKey && current <= 0) {
+          event.preventDefault()
+          buttons.at(-1)?.focus()
+        } else if (buttons.length > 0 && !event.shiftKey && current === buttons.length - 1) {
+          event.preventDefault()
+          buttons[0].focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [move, props.onClose, stepIndex])
+
+  const padding = 8
+  const spotlightStyle: CSSProperties | undefined = targetRect
+    ? {
+        top: Math.max(6, targetRect.top - padding),
+        left: Math.max(6, targetRect.left - padding),
+        width: Math.min(window.innerWidth - 12, targetRect.width + padding * 2),
+        height: Math.min(window.innerHeight - 12, targetRect.height + padding * 2)
+      }
+    : undefined
+
+  const tooltipWidth = Math.min(340, window.innerWidth - 32)
+  const tooltipHeight = 260
+  let tooltipTop = 24
+  let tooltipLeft = Math.max(16, (window.innerWidth - tooltipWidth) / 2)
+  if (targetRect) {
+    if (step.placement === 'right') {
+      tooltipTop = Math.min(
+        Math.max(16, targetRect.top),
+        window.innerHeight - tooltipHeight - 16
+      )
+      tooltipLeft = Math.min(targetRect.right + 20, window.innerWidth - tooltipWidth - 16)
+    } else {
+      const fitsBelow = targetRect.bottom + tooltipHeight + 20 < window.innerHeight
+      tooltipTop = fitsBelow
+        ? targetRect.bottom + 16
+        : Math.max(16, targetRect.top - tooltipHeight - 16)
+      tooltipLeft = Math.min(
+        Math.max(16, targetRect.left + (targetRect.width - tooltipWidth) / 2),
+        window.innerWidth - tooltipWidth - 16
+      )
+    }
+  }
+
+  const lastStep = stepIndex === steps.length - 1
+  return (
+    <div className="tour-layer" role="presentation">
+      {spotlightStyle && <div className="tour-spotlight" style={spotlightStyle} />}
+      <div
+        className="tour-tooltip"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tour-title"
+        aria-describedby="tour-body"
+        style={{ top: tooltipTop, left: tooltipLeft, width: tooltipWidth }}
+      >
+        <p className="tour-progress" aria-live="polite">
+          {props.t('tour.progress', {
+            current: stepIndex + 1,
+            total: steps.length
+          })}
+        </p>
+        <h3 id="tour-title">{props.t(step.title)}</h3>
+        <p id="tour-body" className="muted">
+          {props.t(step.body)}
+        </p>
+        <div className="tour-actions">
+          <button className="btn" type="button" onClick={props.onClose}>
+            {props.t('tour.skip')}
+          </button>
+          <div className="row">
+            {stepIndex > 0 && (
+              <button className="btn" type="button" onClick={() => move(-1)}>
+                {props.t('tour.back')}
+              </button>
+            )}
+            <button
+              ref={actionRef}
+              className="btn primary"
+              type="button"
+              onClick={() => (lastStep ? props.onClose() : move(1))}
+            >
+              {props.t(lastStep ? 'tour.finish' : 'tour.next')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Keeps a button visibly working until its IPC round trip settles.
 function useBusyAction(action: () => Promise<void>): [boolean, () => void] {
   const [busy, setBusy] = useState(false)
@@ -262,6 +724,9 @@ function AppShell(): JSX.Element {
   const [isPro, setIsPro] = useState(false)
   const [forecast, setForecast] = useState<HeadroomForecastStatus>(gatedForecastStatus)
   const [welcomeStep, setWelcomeStep] = useState<'choose' | 'howto'>('choose')
+  const [tourKind, setTourKind] = useState<'intro' | 'results' | null>(null)
+  const [tourReturnView, setTourReturnView] = useState<ViewId>('dashboard')
+  const [tourSettingsTab, setTourSettingsTab] = useState<SettingsTab | null>(null)
   const bootstrapped = useRef(false)
   const locale = settings?.locale ?? 'en'
   const t = translator(locale)
@@ -350,6 +815,14 @@ function AppShell(): JSX.Element {
       }
       setSelected(initial)
       setView('results')
+      if (!settings.resultsTourComplete) {
+        if (next.items.length > 0) {
+          setTourReturnView('results')
+          setTourKind('results')
+        } else {
+          void updateSettings(() => ({ resultsTourComplete: true }))
+        }
+      }
     } catch {
       setScanFailed(true)
     } finally {
@@ -425,6 +898,42 @@ function AppShell(): JSX.Element {
     await updateSettings(() => ({ preferencesSetupComplete: true }))
   }
 
+  function startProductTour(returnView: ViewId): void {
+    setTourReturnView(returnView)
+    setTourSettingsTab(null)
+    setView('dashboard')
+    setTourKind('intro')
+  }
+
+  async function finishWelcome(): Promise<void> {
+    const returnView = view
+    await markPreferencesSetupDone()
+    startProductTour(returnView)
+  }
+
+  function closeProductTour(): void {
+    const kind = tourKind
+    setTourKind(null)
+    setTourSettingsTab(null)
+    setView(tourReturnView)
+    if (kind === 'results') {
+      void updateSettings(() => ({ resultsTourComplete: true }))
+    }
+  }
+
+  const prepareTourStep = useCallback((step: TourStep): void => {
+    if (step.view) setView(step.view)
+    setTourSettingsTab(step.settingsTab ?? null)
+  }, [])
+
+  function restartProductTourFromSettings(): void {
+    setSettingsSection((current) => ({
+      id: 'general',
+      nonce: (current?.nonce ?? 0) + 1
+    }))
+    startProductTour('settings')
+  }
+
   async function updateScanCategory(id: ScanCategoryFlag, enabled: boolean): Promise<void> {
     await updateSettings((current) => ({
       scanCategories: { ...current.scanCategories, [id]: enabled }
@@ -457,7 +966,7 @@ function AppShell(): JSX.Element {
     function onKey(event: KeyboardEvent): void {
       const action = matchAppShortcut(event)
       if (!action) return
-      if (confirmCleanOpen) return
+      if (confirmCleanOpen || tourKind) return
       if (action === 'scan') {
         event.preventDefault()
         void startScan()
@@ -470,7 +979,7 @@ function AppShell(): JSX.Element {
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [confirmCleanOpen, result, startScan])
+  }, [confirmCleanOpen, result, startScan, tourKind])
 
   function requestClean(): void {
     if (selectedItems.length === 0) return
@@ -526,7 +1035,7 @@ function AppShell(): JSX.Element {
             <p>{t('app.tagline')}</p>
           </div>
         </div>
-        <nav className="nav">
+        <nav className="nav" data-tour="navigation">
           {NAV.map((item) => (
             <button
               key={item.id}
@@ -535,6 +1044,7 @@ function AppShell(): JSX.Element {
               }
               onClick={() => setView(item.id)}
               type="button"
+              data-tour={item.id === 'settings' ? 'settings' : undefined}
             >
               {t(item.label)}
             </button>
@@ -642,6 +1152,8 @@ function AppShell(): JSX.Element {
             onRecheck={refresh}
             onContinue={() => void markSetupDone()}
             focusSection={settingsSection}
+            tourTab={tourKind === 'intro' ? tourSettingsTab : null}
+            onStartTour={restartProductTourFromSettings}
           />
         )}
         {import.meta.env.DEV && view === 'debug' && (
@@ -656,8 +1168,17 @@ function AppShell(): JSX.Element {
           onLocale={(value) => void updateLocale(value)}
           onAppearance={(value) => void updateAppearance(value)}
           onContinue={() => setWelcomeStep('howto')}
-          onDone={() => void markPreferencesSetupDone()}
+          onDone={() => void finishWelcome()}
           step={welcomeStep}
+        />
+      )}
+      {tourKind && (
+        <ProductTour
+          t={t}
+          steps={tourKind === 'results' ? RESULTS_TOUR_STEPS : PRODUCT_TOUR_STEPS}
+          onClose={closeProductTour}
+          onPrepareStep={prepareTourStep}
+          layoutKey={`${view}:${tourSettingsTab ?? ''}`}
         />
       )}
       {confirmCleanOpen && (
@@ -702,7 +1223,7 @@ function PermissionsView(props: {
   }
 
   return (
-    <div id="settings-permissions">
+    <div id="settings-permissions" data-tour="settings-permissions">
       <div className="hero">
         <div>
           <h3>{props.t('permissions.title')}</h3>
@@ -817,7 +1338,7 @@ function DiskPanel(props: {
   const selectedPct = Math.min(props.usedPct, (selectedBytes / disk.totalBytes) * 100)
 
   return (
-    <div className="card disk-panel">
+    <div className="card disk-panel" data-tour="disk">
       <div className="disk-head">
         <div>
           <h3>{props.t('disk.title')}</h3>
@@ -897,7 +1418,7 @@ function ForecastCard(props: {
   const entitled = isProEntitled(props.isPro)
 
   return (
-    <div className="card forecast-card">
+    <div className="card forecast-card" data-tour="forecast">
       <div className="forecast-head">
         <h3>{props.t('forecast.title')}</h3>
         <small className="pro-badge">{props.t('settings.proBadge')}</small>
@@ -995,6 +1516,7 @@ function DashboardView(props: {
           disabled={props.scanning}
           aria-keyshortcuts={APP_SHORTCUTS.scan.aria}
           onClick={props.onScan}
+          data-tour="scan"
         >
           {props.scanning && <Spinner />}
           {props.scanning ? props.t('dashboard.scanning') : props.t('dashboard.scan')}
@@ -1026,6 +1548,7 @@ function ResultItemRow(props: {
   item: ScanItem
   checked: boolean
   keepLocked: boolean
+  tourTarget?: boolean
   onToggle: (item: ScanItem, value: boolean) => void
 }): JSX.Element {
   const { t, item } = props
@@ -1038,7 +1561,7 @@ function ResultItemRow(props: {
   }
 
   return (
-    <div className="item">
+    <div className="item" data-tour={props.tourTarget ? 'results-item' : undefined}>
       <label className="item-select">
         <input
           type="checkbox"
@@ -1128,7 +1651,7 @@ function ResultsView(props: {
 
   return (
     <section>
-      <div className="hero">
+      <div className="hero" data-tour="results-overview">
         <div>
           <h2>{props.t('results.title')}</h2>
           <p>{props.t('results.description')}</p>
@@ -1139,13 +1662,15 @@ function ResultsView(props: {
           </p>
         </div>
       </div>
-      <DiskPanel
-        t={props.t}
-        disk={props.disk}
-        usedPct={props.usedPct}
-        foundBytes={props.foundBytes}
-        selectedBytes={props.selectedBytes}
-      />
+      <div data-tour="results-summary">
+        <DiskPanel
+          t={props.t}
+          disk={props.disk}
+          usedPct={props.usedPct}
+          foundBytes={props.foundBytes}
+          selectedBytes={props.selectedBytes}
+        />
+      </div>
       {props.result.limited && (
         <div className="notice">{props.t('results.limited')}</div>
       )}
@@ -1168,7 +1693,7 @@ function ResultsView(props: {
         </div>
       )}
       {props.result.items.length > 0 && (
-        <div className="results-filter">
+        <div className="results-filter" data-tour="results-filter">
           <input
             ref={filterRef}
             type="search"
@@ -1181,15 +1706,20 @@ function ResultsView(props: {
           <kbd aria-hidden="true">{APP_SHORTCUTS.focusResultsFilter.chord}</kbd>
         </div>
       )}
-      {Array.from(grouped.entries()).map(([categoryId, items]) => {
+      {Array.from(grouped.entries()).map(([categoryId, items], categoryIndex) => {
         // Select/clear group only toggles the rows currently on screen, so a
         // filter cannot silently change hidden items in the same category.
         const ids = items.map((item) => item.id)
         const allOn = categoryExtrasSelected(items, props.selected)
         const bytes = items.reduce((sum, item) => sum + item.bytes, 0)
         const meta = CATEGORY_META[categoryId]
+        const sorted = items.slice().sort((a, b) => b.bytes - a.bytes)
         return (
-          <div className="list-card category" key={categoryId}>
+          <div
+            className="list-card category"
+            key={categoryId}
+            data-tour={categoryIndex === 0 ? 'results-group' : undefined}
+          >
             <div className="category-head">
               <div>
                 <h3>{props.t(meta.title)}</h3>
@@ -1205,20 +1735,18 @@ function ResultsView(props: {
             {CATEGORY_WARNING[categoryId] && (
               <div className="notice">{props.t(CATEGORY_WARNING[categoryId])}</div>
             )}
-            {items
-              .slice()
-              .sort((a, b) => b.bytes - a.bytes)
-              .map((item) => (
-                <ResultItemRow
-                  key={item.id}
-                  t={props.t}
-                  locale={props.locale}
-                  item={item}
-                  checked={Boolean(props.selected[item.id])}
-                  keepLocked={isLastUnselectedDuplicate(item, props.result.items, props.selected)}
-                  onToggle={props.onToggle}
-                />
-              ))}
+            {sorted.map((item, itemIndex) => (
+              <ResultItemRow
+                key={item.id}
+                t={props.t}
+                locale={props.locale}
+                item={item}
+                checked={Boolean(props.selected[item.id])}
+                keepLocked={isLastUnselectedDuplicate(item, props.result.items, props.selected)}
+                tourTarget={categoryIndex === 0 && itemIndex === 0}
+                onToggle={props.onToggle}
+              />
+            ))}
           </div>
         )
       })}
@@ -1234,7 +1762,7 @@ function ResultsView(props: {
           <p className="muted">{props.t('results.filterEmptyHint')}</p>
         </div>
       )}
-      <div className="footer-bar">
+      <div className="footer-bar" data-tour="results-actions">
         <span>
           {props.t(props.selectedCount === 1 ? 'results.selectedOne' : 'results.selectedOther', {
             count: props.selectedCount,
@@ -1273,7 +1801,7 @@ function UpdateSettingsCard(props: { t: Translator }): JSX.Element {
   }
 
   return (
-    <div className="card">
+    <div className="card" data-tour="settings-updates">
       <h3>{props.t('settings.updateTitle')}</h3>
       <p className="muted">{props.t('settings.updateHint')}</p>
       {status && (
@@ -1368,6 +1896,8 @@ function SettingsView(props: {
   onRecheck: () => Promise<void>
   onContinue: () => void
   focusSection: { id: SettingsSection; nonce: number } | null
+  tourTab?: SettingsTab | null
+  onStartTour: () => void
 }): JSX.Element {
   const alert = props.settings.lowDiskAlert
   const reminder = props.settings.scanReminder
@@ -1378,6 +1908,7 @@ function SettingsView(props: {
   const [tab, setTab] = useState<SettingsTab>(
     props.settings.setupComplete ? 'pro' : 'permissions'
   )
+  const activeTab = props.tourTab ?? tab
   const presets = LOW_DISK_ALERT_PRESETS.some(
     (preset) => preset.kind === alert.kind && preset.value === alert.value
   )
@@ -1413,6 +1944,11 @@ function SettingsView(props: {
     setTab(tabForSection(props.focusSection.id))
   }, [props.focusSection])
 
+  useEffect(() => {
+    if (!props.tourTab) return
+    setTab(props.tourTab)
+  }, [props.tourTab])
+
   const permissions = (
     <PermissionsView
       t={props.t}
@@ -1434,7 +1970,12 @@ function SettingsView(props: {
           <p>{props.t('settings.description')}</p>
         </div>
       </div>
-      <div className="settings-tabs" role="tablist" aria-label={props.t('settings.title')}>
+      <div
+        className="settings-tabs"
+        role="tablist"
+        aria-label={props.t('settings.title')}
+        data-tour="settings-tabs"
+      >
         {SETTINGS_TABS.map((item) => (
           <button
             key={item.id}
@@ -1442,7 +1983,7 @@ function SettingsView(props: {
             role="tab"
             id={`settings-tab-${item.id}`}
             aria-controls={`settings-panel-${item.id}`}
-            aria-selected={tab === item.id}
+            aria-selected={activeTab === item.id}
             onClick={() => setTab(item.id)}
           >
             {props.t(item.label)}
@@ -1453,9 +1994,9 @@ function SettingsView(props: {
         role="tabpanel"
         id="settings-panel-scan"
         aria-labelledby="settings-tab-scan"
-        hidden={tab !== 'scan'}
+        hidden={activeTab !== 'scan'}
       >
-      <div className="card">
+      <div className="card" data-tour="settings-scan-categories">
         <h3>{props.t('settings.scanTitle')}</h3>
         <p className="muted">{props.t('settings.scanHint')}</p>
         <div className="scan-flags">
@@ -1475,7 +2016,7 @@ function SettingsView(props: {
           ))}
         </div>
       </div>
-      <div className="card">
+      <div className="card" data-tour="settings-large-files">
         <h3>{props.t('settings.largeFilesTitle')}</h3>
         <p className="muted">{props.t('settings.largeFilesHint')}</p>
         <select
@@ -1501,7 +2042,7 @@ function SettingsView(props: {
           </button>
         )}
       </div>
-      <div className="card">
+      <div className="card" data-tour="settings-downloads">
         <h3>{props.t('settings.downloadsTitle')}</h3>
         <p className="muted">{props.t('settings.downloadsHint')}</p>
         <label className="field-label" htmlFor="downloads-min-age">
@@ -1550,7 +2091,7 @@ function SettingsView(props: {
           </button>
         )}
       </div>
-      <div className="card">
+      <div className="card" data-tour="settings-duplicates">
         <h3>{props.t('settings.duplicateFoldersTitle')}</h3>
         <p className="muted">{props.t('settings.duplicateFoldersHint')}</p>
         <div className="row">
@@ -1612,7 +2153,7 @@ function SettingsView(props: {
           </ul>
         )}
       </div>
-      <div className="card">
+      <div className="card" data-tour="settings-never-touch">
         <h3>{props.t('settings.neverTouchTitle')}</h3>
         <p className="muted">{props.t('settings.neverTouchHint')}</p>
         <form
@@ -1683,7 +2224,7 @@ function SettingsView(props: {
           </ul>
         )}
       </div>
-      <div className="card">
+      <div className="card" data-tour="settings-idle">
         <h3>{props.t('settings.idleTitle')}</h3>
         <p className="muted">{props.t('settings.idleHint')}</p>
         <select
@@ -1702,7 +2243,7 @@ function SettingsView(props: {
         role="tabpanel"
         id="settings-panel-permissions"
         aria-labelledby="settings-tab-permissions"
-        hidden={tab !== 'permissions'}
+        hidden={activeTab !== 'permissions'}
       >
         {permissions}
       </div>
@@ -1710,9 +2251,10 @@ function SettingsView(props: {
         role="tabpanel"
         id="settings-panel-pro"
         aria-labelledby="settings-tab-pro"
-        hidden={tab !== 'pro'}
+        hidden={activeTab !== 'pro'}
       >
       <div className="card">
+        <div data-tour="settings-pro">
         <h3>{props.t('settings.proTitle')}</h3>
         <p className="muted">{props.t('settings.proHint')}</p>
         <p className={props.isPro ? 'pro-status on' : 'pro-status'}>
@@ -1758,7 +2300,8 @@ function SettingsView(props: {
             </button>
           </div>
         </form>
-        <div className="support-actions">
+        </div>
+        <div className="support-actions" data-tour="settings-donate">
           <p className="muted">{props.t('donate.description')}</p>
           <p className="muted">{props.t('donate.body')}</p>
           <button
@@ -1785,9 +2328,9 @@ function SettingsView(props: {
         role="tabpanel"
         id="settings-panel-general"
         aria-labelledby="settings-tab-general"
-        hidden={tab !== 'general'}
+        hidden={activeTab !== 'general'}
       >
-      <div className="card">
+      <div className="card" data-tour="settings-launch-at-login">
         <h3>{props.t('settings.launchAtLoginTitle')}</h3>
         <p className="muted">{props.t('settings.launchAtLoginHint')}</p>
         <label className="scan-flag">
@@ -1799,7 +2342,7 @@ function SettingsView(props: {
           <span>{props.t('settings.launchAtLoginEnable')}</span>
         </label>
       </div>
-      <div className="card">
+      <div className="card" data-tour="settings-scan-reminder">
         <h3>{props.t('settings.scanReminderTitle')}</h3>
         <p className="muted">{props.t('settings.scanReminderHint')}</p>
         <label className="scan-flag">
@@ -1830,7 +2373,7 @@ function SettingsView(props: {
           ))}
         </select>
       </div>
-      <div className="card">
+      <div className="card" data-tour="settings-low-disk">
         <h3>{props.t('settings.lowDiskTitle')}</h3>
         <p className="muted">{props.t('settings.lowDiskHint')}</p>
         <label className="scan-flag">
@@ -1863,7 +2406,7 @@ function SettingsView(props: {
           ))}
         </select>
       </div>
-      <div className="card">
+      <div className="card" data-tour="settings-appearance">
         <h3>{props.t('settings.appearanceTitle')}</h3>
         <p className="muted">{props.t('settings.appearanceHint')}</p>
         <select
@@ -1878,7 +2421,7 @@ function SettingsView(props: {
           ))}
         </select>
       </div>
-      <div className="card">
+      <div className="card" data-tour="settings-shortcuts">
         <h3>{props.t('settings.shortcutsTitle')}</h3>
         <p className="muted">{props.t('settings.shortcutsHint')}</p>
         <dl className="shortcut-list">
@@ -1896,7 +2439,14 @@ function SettingsView(props: {
           </div>
         </dl>
       </div>
-      <div className="card">
+      <div className="card" data-tour="settings-replay">
+        <h3>{props.t('settings.tourTitle')}</h3>
+        <p className="muted">{props.t('settings.tourHint')}</p>
+        <button className="btn" type="button" onClick={props.onStartTour}>
+          {props.t('settings.tourStart')}
+        </button>
+      </div>
+      <div className="card" data-tour="settings-language">
         <h3>{props.t('settings.languageTitle')}</h3>
         <p className="muted">{props.t('settings.languageHint')}</p>
         <select
@@ -1915,7 +2465,7 @@ function SettingsView(props: {
         role="tabpanel"
         id="settings-panel-updates"
         aria-labelledby="settings-tab-updates"
-        hidden={tab !== 'updates'}
+        hidden={activeTab !== 'updates'}
       >
         <UpdateSettingsCard t={props.t} />
       </div>

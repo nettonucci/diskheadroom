@@ -121,7 +121,7 @@ export const SETTINGS_TABS = [
 ] as const
 
 export type SettingsTab = (typeof SETTINGS_TABS)[number]['id']
-export type SettingsSection = 'permissions' | 'donate'
+export type SettingsSection = 'permissions' | 'donate' | 'general'
 
 export function tabForSection(section: SettingsSection): SettingsTab {
   return section === 'donate' ? 'pro' : section

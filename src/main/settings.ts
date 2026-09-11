@@ -17,6 +17,7 @@ import {
   mergeLowDiskAlert,
   mergeNeverTouchPaths,
   mergePreferencesSetupComplete,
+  mergeResultsTourComplete,
   mergeScanCategories,
   mergeScanReminder
 } from '../shared/constants'
@@ -30,6 +31,7 @@ const defaults = (): AppSettings => ({
   unusedDays: DEFAULT_UNUSED_DAYS,
   setupComplete: false,
   preferencesSetupComplete: false,
+  resultsTourComplete: false,
   locale: resolveLocale(app.getLocale()),
   appearance: DEFAULT_APPEARANCE,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
@@ -48,6 +50,7 @@ function appSettingsBody(next: AppSettings): AppSettings {
     unusedDays: next.unusedDays,
     setupComplete: next.setupComplete,
     preferencesSetupComplete: next.preferencesSetupComplete,
+    resultsTourComplete: next.resultsTourComplete,
     locale: next.locale,
     appearance: next.appearance,
     scanCategories: next.scanCategories,
@@ -72,6 +75,7 @@ function parseSettings(raw: string): AppSettings {
     locale: data.locale ? resolveLocale(data.locale) : defaults().locale,
     appearance: mergeAppearance(data.appearance),
     preferencesSetupComplete: mergePreferencesSetupComplete(data.preferencesSetupComplete),
+    resultsTourComplete: mergeResultsTourComplete(data.resultsTourComplete),
     scanCategories: mergeScanCategories(data.scanCategories),
     largeFileMinBytes: mergeLargeFileMinBytes(data.largeFileMinBytes),
     downloadsMinDays: mergeDownloadsMinDays(data.downloadsMinDays),

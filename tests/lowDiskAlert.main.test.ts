@@ -46,6 +46,7 @@ const enabled: AppSettings = {
   unusedDays: 90,
   setupComplete: true,
   preferencesSetupComplete: true,
+  resultsTourComplete: true,
   locale: 'en',
   appearance: 'system',
   scanCategories: DEFAULT_SCAN_CATEGORIES,
