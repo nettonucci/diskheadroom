@@ -18,6 +18,7 @@ const granted = {
 const settings = {
   unusedDays: 90 as const,
   setupComplete: true,
+  preferencesSetupComplete: true,
   locale: 'en' as const,
   appearance: 'system' as const,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
@@ -201,6 +202,34 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Continue with limited scan' }))
     expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ setupComplete: true }))
     expect(await screen.findByText('Reclaim storage')).toBeInTheDocument()
+  })
+
+  it('asks for appearance and language until the choice is saved', async () => {
+    const bridge = api({
+      getSettings: vi.fn().mockResolvedValue({ ...settings, preferencesSetupComplete: false })
+    })
+    window.diskheadroom = bridge
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByRole('dialog', { name: 'Appearance and language' })).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Appearance'), 'dark')
+    expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ appearance: 'dark' }))
+    await user.selectOptions(screen.getByLabelText('Language'), 'pt-BR')
+    expect(bridge.setSettings).toHaveBeenCalledWith(expect.objectContaining({ locale: 'pt-BR' }))
+
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByRole('dialog', { name: 'Você pode mudar isso depois' })).toBeInTheDocument()
+    expect(screen.getByText(/Abra Ajustes na barra lateral/)).toBeInTheDocument()
+    expect(screen.getByText(/Abra a aba Geral/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Entendi' }))
+    expect(bridge.setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ preferencesSetupComplete: true })
+    )
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
   })
 
   it('scans, selects groups, rescans and cleans selected items', async () => {

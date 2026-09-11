@@ -93,6 +93,8 @@ export interface GrantTarget {
 export interface AppSettings {
   unusedDays: UnusedDays
   setupComplete: boolean
+  /** First-launch theme/language picker. Missing on older installs → show once. */
+  preferencesSetupComplete: boolean
   locale: Locale
   appearance: Appearance
   scanCategories: ScanCategoryFlags

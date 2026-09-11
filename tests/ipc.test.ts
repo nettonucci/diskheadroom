@@ -131,7 +131,8 @@ describe('IPC registration', () => {
         scanReminder: { enabled: false, intervalDays: 7 },
         neverTouchPaths: [],
         duplicateFolders: [],
-        appearance: 'system'
+        appearance: 'system',
+        preferencesSetupComplete: false
       })
     )
     expect(mocks.saveSettings).toHaveBeenCalledWith(saved)

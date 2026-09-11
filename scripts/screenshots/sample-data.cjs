@@ -131,6 +131,7 @@ module.exports = {
   settings: {
     unusedDays: 90,
     setupComplete: true,
+    preferencesSetupComplete: true,
     locale: 'en',
     appearance: 'dark',
     lowDiskAlert: {

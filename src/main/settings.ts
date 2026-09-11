@@ -16,6 +16,7 @@ import {
   mergeLaunchAtLogin,
   mergeLowDiskAlert,
   mergeNeverTouchPaths,
+  mergePreferencesSetupComplete,
   mergeScanCategories,
   mergeScanReminder
 } from '../shared/constants'
@@ -28,6 +29,7 @@ const filePath = (): string => join(app.getPath('userData'), 'settings.json')
 const defaults = (): AppSettings => ({
   unusedDays: DEFAULT_UNUSED_DAYS,
   setupComplete: false,
+  preferencesSetupComplete: false,
   locale: resolveLocale(app.getLocale()),
   appearance: DEFAULT_APPEARANCE,
   scanCategories: { ...DEFAULT_SCAN_CATEGORIES },
@@ -45,6 +47,7 @@ function appSettingsBody(next: AppSettings): AppSettings {
   return {
     unusedDays: next.unusedDays,
     setupComplete: next.setupComplete,
+    preferencesSetupComplete: next.preferencesSetupComplete,
     locale: next.locale,
     appearance: next.appearance,
     scanCategories: next.scanCategories,
@@ -68,6 +71,7 @@ function parseSettings(raw: string): AppSettings {
     ...data,
     locale: data.locale ? resolveLocale(data.locale) : defaults().locale,
     appearance: mergeAppearance(data.appearance),
+    preferencesSetupComplete: mergePreferencesSetupComplete(data.preferencesSetupComplete),
     scanCategories: mergeScanCategories(data.scanCategories),
     largeFileMinBytes: mergeLargeFileMinBytes(data.largeFileMinBytes),
     downloadsMinDays: mergeDownloadsMinDays(data.downloadsMinDays),

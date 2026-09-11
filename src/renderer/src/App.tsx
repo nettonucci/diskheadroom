@@ -121,6 +121,97 @@ function ConfirmDialog(props: {
     </div>
   )
 }
+
+function WelcomePreferencesDialog(props: {
+  t: Translator
+  locale: Locale
+  appearance: Appearance
+  onLocale: (locale: Locale) => void
+  onAppearance: (appearance: Appearance) => void
+  onContinue: () => void
+  onDone: () => void
+  step: 'choose' | 'howto'
+}): JSX.Element {
+  return (
+    <div className="dialog-backdrop welcome" role="presentation">
+      <div
+        className="dialog welcome"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="welcome-preferences-title"
+        aria-describedby="welcome-preferences-message"
+      >
+        {props.step === 'choose' ? (
+          <>
+            <h3 id="welcome-preferences-title">{props.t('welcome.preferences.title')}</h3>
+            <p id="welcome-preferences-message" className="muted">
+              {props.t('welcome.preferences.subtitle')}
+            </p>
+            <div className="dialog-field">
+              <label htmlFor="welcome-appearance">{props.t('settings.appearanceTitle')}</label>
+              <select
+                id="welcome-appearance"
+                value={props.appearance}
+                onChange={(event) => props.onAppearance(event.target.value as Appearance)}
+              >
+                {APPEARANCE_OPTIONS.map((appearance) => (
+                  <option key={appearance} value={appearance}>
+                    {props.t(`settings.appearance.${appearance}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="dialog-field">
+              <label htmlFor="welcome-locale">{props.t('settings.languageTitle')}</label>
+              <select
+                id="welcome-locale"
+                value={props.locale}
+                onChange={(event) => props.onLocale(event.target.value as Locale)}
+              >
+                {LOCALES.map((locale) => (
+                  <option key={locale} value={locale}>
+                    {LOCALE_NAMES[locale]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="row">
+              <button className="btn primary" type="button" autoFocus onClick={props.onContinue}>
+                {props.t('welcome.preferences.continue')}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3 id="welcome-preferences-title">{props.t('welcome.preferences.doneTitle')}</h3>
+            <p id="welcome-preferences-message" className="muted">
+              {props.t('welcome.preferences.doneIntro')}
+            </p>
+            <ol className="dialog-steps">
+              <li>
+                {props.t('welcome.preferences.step1', { settings: props.t('nav.settings') })}
+              </li>
+              <li>
+                {props.t('welcome.preferences.step2', { general: props.t('settings.tab.general') })}
+              </li>
+              <li>
+                {props.t('welcome.preferences.step3', {
+                  appearance: props.t('settings.appearanceTitle'),
+                  language: props.t('settings.languageTitle')
+                })}
+              </li>
+            </ol>
+            <div className="row">
+              <button className="btn primary" type="button" autoFocus onClick={props.onDone}>
+                {props.t('welcome.preferences.gotIt')}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 // Keeps a button visibly working until its IPC round trip settles.
 function useBusyAction(action: () => Promise<void>): [boolean, () => void] {
   const [busy, setBusy] = useState(false)
@@ -170,6 +261,7 @@ function AppShell(): JSX.Element {
   const [filterFocusNonce, setFilterFocusNonce] = useState(0)
   const [isPro, setIsPro] = useState(false)
   const [forecast, setForecast] = useState<HeadroomForecastStatus>(gatedForecastStatus)
+  const [welcomeStep, setWelcomeStep] = useState<'choose' | 'howto'>('choose')
   const bootstrapped = useRef(false)
   const locale = settings?.locale ?? 'en'
   const t = translator(locale)
@@ -327,6 +419,10 @@ function AppShell(): JSX.Element {
 
   async function updateAppearance(appearance: Appearance): Promise<void> {
     await updateSettings(() => ({ appearance }))
+  }
+
+  async function markPreferencesSetupDone(): Promise<void> {
+    await updateSettings(() => ({ preferencesSetupComplete: true }))
   }
 
   async function updateScanCategory(id: ScanCategoryFlag, enabled: boolean): Promise<void> {
@@ -552,6 +648,18 @@ function AppShell(): JSX.Element {
           <DebugView isPro={isPro} onLicenseChange={setIsPro} />
         )}
       </main>
+      {settings && !settings.preferencesSetupComplete && (
+        <WelcomePreferencesDialog
+          t={t}
+          locale={locale}
+          appearance={settings.appearance}
+          onLocale={(value) => void updateLocale(value)}
+          onAppearance={(value) => void updateAppearance(value)}
+          onContinue={() => setWelcomeStep('howto')}
+          onDone={() => void markPreferencesSetupDone()}
+          step={welcomeStep}
+        />
+      )}
       {confirmCleanOpen && (
         <ConfirmDialog
           title={t('results.confirmTitle')}

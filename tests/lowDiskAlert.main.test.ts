@@ -45,6 +45,7 @@ import { startLowDiskAlertWatcher } from '../src/main/lowDiskAlert'
 const enabled: AppSettings = {
   unusedDays: 90,
   setupComplete: true,
+  preferencesSetupComplete: true,
   locale: 'en',
   appearance: 'system',
   scanCategories: DEFAULT_SCAN_CATEGORIES,

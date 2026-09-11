@@ -14,6 +14,7 @@ const scanResult = mode === 'overview' ? sample.compactScanResult : sample.scanR
 let settings = {
   ...sample.settings,
   setupComplete: !firstRun,
+  preferencesSetupComplete: mode !== 'welcome-preferences',
   appearance: theme === 'light' ? 'light' : 'dark'
 }
 const permissions = firstRun ? sample.permissionsMissing : sample.permissionsGranted

@@ -37,3 +37,4 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-09-09 | Pro: previsão local de espaço | [2026-09-09-previsao-headroom-pro](./2026-09-09-previsao-headroom-pro/post.md) |
 | 2026-09-10 | Pro e apoio via GitHub Sponsors | [2026-09-10-pro-github-sponsors](./2026-09-10-pro-github-sponsors/post.md) |
 | 2026-09-10 | Redesign completo do site | [2026-09-10-redesign-site-positivus](./2026-09-10-redesign-site-positivus/post.md) |
+| 2026-09-11 | Primeira abertura: tema e idioma | [2026-09-11-welcome-tema-idioma](./2026-09-11-welcome-tema-idioma/post.md) |

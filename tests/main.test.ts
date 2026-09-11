@@ -156,6 +156,7 @@ describe('settings', () => {
     await expect(loadSettings()).resolves.toEqual({
       unusedDays: 90,
       setupComplete: false,
+      preferencesSetupComplete: false,
       locale: 'pt-BR',
       appearance: 'system',
       scanCategories: DEFAULT_SCAN_CATEGORIES,
@@ -225,6 +226,14 @@ describe('settings', () => {
     await expect(loadSettings()).resolves.toMatchObject({ setupComplete: true, locale: 'pt-BR' })
   })
 
+  it('asks existing installs for appearance and language when the flag is missing', async () => {
+    mocks.readFile.mockResolvedValue(JSON.stringify({ setupComplete: true, locale: 'en' }))
+    await expect(loadSettings()).resolves.toMatchObject({
+      setupComplete: true,
+      preferencesSetupComplete: false
+    })
+  })
+
   it('strips a fallback license key from settings returned to the renderer', async () => {
     mocks.readFile.mockResolvedValue(
       JSON.stringify({ locale: 'en', licenseKey: 'dh1.should-not-leak' })
@@ -241,6 +250,7 @@ describe('settings', () => {
     const value = {
       unusedDays: 30 as const,
       setupComplete: true,
+      preferencesSetupComplete: true,
       locale: 'en' as const,
       appearance: 'system' as const,
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
@@ -281,6 +291,7 @@ describe('settings', () => {
     const value = {
       unusedDays: 30 as const,
       setupComplete: true,
+      preferencesSetupComplete: true,
       locale: 'en' as const,
       appearance: 'dark' as const,
       scanCategories: { ...DEFAULT_SCAN_CATEGORIES, unusedApps: false },
