@@ -132,6 +132,7 @@ module.exports = {
     unusedDays: 90,
     setupComplete: true,
     preferencesSetupComplete: true,
+    resultsTourComplete: true,
     locale: 'en',
     appearance: 'dark',
     lowDiskAlert: {

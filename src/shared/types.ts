@@ -95,6 +95,8 @@ export interface AppSettings {
   setupComplete: boolean
   /** First-launch theme/language picker. Missing on older installs → show once. */
   preferencesSetupComplete: boolean
+  /** First successful scan with results → walkthrough. Missing on older installs → show once. */
+  resultsTourComplete: boolean
   locale: Locale
   appearance: Appearance
   scanCategories: ScanCategoryFlags

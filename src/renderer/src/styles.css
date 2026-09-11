@@ -770,6 +770,71 @@ code {
   margin-top: 8px;
 }
 
+.tour-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+}
+
+.tour-spotlight {
+  position: fixed;
+  z-index: 1;
+  pointer-events: none;
+  border: 2px solid var(--accent-strong);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px var(--overlay);
+  transition:
+    top 180ms ease,
+    left 180ms ease,
+    width 180ms ease,
+    height 180ms ease;
+}
+
+.tour-tooltip {
+  position: fixed;
+  z-index: 2;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 20px 22px;
+  border: 1px solid var(--dialog-line);
+  border-radius: 16px;
+  background: var(--bg-dialog);
+  box-shadow: var(--dialog-shadow);
+}
+
+.tour-tooltip h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+
+.tour-tooltip .muted {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.tour-progress {
+  margin: 0 0 8px;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tour-actions .row {
+  flex-wrap: nowrap;
+}
+
 .footer-bar {
   position: sticky;
   bottom: 8px;

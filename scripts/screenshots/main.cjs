@@ -84,11 +84,31 @@ app.whenReady().then(async () => {
   )
   await wait(250)
   await capture(welcome, 'welcome-preferences-howto')
+  await welcome.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.dialog.welcome button')].find((el) => el.textContent === 'Got it')?.click()`
+  )
+  await wait(250)
+  await capture(welcome, 'product-tour')
+  for (let i = 0; i < 5; i += 1) {
+    await welcome.webContents.executeJavaScript(
+      `[...document.querySelectorAll('.tour-tooltip button')].find((el) => el.textContent === 'Next')?.click()`
+    )
+    await wait(280)
+  }
+  await capture(welcome, 'product-tour-settings')
   welcome.destroy()
 
   const welcomeLight = await openWindow('welcome-preferences', HEIGHT, 'light')
   await capture(welcomeLight, 'welcome-preferences-light')
   welcomeLight.destroy()
+
+  const resultsTour = await openWindow('results-tour', 900)
+  await resultsTour.webContents.executeJavaScript(
+    "document.querySelector('.main .row button.btn.primary')?.click()"
+  )
+  await wait(700)
+  await capture(resultsTour, 'product-tour-results')
+  resultsTour.destroy()
 
   const ready = await openWindow('ready')
   await capture(ready, 'scan')
