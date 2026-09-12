@@ -41,3 +41,4 @@ Pacotes prontos para postar. Cada pasta tem um `post.md` com dados, legenda e im
 | 2026-09-11 | Product tour na primeira abertura | [2026-09-11-product-tour](./2026-09-11-product-tour/post.md) |
 | 2026-09-11 | Tour dos resultados no primeiro scan | [2026-09-11-tour-resultados](./2026-09-11-tour-resultados/post.md) |
 | 2026-09-11 | Inventário local de fotos e vídeos no iPhone | [2026-09-11-inventario-local-midia](./2026-09-11-inventario-local-midia/post.md) |
+| 2026-09-12 | Vídeos grandes e screenshots no iPhone | [2026-09-12-videos-grandes-screenshots](./2026-09-12-videos-grandes-screenshots/post.md) |
