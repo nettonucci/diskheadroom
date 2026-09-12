@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { hostname } from 'node:os'
 import { BrowserWindow } from 'electron'
 import Bonjour from 'bonjour-service'
@@ -114,7 +115,7 @@ export function createPairingSession(port: number): PairingSession {
     (length) => new Uint8Array(randomBytes(length))
   )
   const token = new Uint8Array(randomBytes(32))
-  const host = hostname().endsWith('.local') ? hostname() : `${hostname()}.local`
+  const host = resolveLocalMdnsHostname()
   const descriptor: PairingDescriptor = {
     version: 1,
     sessionId: randomUUID(),
@@ -126,6 +127,29 @@ export function createPairingSession(port: number): PairingSession {
   }
 
   return { descriptor, secretKey: keyPair.secretKey, token, used: false }
+}
+
+export function resolveLocalMdnsHostname(
+  readLocalHostName: () => string = () =>
+    execFileSync('/usr/sbin/scutil', ['--get', 'LocalHostName'], {
+      encoding: 'utf8'
+    }),
+  systemHostname: string = hostname()
+): string {
+  try {
+    return formatLocalMdnsHostname(readLocalHostName())
+  } catch {
+    return formatLocalMdnsHostname(systemHostname)
+  }
+}
+
+function formatLocalMdnsHostname(value: string): string {
+  const label = value.trim().replace(/\.$/, '').split('.')[0]
+  if (!label || !/^[a-zA-Z0-9-]{1,63}$/.test(label)) {
+    throw new Error('O hostname local do Mac é inválido.')
+  }
+
+  return `${label}.local`
 }
 
 export async function handleClientHello(
