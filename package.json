@@ -6,10 +6,10 @@
   "author": "Netto Nucci",
   "license": "MIT",
   "private": true,
-  "homepage": "https://github.com/nettonucci/diskheadroom",
+  "homepage": "https://github.com/nettonucci/diskheadroom-app-comp",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nettonucci/diskheadroom.git"
+    "url": "git+https://github.com/nettonucci/diskheadroom-app-comp.git"
   },
   "os": [
     "darwin"
