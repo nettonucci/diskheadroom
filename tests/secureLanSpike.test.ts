@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import type { WebSocket } from 'ws'
 import {
   createPairingSession,
-  handleClientHello
+  handleClientHello,
+  resolveLocalMdnsHostname
 } from '../src/main/secureLanSpike'
 import {
   createEphemeralKeyPair,
@@ -15,6 +16,23 @@ import {
 } from '../src/shared/secureLan'
 
 describe('secure LAN spike server', () => {
+  it('uses the macOS LocalHostName for the pairing descriptor', () => {
+    expect(
+      resolveLocalMdnsHostname(() => 'Nettos-MacBook-Pro\n', 'macbookpro.lan')
+    ).toBe('Nettos-MacBook-Pro.local')
+  })
+
+  it('removes the DNS suffix when LocalHostName is unavailable', () => {
+    expect(
+      resolveLocalMdnsHostname(
+        () => {
+          throw new Error('scutil unavailable')
+        },
+        'macbookpro.lan'
+      )
+    ).toBe('macbookpro.local')
+  })
+
   it('accepts one authenticated proof and returns an encrypted response', async () => {
     const session = createPairingSession(43119)
     const client = createEphemeralKeyPair(
