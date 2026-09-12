@@ -194,6 +194,7 @@ Useful scripts:
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Development with live reload |
+| `npm run dev:lan` | Development-only secure LAN spike with Bonjour and an ephemeral pairing QR |
 | `npm run dev:app` | Build and launch detached from the terminal, so macOS evaluates permissions against `Electron.app` |
 | `npm run typecheck` | Main + renderer TypeScript |
 | `npm test` | Run the unit-test suite once |
