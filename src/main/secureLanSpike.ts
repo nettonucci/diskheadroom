@@ -21,6 +21,7 @@ import {
 } from '../shared/secureLan'
 
 const PAIRING_LIFETIME_MS = 2 * 60_000
+export const SECURE_LAN_LISTEN_HOST = '::'
 
 export interface PairingSession {
   descriptor: PairingDescriptor
@@ -36,7 +37,9 @@ export interface SecureLanSpikeController {
 
 export async function startSecureLanSpike(): Promise<SecureLanSpikeController> {
   const webSocketServer = new WebSocketServer({
-    host: '0.0.0.0',
+    // A hostname .local pode resolver primeiro para IPv6 no iOS. O wildcard
+    // IPv6 do macOS também aceita IPv4 mapeado, mantendo o listener dual-stack.
+    host: SECURE_LAN_LISTEN_HOST,
     maxPayload: 1024 * 1024,
     path: '/spike',
     perMessageDeflate: false,
