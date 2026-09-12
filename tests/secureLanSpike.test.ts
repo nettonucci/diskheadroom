@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { WebSocket } from 'ws'
 import {
+  SECURE_LAN_LISTEN_HOST,
   createPairingSession,
   handleClientHello,
   resolveLocalMdnsHostname
@@ -16,6 +17,10 @@ import {
 } from '../src/shared/secureLan'
 
 describe('secure LAN spike server', () => {
+  it('listens on the IPv6 wildcard to accept IPv4 and IPv6 clients', () => {
+    expect(SECURE_LAN_LISTEN_HOST).toBe('::')
+  })
+
   it('uses the macOS LocalHostName for the pairing descriptor', () => {
     expect(
       resolveLocalMdnsHostname(() => 'Nettos-MacBook-Pro\n', 'macbookpro.lan')
