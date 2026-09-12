@@ -9,6 +9,10 @@ import { applyLaunchAtLogin, shouldShowWindowOnLaunch } from './loginItem'
 import { recordDiskSample, recordScanSample } from './headroomForecast'
 import { startLowDiskAlertWatcher } from './lowDiskAlert'
 import { startScanReminderWatcher } from './scanReminder'
+import {
+  startSecureLanSpike,
+  type SecureLanSpikeController
+} from './secureLanSpike'
 import { loadSettings } from './settings'
 import { createTray, type TrayController } from './tray'
 import { startPackagedUpdateCheck } from './updates'
@@ -16,6 +20,7 @@ import { startPackagedUpdateCheck } from './updates'
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
 let trayController: TrayController | null = null
+let secureLanSpike: SecureLanSpikeController | null = null
 let currentAppearance: Appearance = DEFAULT_APPEARANCE
 
 // A development run inherits Electron's bundle name, which then shows up in the
@@ -170,6 +175,9 @@ app.whenReady().then(async () => {
   }
   createWindow(shouldShowWindowOnLaunch())
   applyNativeAppearance(currentAppearance, mainWindow)
+  if (import.meta.env.DEV && process.env['DISKHEADROOM_LAN_SPIKE'] === '1') {
+    secureLanSpike = await startSecureLanSpike()
+  }
   nativeTheme.on('updated', () => {
     applyNativeAppearance(currentAppearance, mainWindow)
   })
@@ -197,6 +205,10 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  if (secureLanSpike) {
+    void secureLanSpike.stop()
+    secureLanSpike = null
+  }
 })
 
 app.on('window-all-closed', () => {
