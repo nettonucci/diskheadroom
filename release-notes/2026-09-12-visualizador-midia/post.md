@@ -1,7 +1,7 @@
 # Conferir a mídia sugerida no iPhone
 
 - **Data:** 2026-09-12
-- **Commit / PR:** diskheadroom-app-mobile #49
+- **Commit / PR:** diskheadroom-app-mobile #52
 - **Tipo:** feat
 - **Público:** pessoas que testam o Disk Headroom no iPhone
 - **Formato sugerido no Instagram:** carrossel
