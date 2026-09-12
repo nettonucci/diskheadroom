@@ -147,7 +147,7 @@ export function decryptFrame(
   if (frame.sessionId !== expectedSessionId) {
     throw new Error('Sessão de pareamento inválida.')
   }
-  if (frame.sequence <= lastSequence) {
+  if (frame.sequence !== lastSequence + 1) {
     throw new Error('Mensagem repetida ou fora de ordem.')
   }
 

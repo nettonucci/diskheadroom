@@ -57,6 +57,8 @@ describe('secure LAN envelope compatibility', () => {
     )
 
     expect(JSON.stringify(frame)).not.toContain(encodeBase64Url(token))
+    expect(JSON.stringify(frame)).not.toContain(requestId)
+    expect(JSON.stringify(frame)).not.toContain('pair.prove')
     expect(decryptFrame(serverKeys.receive, sessionId, 0, frame)).toMatchObject({
       message: { type: 'pair.prove', requestId },
       sequence: 1
@@ -67,7 +69,7 @@ describe('secure LAN envelope compatibility', () => {
     const frame = encryptFrame(
       clientKeys.transmit,
       sessionId,
-      2,
+      1,
       {
         type: 'pair.prove',
         requestId,
@@ -77,8 +79,11 @@ describe('secure LAN envelope compatibility', () => {
       deterministicBytes(121)
     )
 
-    expect(() => decryptFrame(serverKeys.receive, sessionId, 2, frame)).toThrow(
+    expect(() => decryptFrame(serverKeys.receive, sessionId, 1, frame)).toThrow(
       'Mensagem repetida'
+    )
+    expect(() => decryptFrame(serverKeys.receive, sessionId, -1, frame)).toThrow(
+      'fora de ordem'
     )
     expect(() =>
       decryptFrame(

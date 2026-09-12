@@ -36,7 +36,9 @@ export interface SecureLanSpikeController {
 export async function startSecureLanSpike(): Promise<SecureLanSpikeController> {
   const webSocketServer = new WebSocketServer({
     host: '0.0.0.0',
+    maxPayload: 1024 * 1024,
     path: '/spike',
+    perMessageDeflate: false,
     port: 0,
   })
   await waitForListening(webSocketServer)
@@ -47,13 +49,15 @@ export async function startSecureLanSpike(): Promise<SecureLanSpikeController> {
   }
 
   const port = address.port
+  const discoveryId = randomUUID()
   const bonjour = new Bonjour()
   const service = bonjour.publish({
-    name: `Disk Headroom — ${hostname()}`,
+    name: `Disk Headroom ${discoveryId.slice(0, 8)}`,
     type: SECURE_LAN_SERVICE_TYPE,
     protocol: 'tcp',
     port,
     txt: {
+      instance: discoveryId,
       version: '1',
       security: 'x25519-xchacha20poly1305'
     }
@@ -75,7 +79,13 @@ export async function startSecureLanSpike(): Promise<SecureLanSpikeController> {
   }, 5_000)
 
   webSocketServer.on('connection', (socket) => {
+    const handshakeTimeout = setTimeout(
+      () => socket.close(1008, 'handshake timeout'),
+      8_000
+    )
+    socket.once('close', () => clearTimeout(handshakeTimeout))
     socket.once('message', (data, isBinary) => {
+      clearTimeout(handshakeTimeout)
       handleClientHello(socket, data, isBinary, session)
         .then(async (accepted) => {
           if (!accepted) return
